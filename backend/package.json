@@ -13,6 +13,9 @@
     "express": "^4.21.0",
     "jsonwebtoken": "^9.0.2"
   },
+  "prisma": {
+    "seed": "ts-node-dev --transpile-only prisma/seed.ts"
+  },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",

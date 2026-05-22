@@ -1,17 +1,31 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import AdminWorkflow from './pages/AdminWorkflow'
 import Suivi from './pages/Suivi'
+import Layout from './components/Layout'
+
+function isConnecte() {
+  return !!localStorage.getItem('token')
+}
+
+function RoutePrivee() {
+  if (!isConnecte()) return <Navigate to="/login" replace />
+  return <Outlet />
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/admin/workflow" element={<AdminWorkflow />} />
-        <Route path="/suivi" element={<Suivi />} />
+        <Route element={<RoutePrivee />}>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/suivi" element={<Suivi />} />
+            <Route path="/admin/workflow" element={<AdminWorkflow />} />
+          </Route>
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

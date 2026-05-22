@@ -1,70 +1,101 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Warehouse } from 'lucide-react'
 import { post } from '../api/client'
+
+const SITE_SLUG = 'smac-vallery'
 
 export default function Login() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ login: '', motDePasse: '', siteSlug: '' })
+  const [login, setLogin] = useState('')
+  const [motDePasse, setMotDePasse] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError('')
+    setLoading(true)
     try {
-      const data = await post<{ token: string; utilisateur: unknown }>('/auth/login', form)
-      localStorage.setItem('token', data.token)
+      const data = await post<{ token: string; utilisateur: unknown }>('/auth/login', {
+        login,
+        motDePasse,
+        siteSlug: SITE_SLUG
+      })
+      localStorage.setItem('token', data.token as string)
       localStorage.setItem('utilisateur', JSON.stringify(data.utilisateur))
       navigate('/')
     } catch {
-      setError('Identifiants invalides')
+      setError('Identifiants incorrects')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f3f4f6' }}>
-      <form onSubmit={handleSubmit} style={{ background: '#fff', padding: '2rem', borderRadius: '8px', width: '320px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-        <h1 style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>SMAC Core</h1>
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', background: '#f9fafb', padding: '16px'
+    }}>
+      <div style={{ maxWidth: '420px', width: '100%' }}>
 
-        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Site</label>
-        <input
-          value={form.siteSlug}
-          onChange={e => setForm(f => ({ ...f, siteSlug: e.target.value }))}
-          placeholder="ex: smac-rennes"
-          required
-          style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }}
-        />
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: '64px', height: '64px', background: '#2563eb', borderRadius: '12px', marginBottom: '16px'
+          }}>
+            <Warehouse size={32} color="white" />
+          </div>
+          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#111827', marginBottom: '4px' }}>SMAC</h1>
+          <p style={{ color: '#6b7280' }}>Gestion industrielle — Vallery</p>
+        </div>
 
-        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Login</label>
-        <input
-          value={form.login}
-          onChange={e => setForm(f => ({ ...f, login: e.target.value }))}
-          required
-          style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }}
-        />
+        {/* Formulaire */}
+        <div className="card">
+          <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '24px' }}>Connexion</h2>
 
-        <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.875rem' }}>Mot de passe</label>
-        <input
-          type="password"
-          value={form.motDePasse}
-          onChange={e => setForm(f => ({ ...f, motDePasse: e.target.value }))}
-          required
-          style={{ width: '100%', padding: '0.5rem', marginBottom: '1.5rem', border: '1px solid #d1d5db', borderRadius: '4px', boxSizing: 'border-box' }}
-        />
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Identifiant</label>
+              <input
+                value={login}
+                onChange={e => setLogin(e.target.value)}
+                className="form-input"
+                placeholder="admin"
+                required
+                autoFocus
+              />
+            </div>
 
-        {error && <p style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.875rem' }}>{error}</p>}
+            <div className="form-group">
+              <label className="form-label">Mot de passe</label>
+              <input
+                type="password"
+                value={motDePasse}
+                onChange={e => setMotDePasse(e.target.value)}
+                className="form-input"
+                placeholder="••••••••"
+                required
+              />
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{ width: '100%', padding: '0.625rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '1rem' }}
-        >
-          {loading ? 'Connexion...' : 'Se connecter'}
-        </button>
-      </form>
+            {error && (
+              <div style={{
+                background: '#fee2e2', color: '#991b1b',
+                padding: '12px 16px', borderRadius: '8px',
+                fontSize: '14px', marginBottom: '16px'
+              }}>
+                {error}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%' }}>
+              {loading ? 'Connexion...' : 'Se connecter'}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }
