@@ -1,0 +1,13 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  color: #111827;
+  background: #f9fafb;
+}
+
+a { color: #2563eb; }
+
+h1, h2, h3 { margin: 0 0 0.5rem; }

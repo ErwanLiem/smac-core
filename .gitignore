@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+*.local
+
+# Prisma
+backend/src/generated/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

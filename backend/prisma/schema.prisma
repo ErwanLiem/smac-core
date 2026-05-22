@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// --- CORE : Moteur de workflow ---
+
+model Site {
+  id        Int      @id @default(autoincrement())
+  nom       String
+  slug      String   @unique
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  statuts     Statut[]
+  transitions Transition[]
+  roles       Role[]
+  utilisateurs Utilisateur[]
+  articles    Article[]
+}
+
+model Statut {
+  id       Int     @id @default(autoincrement())
+  siteId   Int
+  code     String
+  label    String
+  couleur  String  @default("#6b7280")
+  icone    String?
+  ordre    Int     @default(0)
+  estFinal Boolean @default(false)
+
+  site            Site         @relation(fields: [siteId], references: [id])
+  transitionsFrom Transition[] @relation("TransitionFrom")
+  transitionsTo   Transition[] @relation("TransitionTo")
+  articles        Article[]
+  historiques     HistoriqueStatut[]
+
+  @@unique([siteId, code])
+}
+
+model Transition {
+  id            Int    @id @default(autoincrement())
+  siteId        Int
+  statutFromId  Int
+  statutToId    Int
+  labelBouton   String
+  couleurBouton String @default("#3b82f6")
+  ordre         Int    @default(0)
+
+  site       Site   @relation(fields: [siteId], references: [id])
+  statutFrom Statut @relation("TransitionFrom", fields: [statutFromId], references: [id])
+  statutTo   Statut @relation("TransitionTo", fields: [statutToId], references: [id])
+}
+
+// --- UTILISATEURS & RÔLES ---
+
+model Role {
+  id     Int    @id @default(autoincrement())
+  siteId Int
+  code   String
+  label  String
+
+  site         Site          @relation(fields: [siteId], references: [id])
+  utilisateurs Utilisateur[]
+
+  @@unique([siteId, code])
+}
+
+model Utilisateur {
+  id         Int      @id @default(autoincrement())
+  siteId     Int
+  nom        String
+  prenom     String
+  login      String   @unique
+  motDePasse String
+  roleId     Int
+  actif      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  site Site @relation(fields: [siteId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+}
+
+// --- ARTICLES (machines, terminaux, équipements...) ---
+
+model Article {
+  id           Int      @id @default(autoincrement())
+  siteId       Int
+  reference    String
+  designation  String
+  serialNumber String?
+  statutId     Int
+  metadata     Json?    // champs libres selon le site (n° OR, client, bac...)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  site       Site   @relation(fields: [siteId], references: [id])
+  statut     Statut @relation(fields: [statutId], references: [id])
+  historique HistoriqueStatut[]
+}
+
+model HistoriqueStatut {
+  id          Int      @id @default(autoincrement())
+  articleId   Int
+  statutId    Int
+  commentaire String?
+  userId      Int?
+  createdAt   DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id])
+  statut  Statut  @relation(fields: [statutId], references: [id])
+}
