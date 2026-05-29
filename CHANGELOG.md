@@ -6,6 +6,27 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [0.3.0] - 2026-05-29
+
+### Sécurité
+- Middleware JWT : toutes les routes API sont protégées, seul `/api/auth/login` est public
+- CORS restreint au frontend local (`localhost:5173`) et réseau WiFi local
+- JWT_SECRET fort dans `.env`, suppression du fallback faible en dur
+
+### Ajouté
+- Champs articles configurables par site (`champArticle`, `valeurChamp`) — même philosophie que le workflow
+- Page **Admin Articles** : création, modification, suppression des champs dynamiques
+- Types de champs disponibles : Texte, Nombre, Date, Liste déroulante
+
+### Design
+- Badges statuts : fond coloré léger + point coloré (fini l'arc-en-ciel plein)
+- Boutons d'action : icônes crayon/poubelle à la place des textes
+- Bouton Supprimer : discret par défaut, rouge plein uniquement dans le modal de confirmation
+- Codes techniques : style `monospace` sur fond gris clair
+- Sidebar : section "ADMINISTRATION" renommée "CONFIGURATION"
+
+---
+
 ## [0.2.0] - 2026-05-22
 
 ### Ajouté
