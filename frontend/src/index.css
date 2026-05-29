@@ -210,11 +210,11 @@ body {
   font-size: 12px;
   font-weight: 500;
 }
-.badge-success { background: #d1fae5; color: #065f46; }
-.badge-warning { background: #fed7aa; color: #92400e; }
-.badge-danger  { background: #fee2e2; color: #991b1b; }
-.badge-info    { background: #dbeafe; color: #1e40af; }
-.badge-default { background: #f3f4f6; color: #374151; }
+.badge-success  { background: #d1fae5; color: #065f46; }
+.badge-warning  { background: #fef3c7; color: #92400e; }
+.badge-danger   { background: #fee2e2; color: #991b1b; }
+.badge-info     { background: #dbeafe; color: #1e40af; }
+.badge-default  { background: #f3f4f6; color: #374151; }
 
 /* Form */
 .form-group { margin-bottom: 16px; }

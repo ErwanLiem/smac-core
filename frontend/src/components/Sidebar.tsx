@@ -8,6 +8,9 @@ import {
   LogOut,
   Warehouse,
   Database,
+  Users,
+  Building2,
+  Package,
 } from 'lucide-react'
 import type { Utilisateur } from '../types'
 
@@ -17,6 +20,12 @@ export default function Sidebar() {
   const [expandedSections, setExpandedSections] = useState<string[]>(['ACCUEIL', 'PRODUCTION'])
 
   const utilisateur: Utilisateur | null = JSON.parse(localStorage.getItem('utilisateur') || 'null')
+  const permissions: string[] = utilisateur?.permissions ?? []
+  const isAdmin = utilisateur?.role?.code === 'ADMIN'
+
+  function peutVoir(path: string) {
+    return isAdmin || permissions.includes(path)
+  }
 
   function handleLogout() {
     localStorage.removeItem('token')
@@ -38,6 +47,14 @@ export default function Sidebar() {
       ],
     },
     {
+      title: 'BASE DE DONNÉES',
+      items: [
+        { name: 'Articles', path: '/articles', icon: Package },
+        { name: 'Clients', path: '/clients', icon: Users },
+        { name: 'Plateformes', path: '/plateformes', icon: Building2 },
+      ],
+    },
+    {
       title: 'PRODUCTION',
       items: [
         { name: 'Suivi', path: '/suivi', icon: ClipboardList },
@@ -47,10 +64,17 @@ export default function Sidebar() {
       title: 'CONFIGURATION',
       items: [
         { name: 'Articles', path: '/admin/articles', icon: Database },
+        { name: 'Clients', path: '/admin/clients', icon: Users },
+        { name: 'Plateformes', path: '/admin/plateformes', icon: Building2 },
         { name: 'Workflow', path: '/admin/workflow', icon: Settings },
+        { name: 'Rôles', path: '/admin/roles', icon: Settings },
+        { name: 'Utilisateurs', path: '/admin/utilisateurs', icon: Users },
       ],
     },
-  ]
+  ].map(section => ({
+    ...section,
+    items: section.items.filter(item => peutVoir(item.path))
+  })).filter(section => section.items.length > 0)
 
   return (
     <div className="sidebar">

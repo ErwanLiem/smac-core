@@ -17,13 +17,13 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      const data = await post<{ token: string; utilisateur: unknown }>('/auth/login', {
+      const data = await post<{ token: string; doitChangerMdp: boolean; utilisateur: unknown }>('/auth/login', {
         login,
         motDePasse,
         siteSlug: SITE_SLUG
       })
       localStorage.setItem('token', data.token as string)
-      localStorage.setItem('utilisateur', JSON.stringify(data.utilisateur))
+      localStorage.setItem('utilisateur', JSON.stringify({ ...data.utilisateur as object, doitChangerMdp: data.doitChangerMdp }))
       navigate('/')
     } catch {
       setError('Identifiants incorrects')

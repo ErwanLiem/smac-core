@@ -52,6 +52,88 @@ model valeurChamp {
   @@index([champId], map: "ValeurChamp_champId_fkey")
 }
 
+model client {
+  id        Int                @id @default(autoincrement())
+  siteId    Int
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  site      site               @relation(fields: [siteId], references: [id], map: "Client_siteId_fkey")
+  valeurs   valeurChampClient[]
+
+  @@index([siteId], map: "Client_siteId_fkey")
+}
+
+model champClient {
+  id          Int                @id @default(autoincrement())
+  siteId      Int
+  code        String
+  label       String
+  type        String             @default("TEXT")
+  options     String?            @db.LongText
+  obligatoire Boolean            @default(false)
+  ordre       Int                @default(0)
+  actif       Boolean            @default(true)
+  site        site               @relation(fields: [siteId], references: [id], map: "ChampClient_siteId_fkey")
+  valeurs     valeurChampClient[]
+
+  @@unique([siteId, code], map: "ChampClient_siteId_code_key")
+  @@index([siteId], map: "ChampClient_siteId_fkey")
+}
+
+model valeurChampClient {
+  id       Int         @id @default(autoincrement())
+  clientId Int
+  champId  Int
+  valeur   String?     @db.LongText
+  client   client      @relation(fields: [clientId], references: [id], map: "ValeurChampClient_clientId_fkey")
+  champ    champClient @relation(fields: [champId], references: [id], map: "ValeurChampClient_champId_fkey")
+
+  @@unique([clientId, champId], map: "ValeurChampClient_clientId_champId_key")
+  @@index([clientId], map: "ValeurChampClient_clientId_fkey")
+  @@index([champId], map: "ValeurChampClient_champId_fkey")
+}
+
+model plateforme {
+  id        Int                     @id @default(autoincrement())
+  siteId    Int
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  site      site                    @relation(fields: [siteId], references: [id], map: "Plateforme_siteId_fkey")
+  valeurs   valeurChampPlateforme[]
+
+  @@index([siteId], map: "Plateforme_siteId_fkey")
+}
+
+model champPlateforme {
+  id          Int                     @id @default(autoincrement())
+  siteId      Int
+  code        String
+  label       String
+  type        String                  @default("TEXT")
+  options     String?                 @db.LongText
+  obligatoire Boolean                 @default(false)
+  ordre       Int                     @default(0)
+  actif       Boolean                 @default(true)
+  site        site                    @relation(fields: [siteId], references: [id], map: "ChampPlateforme_siteId_fkey")
+  valeurs     valeurChampPlateforme[]
+
+  @@unique([siteId, code], map: "ChampPlateforme_siteId_code_key")
+  @@index([siteId], map: "ChampPlateforme_siteId_fkey")
+}
+
+model valeurChampPlateforme {
+  id           Int             @id @default(autoincrement())
+  plateformeId Int
+  champId      Int
+  valeur       String?         @db.LongText
+  plateforme   plateforme      @relation(fields: [plateformeId], references: [id], map: "ValeurChampPlateforme_plateformeId_fkey")
+  champ        champPlateforme @relation(fields: [champId], references: [id], map: "ValeurChampPlateforme_champId_fkey")
+
+  @@unique([plateformeId, champId], map: "ValeurChampPlateforme_plateformeId_champId_key")
+  @@index([plateformeId], map: "ValeurChampPlateforme_plateformeId_fkey")
+  @@index([champId], map: "ValeurChampPlateforme_champId_fkey")
+}
+
 model historiquestatut {
   id          Int      @id @default(autoincrement())
   articleId   Int
@@ -67,12 +149,13 @@ model historiquestatut {
 }
 
 model role {
-  id          Int           @id @default(autoincrement())
-  siteId      Int
-  code        String
-  label       String
-  site        site          @relation(fields: [siteId], references: [id], map: "Role_siteId_fkey")
-  utilisateur utilisateur[]
+  id              Int               @id @default(autoincrement())
+  siteId          Int
+  code            String
+  label           String
+  site            site              @relation(fields: [siteId], references: [id], map: "Role_siteId_fkey")
+  utilisateur     utilisateur[]
+  permissions     permissionRole[]
 
   @@unique([siteId, code], map: "Role_siteId_code_key")
 }
@@ -83,12 +166,16 @@ model site {
   slug        String        @unique(map: "Site_slug_key")
   actif       Boolean       @default(true)
   createdAt   DateTime      @default(now())
-  article      article[]
-  role         role[]
-  statut       statut[]
-  transition   transition[]
-  utilisateur  utilisateur[]
-  champArticle champArticle[]
+  article         article[]
+  role            role[]
+  statut          statut[]
+  transition      transition[]
+  utilisateur     utilisateur[]
+  champArticle    champArticle[]
+  client          client[]
+  champClient     champClient[]
+  plateforme      plateforme[]
+  champPlateforme champPlateforme[]
 }
 
 model statut {
@@ -127,18 +214,29 @@ model transition {
 }
 
 model utilisateur {
-  id         Int      @id @default(autoincrement())
-  siteId     Int
-  nom        String
-  prenom     String
-  login      String   @unique(map: "Utilisateur_login_key")
-  motDePasse String
-  roleId     Int
-  actif      Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  role       role     @relation(fields: [roleId], references: [id], map: "Utilisateur_roleId_fkey")
-  site       site     @relation(fields: [siteId], references: [id], map: "Utilisateur_siteId_fkey")
+  id               Int      @id @default(autoincrement())
+  siteId           Int
+  nom              String
+  prenom           String
+  login            String   @unique(map: "Utilisateur_login_key")
+  motDePasse       String
+  roleId           Int
+  actif            Boolean  @default(true)
+  doitChangerMdp   Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  role             role     @relation(fields: [roleId], references: [id], map: "Utilisateur_roleId_fkey")
+  site             site     @relation(fields: [siteId], references: [id], map: "Utilisateur_siteId_fkey")
 
   @@index([roleId], map: "Utilisateur_roleId_fkey")
   @@index([siteId], map: "Utilisateur_siteId_fkey")
+}
+
+model permissionRole {
+  id     Int    @id @default(autoincrement())
+  roleId Int
+  page   String
+  role   role   @relation(fields: [roleId], references: [id], map: "PermissionRole_roleId_fkey")
+
+  @@unique([roleId, page], map: "PermissionRole_roleId_page_key")
+  @@index([roleId], map: "PermissionRole_roleId_fkey")
 }
