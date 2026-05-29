@@ -3,49 +3,138 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// --- CHAMPS ARTICLE ---
+
+export async function getChamps(req: Request, res: Response) {
+  const siteId = Number(req.params.siteId)
+  const champs = await prisma.champArticle.findMany({
+    where: { siteId },
+    orderBy: { ordre: 'asc' }
+  })
+  res.json(champs)
+}
+
+export async function createChamp(req: Request, res: Response) {
+  const siteId = Number(req.params.siteId)
+  const { code, label, type, options, obligatoire, ordre } = req.body
+  const champ = await prisma.champArticle.create({
+    data: { siteId, code, label, type: type ?? 'TEXT', options, obligatoire: obligatoire ?? false, ordre: ordre ?? 0 }
+  })
+  res.json(champ)
+}
+
+export async function updateChamp(req: Request, res: Response) {
+  const id = Number(req.params.id)
+  const { label, type, options, obligatoire, ordre, actif } = req.body
+  const champ = await prisma.champArticle.update({
+    where: { id },
+    data: { label, type, options, obligatoire, ordre, actif }
+  })
+  res.json(champ)
+}
+
+export async function deleteChamp(req: Request, res: Response) {
+  const id = Number(req.params.id)
+  await prisma.valeurChamp.deleteMany({ where: { champId: id } })
+  await prisma.champArticle.delete({ where: { id } })
+  res.json({ ok: true })
+}
+
+// --- ARTICLES ---
+
 export async function getArticles(req: Request, res: Response) {
-  const { statut } = req.query
+  const siteId = Number(req.params.siteId)
   const articles = await prisma.article.findMany({
-    where: {
-      siteId: Number(req.params.siteId),
-      ...(statut ? { statut: { code: String(statut) } } : {})
+    where: { siteId },
+    include: {
+      statut: true,
+      valeurs: { include: { champ: true } }
     },
-    include: { statut: true },
-    orderBy: { updatedAt: 'desc' }
+    orderBy: { createdAt: 'desc' }
   })
   res.json(articles)
 }
 
 export async function getArticleById(req: Request, res: Response) {
+  const id = Number(req.params.id)
   const article = await prisma.article.findUnique({
-    where: { id: Number(req.params.id) },
+    where: { id },
     include: {
       statut: true,
-      historique: { include: { statut: true }, orderBy: { createdAt: 'desc' } }
+      valeurs: { include: { champ: true } },
+      historiquestatut: { include: { statut: true }, orderBy: { createdAt: 'desc' } }
     }
   })
-  if (!article) return res.status(404).json({ error: 'Article non trouvé' })
+  if (!article) return res.status(404).json({ error: 'Article introuvable' })
   res.json(article)
 }
 
 export async function createArticle(req: Request, res: Response) {
-  const { reference, designation, serialNumber, statutId, metadata } = req.body
+  const siteId = Number(req.params.siteId)
+  const { statutId, valeurs } = req.body
+  // valeurs = [{ champId, valeur }]
+
   const article = await prisma.article.create({
-    data: { siteId: Number(req.params.siteId), reference, designation, serialNumber, statutId, metadata },
-    include: { statut: true }
+    data: {
+      siteId,
+      statutId,
+      valeurs: {
+        create: (valeurs ?? []).map((v: { champId: number; valeur: string }) => ({
+          champId: v.champId,
+          valeur: v.valeur
+        }))
+      }
+    },
+    include: {
+      statut: true,
+      valeurs: { include: { champ: true } }
+    }
   })
-  res.status(201).json(article)
+  res.json(article)
+}
+
+export async function updateArticle(req: Request, res: Response) {
+  const id = Number(req.params.id)
+  const { statutId, valeurs } = req.body
+
+  if (valeurs) {
+    for (const v of valeurs as { champId: number; valeur: string }[]) {
+      await prisma.valeurChamp.upsert({
+        where: { articleId_champId: { articleId: id, champId: v.champId } },
+        update: { valeur: v.valeur },
+        create: { articleId: id, champId: v.champId, valeur: v.valeur }
+      })
+    }
+  }
+
+  const article = await prisma.article.update({
+    where: { id },
+    data: { ...(statutId ? { statutId } : {}) },
+    include: {
+      statut: true,
+      valeurs: { include: { champ: true } }
+    }
+  })
+  res.json(article)
+}
+
+export async function deleteArticle(req: Request, res: Response) {
+  const id = Number(req.params.id)
+  await prisma.valeurChamp.deleteMany({ where: { articleId: id } })
+  await prisma.historiquestatut.deleteMany({ where: { articleId: id } })
+  await prisma.article.delete({ where: { id } })
+  res.json({ ok: true })
 }
 
 export async function changerStatut(req: Request, res: Response) {
+  const id = Number(req.params.id)
   const { transitionId, commentaire, userId } = req.body
-  const articleId = Number(req.params.id)
 
   const transition = await prisma.transition.findUnique({ where: { id: transitionId } })
-  if (!transition) return res.status(404).json({ error: 'Transition non trouvée' })
+  if (!transition) return res.status(404).json({ error: 'Transition introuvable' })
 
-  const article = await prisma.article.findUnique({ where: { id: articleId } })
-  if (!article) return res.status(404).json({ error: 'Article non trouvé' })
+  const article = await prisma.article.findUnique({ where: { id } })
+  if (!article) return res.status(404).json({ error: 'Article introuvable' })
 
   if (article.statutId !== transition.statutFromId) {
     return res.status(400).json({ error: 'Transition non applicable depuis le statut actuel' })
@@ -53,12 +142,12 @@ export async function changerStatut(req: Request, res: Response) {
 
   const [updated] = await prisma.$transaction([
     prisma.article.update({
-      where: { id: articleId },
+      where: { id },
       data: { statutId: transition.statutToId },
-      include: { statut: true }
+      include: { statut: true, valeurs: { include: { champ: true } } }
     }),
-    prisma.historiqueStatut.create({
-      data: { articleId, statutId: transition.statutToId, commentaire, userId }
+    prisma.historiquestatut.create({
+      data: { articleId: id, statutId: transition.statutToId, commentaire, userId }
     })
   ])
 

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import AdminWorkflow from './pages/AdminWorkflow'
+import AdminArticles from './pages/AdminArticles'
 import Suivi from './pages/Suivi'
 import Layout from './components/Layout'
 
@@ -24,6 +25,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/suivi" element={<Suivi />} />
             <Route path="/admin/workflow" element={<AdminWorkflow />} />
+            <Route path="/admin/articles" element={<AdminArticles />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

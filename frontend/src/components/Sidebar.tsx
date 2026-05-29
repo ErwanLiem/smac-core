@@ -7,6 +7,7 @@ import {
   ChevronDown,
   LogOut,
   Warehouse,
+  Database,
 } from 'lucide-react'
 import type { Utilisateur } from '../types'
 
@@ -43,8 +44,9 @@ export default function Sidebar() {
       ],
     },
     {
-      title: 'ADMINISTRATION',
+      title: 'CONFIGURATION',
       items: [
+        { name: 'Articles', path: '/admin/articles', icon: Database },
         { name: 'Workflow', path: '/admin/workflow', icon: Settings },
       ],
     },

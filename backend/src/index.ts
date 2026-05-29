@@ -4,17 +4,29 @@ import sitesRouter from './routes/sites'
 import workflowRouter from './routes/workflow'
 import articlesRouter from './routes/articles'
 import authRouter from './routes/auth'
+import { requireAuth } from './middleware/auth'
 
 const app = express()
 const PORT = process.env.PORT || 5000
 
-app.use(cors())
+// CORS restreint au frontend local
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    /^http:\/\/192\.168\.\d+\.\d+:5173$/  // accès réseau local (terminaux WiFi)
+  ],
+  credentials: true
+}))
+
 app.use(express.json())
 
+// Route publique — login uniquement
 app.use('/api/auth', authRouter)
-app.use('/api/sites', sitesRouter)
-app.use('/api/workflow', workflowRouter)
-app.use('/api/articles', articlesRouter)
+
+// Toutes les autres routes nécessitent un token valide
+app.use('/api/sites', requireAuth, sitesRouter)
+app.use('/api/workflow', requireAuth, workflowRouter)
+app.use('/api/articles', requireAuth, articlesRouter)
 
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur http://localhost:${PORT}`)

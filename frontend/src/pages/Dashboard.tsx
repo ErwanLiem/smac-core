@@ -1,5 +1,11 @@
-import { ClipboardList, Settings } from 'lucide-react'
+import { ClipboardList, Settings, Database } from 'lucide-react'
 import { Link } from 'react-router-dom'
+
+const cards = [
+  { to: '/suivi', icon: ClipboardList, color: '#2563eb', bg: '#dbeafe', label: 'Suivi articles', sub: 'Gérer le workflow' },
+  { to: '/admin/articles', icon: Database, color: '#0891b2', bg: '#cffafe', label: 'Base articles', sub: 'Configurer les champs' },
+  { to: '/admin/workflow', icon: Settings, color: '#6b7280', bg: '#f3f4f6', label: 'Admin workflow', sub: 'Statuts & transitions' },
+]
 
 export default function Dashboard() {
   return (
@@ -11,38 +17,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-        <Link to="/suivi" style={{ textDecoration: 'none' }}>
-          <div className="card" style={{ cursor: 'pointer', transition: 'box-shadow 0.2s' }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)')}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ background: '#dbeafe', padding: '10px', borderRadius: '8px' }}>
-                <ClipboardList size={22} color="#2563eb" />
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, color: '#111827' }}>Suivi articles</div>
-                <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>Gérer le workflow</div>
-              </div>
-            </div>
-          </div>
-        </Link>
-
-        <Link to="/admin/workflow" style={{ textDecoration: 'none' }}>
-          <div className="card" style={{ cursor: 'pointer', transition: 'box-shadow 0.2s' }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)')}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ background: '#f3f4f6', padding: '10px', borderRadius: '8px' }}>
-                <Settings size={22} color="#6b7280" />
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, color: '#111827' }}>Admin workflow</div>
-                <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>Configurer statuts & transitions</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+        {cards.map(({ to, icon: Icon, color, bg, label, sub }) => (
+          <Link key={to} to={to} style={{ textDecoration: 'none' }}>
+            <div className="card" style={{ cursor: 'pointer', transition: 'box-shadow 0.15s, border-color 0.15s', marginBottom: 0 }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.07)'; e.currentTarget.style.borderColor = '#d1d5db' }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#e5e7eb' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ background: bg, padding: '10px', borderRadius: '8px', flexShrink: 0 }}>
+                  <Icon size={20} color={color} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, color: '#111827', fontSize: '14px' }}>{label}</div>
+                  <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '2px' }}>{sub}</div>
+                </div>
               </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        ))}
       </div>
     </div>
   )

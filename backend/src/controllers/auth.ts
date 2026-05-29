@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
 const prisma = new PrismaClient()
-const JWT_SECRET = process.env.JWT_SECRET || 'smac-core-secret'
+const JWT_SECRET = process.env.JWT_SECRET!
 
 export async function login(req: Request, res: Response) {
   const { login: loginInput, motDePasse, siteSlug } = req.body

@@ -3,7 +3,6 @@ import { articlesApi } from '../api/articles'
 import { workflowApi } from '../api/workflow'
 import type { Article, Transition } from '../types'
 
-// Récupère le siteId depuis le token stocké (provisoire)
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
   if (!raw) return 1
@@ -30,66 +29,88 @@ export default function Suivi() {
   }
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Suivi articles</h1>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem' }}>
-        <thead>
-          <tr style={{ background: '#f3f4f6' }}>
-            <th style={th}>Référence</th>
-            <th style={th}>Désignation</th>
-            <th style={th}>N° Série</th>
-            <th style={th}>Statut</th>
-            <th style={th}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {articles.map(article => (
-            <tr key={article.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-              <td style={td}>{article.reference}</td>
-              <td style={td}>{article.designation}</td>
-              <td style={td}>{article.serialNumber ?? '—'}</td>
-              <td style={td}>
-                <span style={{
-                  background: article.statut.couleur,
-                  color: '#fff',
-                  padding: '0.2rem 0.6rem',
-                  borderRadius: '12px',
-                  fontSize: '0.8rem'
-                }}>
-                  {article.statut.label}
-                </span>
-              </td>
-              <td style={td}>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  {getTransitionsDisponibles(article).map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => handleTransition(article, t.id)}
-                      style={{
-                        background: t.couleurBouton,
-                        color: '#fff',
-                        border: 'none',
-                        padding: '0.3rem 0.75rem',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem'
-                      }}
-                    >
-                      {t.labelBouton}
-                    </button>
-                  ))}
-                </div>
-              </td>
+    <div>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Suivi articles</h1>
+          <p className="page-subtitle">{articles.length} article{articles.length !== 1 ? 's' : ''} en cours</p>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Référence</th>
+              <th>Désignation</th>
+              <th>N° Série</th>
+              <th>Statut</th>
+              <th>Actions</th>
             </tr>
-          ))}
-          {articles.length === 0 && (
-            <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: '#9ca3af' }}>Aucun article</td></tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {articles.map(article => (
+              <tr key={article.id}>
+                <td style={{ fontWeight: 500 }}>{article.reference}</td>
+                <td>{article.designation}</td>
+                <td style={{ color: '#6b7280', fontFamily: 'monospace', fontSize: '13px' }}>{article.serialNumber ?? '—'}</td>
+                <td>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '3px 10px',
+                    borderRadius: '5px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    background: article.statut.couleur + '1F',
+                    color: article.statut.couleur,
+                    border: `1px solid ${article.statut.couleur}33`,
+                  }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: article.statut.couleur }} />
+                    {article.statut.label}
+                  </span>
+                </td>
+                <td>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {getTransitionsDisponibles(article).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => handleTransition(article, t.id)}
+                        style={{
+                          background: t.couleurBouton + '1F',
+                          color: t.couleurBouton,
+                          border: `1px solid ${t.couleurBouton}33`,
+                          padding: '3px 10px',
+                          borderRadius: '5px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = t.couleurBouton + '30' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = t.couleurBouton + '1F' }}
+                      >
+                        {t.labelBouton}
+                      </button>
+                    ))}
+                    {getTransitionsDisponibles(article).length === 0 && (
+                      <span style={{ color: '#d1d5db', fontSize: '13px' }}>—</span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {articles.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
+                  Aucun article
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
-
-const th: React.CSSProperties = { padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.875rem' }
-const td: React.CSSProperties = { padding: '0.75rem 1rem', fontSize: '0.875rem' }

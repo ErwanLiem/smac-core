@@ -10,19 +10,46 @@ datasource db {
 model article {
   id               Int                @id @default(autoincrement())
   siteId           Int
-  reference        String
-  designation      String
-  serialNumber     String?
   statutId         Int
-  metadata         String?            @db.LongText
   createdAt        DateTime           @default(now())
-  updatedAt        DateTime
+  updatedAt        DateTime           @updatedAt
   site             site               @relation(fields: [siteId], references: [id], map: "Article_siteId_fkey")
   statut           statut             @relation(fields: [statutId], references: [id], map: "Article_statutId_fkey")
   historiquestatut historiquestatut[]
+  valeurs          valeurChamp[]
 
   @@index([siteId], map: "Article_siteId_fkey")
   @@index([statutId], map: "Article_statutId_fkey")
+}
+
+model champArticle {
+  id          Int           @id @default(autoincrement())
+  siteId      Int
+  code        String
+  label       String
+  type        String        @default("TEXT") // TEXT, NUMBER, DATE, SELECT
+  options     String?       @db.LongText     // JSON array pour les SELECT
+  obligatoire Boolean       @default(false)
+  ordre       Int           @default(0)
+  actif       Boolean       @default(true)
+  site        site          @relation(fields: [siteId], references: [id], map: "ChampArticle_siteId_fkey")
+  valeurs     valeurChamp[]
+
+  @@unique([siteId, code], map: "ChampArticle_siteId_code_key")
+  @@index([siteId], map: "ChampArticle_siteId_fkey")
+}
+
+model valeurChamp {
+  id        Int          @id @default(autoincrement())
+  articleId Int
+  champId   Int
+  valeur    String?      @db.LongText
+  article   article      @relation(fields: [articleId], references: [id], map: "ValeurChamp_articleId_fkey")
+  champ     champArticle @relation(fields: [champId], references: [id], map: "ValeurChamp_champId_fkey")
+
+  @@unique([articleId, champId], map: "ValeurChamp_articleId_champId_key")
+  @@index([articleId], map: "ValeurChamp_articleId_fkey")
+  @@index([champId], map: "ValeurChamp_champId_fkey")
 }
 
 model historiquestatut {
@@ -56,11 +83,12 @@ model site {
   slug        String        @unique(map: "Site_slug_key")
   actif       Boolean       @default(true)
   createdAt   DateTime      @default(now())
-  article     article[]
-  role        role[]
-  statut      statut[]
-  transition  transition[]
-  utilisateur utilisateur[]
+  article      article[]
+  role         role[]
+  statut       statut[]
+  transition   transition[]
+  utilisateur  utilisateur[]
+  champArticle champArticle[]
 }
 
 model statut {
