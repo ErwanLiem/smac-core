@@ -6,6 +6,31 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [0.4.0] - 2026-05-29
+
+### Ajouté
+- Bases configurables **Clients** et **Plateformes** — même architecture que les articles (champs dynamiques par site)
+- Pages de visualisation : Articles, Clients, Plateformes (section BASE DE DONNÉES)
+- **Gestion des rôles** : création de rôles avec permissions par page individuelle
+- **Gestion des utilisateurs** : CRUD complet, mot de passe sécurisé généré automatiquement à la création
+- **Réinitialisation de mot de passe** par l'administrateur
+- **Changement de mot de passe obligatoire** au premier login — modal avec règles de sécurité en temps réel
+- **Sidebar filtrée dynamiquement** selon les permissions du rôle connecté
+- L'utilisateur ADMIN a accès à toutes les pages par défaut
+
+### Sécurité
+- Mot de passe généré avec `crypto.randomInt` (12 caractères, majuscule + minuscule + chiffre + spécial)
+- bcrypt avec 12 rounds
+- Nouveau mot de passe soumis à validation : 10 caractères min, majuscule, minuscule, chiffre, caractère spécial
+- Mot de passe affiché une seule fois à la création, jamais stocké en clair
+
+### Technique
+- Composants génériques `BaseAdmin` et `BaseList` pour éviter la duplication de code
+- Flag `doitChangerMdp` sur chaque utilisateur
+- Table `permissionRole` : roleId + page
+
+---
+
 ## [0.3.0] - 2026-05-29
 
 ### Sécurité
