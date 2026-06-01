@@ -24,7 +24,7 @@ SMAC est une **application web** moderne, accessible partout, conçue pour être
 ## Identification des besoins
 
 - Développement d'une base commune facilement réplicable, pour mise en place sur différents sites (MES et WMS)
-- Mise en place d'un tronc commuin permettant le paramétrage complet de l'application (workflow, articles, client, plateforme, etc.)
+- Mise en place d'un tronc commun permettant le paramétrage complet de l'application (workflow, articles, client, plateforme, etc.)
 - Développement de modules fonctionnels spécifique à la plateforme utilisatrice
 - Accès externe pour proactivité avec d'autres plateformes et visibilité client
 - Vision globale de l'activité de production et reporting automatique, prenant en compte plusieurs indicateurs : KPI, SLA, etc.
