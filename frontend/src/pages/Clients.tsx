@@ -7,5 +7,5 @@ function getSiteId(): number {
 }
 
 export default function Clients() {
-  return <BaseList titre="Clients" sousTitre="Base clients" baseUrl="/clients" siteId={getSiteId()} />
+  return <BaseList titre="Clients" sousTitre="Base clients" baseUrl="/clients" siteId={getSiteId()} pagePath="/clients" />
 }

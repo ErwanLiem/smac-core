@@ -34,7 +34,7 @@ export async function login(req: Request, res: Response) {
       prenom: utilisateur.prenom,
       role: utilisateur.role,
       site: utilisateur.site,
-      permissions: utilisateur.role.permissions.map(p => p.page)
+      permissions: utilisateur.role.permissions.map(p => `${p.page}:${p.action}`)
     }
   })
 }

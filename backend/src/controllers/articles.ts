@@ -1,43 +1,45 @@
-import { Request, Response } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
 // --- CHAMPS ARTICLE ---
 
-export async function getChamps(req: Request, res: Response) {
-  const siteId = Number(req.params.siteId)
-  const champs = await prisma.champArticle.findMany({
-    where: { siteId },
-    orderBy: { ordre: 'asc' }
-  })
-  res.json(champs)
+export async function getChamps(req: Request, res: Response, next: NextFunction) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const champs = await prisma.champArticle.findMany({ where: { siteId }, orderBy: { ordre: 'asc' } })
+    res.json(champs)
+  } catch (e) { next(e) }
 }
 
-export async function createChamp(req: Request, res: Response) {
-  const siteId = Number(req.params.siteId)
-  const { code, label, type, options, obligatoire, ordre } = req.body
-  const champ = await prisma.champArticle.create({
-    data: { siteId, code, label, type: type ?? 'TEXT', options, obligatoire: obligatoire ?? false, ordre: ordre ?? 0 }
-  })
-  res.json(champ)
+export async function createChamp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const { code, label, type, options, obligatoire, ordre } = req.body
+    const champ = await prisma.champArticle.create({
+      data: { siteId, code, label, type: type ?? 'TEXT', options, obligatoire: obligatoire ?? false, ordre: ordre ?? 0 }
+    })
+    res.json(champ)
+  } catch (e) { next(e) }
 }
 
-export async function updateChamp(req: Request, res: Response) {
-  const id = Number(req.params.id)
-  const { label, type, options, obligatoire, ordre, actif } = req.body
-  const champ = await prisma.champArticle.update({
-    where: { id },
-    data: { label, type, options, obligatoire, ordre, actif }
-  })
-  res.json(champ)
+export async function updateChamp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id)
+    const { label, type, options, obligatoire, ordre, actif } = req.body
+    const champ = await prisma.champArticle.update({ where: { id }, data: { label, type, options, obligatoire, ordre, actif } })
+    res.json(champ)
+  } catch (e) { next(e) }
 }
 
-export async function deleteChamp(req: Request, res: Response) {
-  const id = Number(req.params.id)
-  await prisma.valeurChamp.deleteMany({ where: { champId: id } })
-  await prisma.champArticle.delete({ where: { id } })
-  res.json({ ok: true })
+export async function deleteChamp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id)
+    await prisma.valeurChamp.deleteMany({ where: { champId: id } })
+    await prisma.champArticle.delete({ where: { id } })
+    res.json({ ok: true })
+  } catch (e) { next(e) }
 }
 
 // --- ARTICLES ---

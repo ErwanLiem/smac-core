@@ -6,16 +6,16 @@ import crypto from 'crypto'
 const prisma = new PrismaClient()
 
 const PAGES_DISPONIBLES = [
-  { path: '/articles',            label: 'Base de données — Articles' },
-  { path: '/clients',             label: 'Base de données — Clients' },
-  { path: '/plateformes',         label: 'Base de données — Plateformes' },
-  { path: '/suivi',               label: 'Production — Suivi' },
-  { path: '/admin/articles',      label: 'Configuration — Articles' },
-  { path: '/admin/clients',       label: 'Configuration — Clients' },
-  { path: '/admin/plateformes',   label: 'Configuration — Plateformes' },
-  { path: '/admin/workflow',      label: 'Configuration — Workflow' },
-  { path: '/admin/roles',         label: 'Configuration — Rôles' },
-  { path: '/admin/utilisateurs',  label: 'Configuration — Utilisateurs' },
+  { path: '/articles',           label: 'Catalogue — Articles',               actions: ['view', 'edit', 'delete'] },
+  { path: '/clients',            label: 'Catalogue — Clients',                actions: ['view', 'edit', 'delete'] },
+  { path: '/plateformes',        label: 'Catalogue — Plateformes',            actions: ['view', 'edit', 'delete'] },
+  { path: '/suivi',              label: 'Production — Suivi',                 actions: ['view'] },
+  { path: '/admin/articles',     label: 'Configuration — Structure articles', actions: ['view'] },
+  { path: '/admin/clients',      label: 'Configuration — Structure clients',  actions: ['view'] },
+  { path: '/admin/plateformes',  label: 'Configuration — Structure plateformes', actions: ['view'] },
+  { path: '/admin/workflow',     label: 'Configuration — Workflow',           actions: ['view'] },
+  { path: '/admin/roles',        label: 'Configuration — Rôles',             actions: ['view'] },
+  { path: '/admin/utilisateurs', label: 'Configuration — Utilisateurs',      actions: ['view'] },
 ]
 
 function genererMotDePasse(): string {
@@ -57,11 +57,11 @@ export async function getRoles(req: Request, res: Response) {
 
 export async function createRole(req: Request, res: Response) {
   const siteId = Number(req.params.siteId)
-  const { code, label, pages } = req.body
+  const { code, label, permissions } = req.body
   const role = await prisma.role.create({
     data: {
       siteId, code, label,
-      permissions: { create: (pages ?? []).map((page: string) => ({ page })) }
+      permissions: { create: (permissions ?? []).map((p: { page: string; action: string }) => ({ page: p.page, action: p.action })) }
     },
     include: { permissions: true }
   })
@@ -70,14 +70,14 @@ export async function createRole(req: Request, res: Response) {
 
 export async function updateRole(req: Request, res: Response) {
   const id = Number(req.params.id)
-  const { label, pages } = req.body
+  const { label, permissions } = req.body
 
   await prisma.permissionRole.deleteMany({ where: { roleId: id } })
   const role = await prisma.role.update({
     where: { id },
     data: {
       label,
-      permissions: { create: (pages ?? []).map((page: string) => ({ page })) }
+      permissions: { create: (permissions ?? []).map((p: { page: string; action: string }) => ({ page: p.page, action: p.action })) }
     },
     include: { permissions: true }
   })

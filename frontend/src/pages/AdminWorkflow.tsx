@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X } from 'lucide-react'
 import { workflowApi } from '../api/workflow'
 import type { Statut, Transition } from '../types'
+import { getPermissions } from '../utils/permissions'
 
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
@@ -41,6 +42,7 @@ function ColorSwatch({ color }: { color: string }) {
 
 export default function AdminWorkflow() {
   const siteId = getSiteId()
+  const { isAdmin } = getPermissions()
   const [statuts, setStatuts] = useState<Statut[]>([])
   const [transitions, setTransitions] = useState<Transition[]>([])
   const [modal, setModal] = useState<{ type: 'deleteStatut' | 'deleteTransition'; id: number } | null>(null)
@@ -122,13 +124,11 @@ export default function AdminWorkflow() {
                 <td><ColorSwatch color={s.couleur} /></td>
                 <td>{s.estFinal ? <span className="badge badge-info">Final</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
                 <td style={{ width: '60px', textAlign: 'right' }}>
-                  <button
-                    className="btn btn-danger btn-icon"
-                    title="Supprimer"
-                    onClick={() => setModal({ type: 'deleteStatut', id: s.id })}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {isAdmin && (
+                    <button className="btn btn-danger btn-icon" title="Supprimer" onClick={() => setModal({ type: 'deleteStatut', id: s.id })}>
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -159,7 +159,7 @@ export default function AdminWorkflow() {
               <input type="checkbox" id="estFinal" checked={newStatut.estFinal} onChange={e => setNewStatut(f => ({ ...f, estFinal: e.target.checked }))} />
               <label htmlFor="estFinal" style={{ fontSize: '13px', color: '#374151' }}>Final</label>
             </div>
-            <button type="submit" className="btn btn-primary">+ Ajouter</button>
+            {isAdmin && <button type="submit" className="btn btn-primary">+ Ajouter</button>}
           </form>
         </div>
       </div>
@@ -196,13 +196,11 @@ export default function AdminWorkflow() {
                   </span>
                 </td>
                 <td style={{ width: '60px', textAlign: 'right' }}>
-                  <button
-                    className="btn btn-danger btn-icon"
-                    title="Supprimer"
-                    onClick={() => setModal({ type: 'deleteTransition', id: t.id })}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {isAdmin && (
+                    <button className="btn btn-danger btn-icon" title="Supprimer" onClick={() => setModal({ type: 'deleteTransition', id: t.id })}>
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -235,7 +233,7 @@ export default function AdminWorkflow() {
               <label className="form-label">Couleur</label>
               <input type="color" value={newTransition.couleurBouton} onChange={e => setNewTransition(f => ({ ...f, couleurBouton: e.target.value }))} style={{ width: '48px', height: '38px', padding: '2px', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer' }} />
             </div>
-            <button type="submit" className="btn btn-primary">+ Ajouter</button>
+            {isAdmin && <button type="submit" className="btn btn-primary">+ Ajouter</button>}
           </form>
         </div>
       </div>

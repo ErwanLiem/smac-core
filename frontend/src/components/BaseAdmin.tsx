@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
+import { getPermissions } from '../utils/permissions'
 
 export type ChampType = 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT'
 
@@ -29,6 +30,8 @@ interface Props {
 }
 
 export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) {
+  const { isAdmin } = getPermissions()
+
   const [champs, setChamps] = useState<Champ[]>([])
   const [form, setForm] = useState(emptyChamp)
   const [editId, setEditId] = useState<number | null>(null)
@@ -117,10 +120,12 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
                     <td>{champ.obligatoire ? <span className="badge badge-info">Oui</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
                     <td><span className={`badge ${champ.actif ? 'badge-success' : 'badge-danger'}`}>{champ.actif ? 'Actif' : 'Inactif'}</span></td>
                     <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button className="btn btn-secondary btn-icon" onClick={() => startEdit(champ)}><Pencil size={14} /></button>
-                        <button className="btn btn-danger btn-icon" onClick={() => setModal({ id: champ.id })}><Trash2 size={14} /></button>
-                      </div>
+                      {isAdmin && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="btn btn-secondary btn-icon" onClick={() => startEdit(champ)}><Pencil size={14} /></button>
+                          <button className="btn btn-danger btn-icon" onClick={() => setModal({ id: champ.id })}><Trash2 size={14} /></button>
+                        </div>
+                      )}
                     </td>
                   </>
                 )}
@@ -154,7 +159,7 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
               <input type="checkbox" id={`${baseUrl}-obligatoire`} checked={form.obligatoire} onChange={e => setForm(f => ({ ...f, obligatoire: e.target.checked }))} />
               <label htmlFor={`${baseUrl}-obligatoire`} style={{ fontSize: '13px', color: '#374151' }}>Obligatoire</label>
             </div>
-            <button type="submit" className="btn btn-primary">+ Ajouter</button>
+            {isAdmin && <button type="submit" className="btn btn-primary">+ Ajouter</button>}
           </form>
         </div>
       </div>

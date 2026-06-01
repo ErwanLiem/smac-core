@@ -235,8 +235,9 @@ model permissionRole {
   id     Int    @id @default(autoincrement())
   roleId Int
   page   String
+  action String @default("view")
   role   role   @relation(fields: [roleId], references: [id], map: "PermissionRole_roleId_fkey")
 
-  @@unique([roleId, page], map: "PermissionRole_roleId_page_key")
+  @@unique([roleId, page, action], map: "PermissionRole_roleId_page_action_key")
   @@index([roleId], map: "PermissionRole_roleId_fkey")
 }

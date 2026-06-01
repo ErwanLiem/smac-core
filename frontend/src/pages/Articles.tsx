@@ -7,5 +7,5 @@ function getSiteId(): number {
 }
 
 export default function Articles() {
-  return <BaseList titre="Articles" sousTitre="Base articles" baseUrl="/articles" siteId={getSiteId()} />
+  return <BaseList titre="Articles" sousTitre="Base articles" baseUrl="/articles" siteId={getSiteId()} pagePath="/articles" />
 }

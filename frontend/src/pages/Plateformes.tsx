@@ -7,5 +7,5 @@ function getSiteId(): number {
 }
 
 export default function Plateformes() {
-  return <BaseList titre="Plateformes" sousTitre="Base plateformes" baseUrl="/plateformes" siteId={getSiteId()} />
+  return <BaseList titre="Plateformes" sousTitre="Base plateformes" baseUrl="/plateformes" siteId={getSiteId()} pagePath="/plateformes" />
 }

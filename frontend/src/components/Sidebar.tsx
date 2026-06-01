@@ -24,7 +24,7 @@ export default function Sidebar() {
   const isAdmin = utilisateur?.role?.code === 'ADMIN'
 
   function peutVoir(path: string) {
-    return isAdmin || permissions.includes(path)
+    return isAdmin || permissions.includes(`${path}:view`)
   }
 
   function handleLogout() {

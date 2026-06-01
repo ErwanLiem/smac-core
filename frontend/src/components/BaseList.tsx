@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2, Plus, X, Check } from 'lucide-react'
+import { Trash2, Plus, X, Check, Pencil } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 
 interface Champ {
@@ -29,14 +29,23 @@ interface Props {
   sousTitre: string
   baseUrl: string
   siteId: number
+  pagePath: string
 }
 
-export default function BaseList({ titre, sousTitre, baseUrl, siteId }: Props) {
+export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }: Props) {
+  const utilisateur = JSON.parse(localStorage.getItem('utilisateur') || 'null')
+  const isAdmin = utilisateur?.role?.code === 'ADMIN'
+  const permissions: string[] = utilisateur?.permissions ?? []
+  const peutEditer  = isAdmin || permissions.includes(`${pagePath}:edit`)
+  const peutSupprimer = isAdmin || permissions.includes(`${pagePath}:delete`)
+  const peutCreer   = isAdmin || permissions.includes(`${pagePath}:edit`)
+
   const [champs, setChamps] = useState<Champ[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [showForm, setShowForm] = useState(false)
   const [formValeurs, setFormValeurs] = useState<Record<number, string>>({})
   const [modal, setModal] = useState<{ id: number } | null>(null)
+  const [editItem, setEditItem] = useState<{ id: number; valeurs: Record<number, string> } | null>(null)
 
   useEffect(() => { reload() }, [siteId])
 
@@ -68,6 +77,21 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId }: Props) {
     reload()
   }
 
+  function openEdit(item: Item) {
+    const valeurs: Record<number, string> = {}
+    item.valeurs.forEach(v => { valeurs[v.champId] = v.valeur ?? '' })
+    setEditItem({ id: item.id, valeurs })
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editItem) return
+    const valeurs = Object.entries(editItem.valeurs).map(([champId, valeur]) => ({ champId: Number(champId), valeur }))
+    await put(`${baseUrl}/${editItem.id}`, { valeurs })
+    setEditItem(null)
+    reload()
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -75,9 +99,11 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId }: Props) {
           <h1 className="page-title">{titre}</h1>
           <p className="page-subtitle">{items.length} enregistrement{items.length !== 1 ? 's' : ''}</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          <Plus size={16} /> Ajouter
-        </button>
+        {peutCreer && (
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            <Plus size={16} /> Ajouter
+          </button>
+        )}
       </div>
 
       {champs.length === 0 ? (
@@ -107,10 +133,17 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId }: Props) {
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>
                     {new Date(item.createdAt).toLocaleDateString('fr-FR')}
                   </td>
-                  <td>
-                    <button className="btn btn-danger btn-icon" onClick={() => setModal({ id: item.id })}>
-                      <Trash2 size={14} />
-                    </button>
+                  <td style={{ display: 'flex', gap: '6px' }}>
+                    {peutEditer && (
+                      <button className="btn btn-secondary btn-icon" onClick={() => openEdit(item)}>
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                    {peutSupprimer && (
+                      <button className="btn btn-danger btn-icon" onClick={() => setModal({ id: item.id })}>
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -148,6 +181,42 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId }: Props) {
               ))}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowForm(false); setFormValeurs({}) }}>Annuler</button>
+                <button type="submit" className="btn btn-primary">Enregistrer</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal édition */}
+      {editItem && (
+        <div className="modal-overlay">
+          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Modifier — {titre}</h3>
+            <form onSubmit={handleEdit}>
+              {champs.map(c => (
+                <div className="form-group" key={c.id}>
+                  <label className="form-label">
+                    {c.label}
+                    {c.obligatoire && <span style={{ color: '#dc2626', marginLeft: '4px' }}>*</span>}
+                  </label>
+                  {c.type === 'DATE' ? (
+                    <input type="date" required={c.obligatoire} className="form-input"
+                      value={editItem.valeurs[c.id] ?? ''}
+                      onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />
+                  ) : c.type === 'NUMBER' ? (
+                    <input type="number" required={c.obligatoire} className="form-input"
+                      value={editItem.valeurs[c.id] ?? ''}
+                      onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />
+                  ) : (
+                    <input type="text" required={c.obligatoire} className="form-input"
+                      value={editItem.valeurs[c.id] ?? ''}
+                      onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />
+                  )}
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setEditItem(null)}>Annuler</button>
                 <button type="submit" className="btn btn-primary">Enregistrer</button>
               </div>
             </form>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
+import { getPermissions } from '../utils/permissions'
 
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
@@ -32,11 +33,13 @@ const emptyChamp = { code: '', label: '', type: 'TEXT' as ChampType, options: ''
 
 export default function AdminArticles() {
   const siteId = getSiteId()
+  const { isAdmin } = getPermissions()
   const [champs, setChamps] = useState<Champ[]>([])
   const [form, setForm] = useState(emptyChamp)
   const [editId, setEditId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<Partial<Champ>>({})
   const [modal, setModal] = useState<{ id: number } | null>(null)
+  const [erreur, setErreur] = useState<string | null>(null)
 
   useEffect(() => { reload() }, [siteId])
 
@@ -47,9 +50,14 @@ export default function AdminArticles() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    await post(`/articles/${siteId}/champs`, form)
-    setForm(emptyChamp)
-    reload()
+    try {
+      setErreur(null)
+      await post(`/articles/${siteId}/champs`, form)
+      setForm(emptyChamp)
+      reload()
+    } catch (e: any) {
+      try { setErreur(JSON.parse(e.message)?.error ?? 'Erreur inconnue') } catch { setErreur('Erreur inconnue') }
+    }
   }
 
   async function handleUpdate(id: number) {
@@ -130,10 +138,12 @@ export default function AdminArticles() {
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button className="btn btn-secondary btn-icon" title="Modifier" onClick={() => startEdit(champ)}><Pencil size={14} /></button>
-                        <button className="btn btn-danger btn-icon" title="Supprimer" onClick={() => setModal({ id: champ.id })}><Trash2 size={14} /></button>
-                      </div>
+                      {isAdmin && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="btn btn-secondary btn-icon" title="Modifier" onClick={() => startEdit(champ)}><Pencil size={14} /></button>
+                          <button className="btn btn-danger btn-icon" title="Supprimer" onClick={() => setModal({ id: champ.id })}><Trash2 size={14} /></button>
+                        </div>
+                      )}
                     </td>
                   </>
                 )}
@@ -168,8 +178,13 @@ export default function AdminArticles() {
               <input type="checkbox" id="obligatoire" checked={form.obligatoire} onChange={e => setForm(f => ({ ...f, obligatoire: e.target.checked }))} />
               <label htmlFor="obligatoire" style={{ fontSize: '13px', color: '#374151' }}>Obligatoire</label>
             </div>
-            <button type="submit" className="btn btn-primary">+ Ajouter</button>
+            {isAdmin && <button type="submit" className="btn btn-primary">+ Ajouter</button>}
           </form>
+          {erreur && (
+            <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#dc2626', fontSize: '13px' }}>
+              ⚠️ {erreur}
+            </div>
+          )}
         </div>
       </div>
 

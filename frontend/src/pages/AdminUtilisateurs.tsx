@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X, RefreshCw, Copy } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
+import { getPermissions } from '../utils/permissions'
 
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
@@ -13,6 +14,7 @@ interface Utilisateur { id: number; nom: string; prenom: string; login: string; 
 
 export default function AdminUtilisateurs() {
   const siteId = getSiteId()
+  const { isAdmin } = getPermissions()
   const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [form, setForm] = useState({ nom: '', prenom: '', login: '', roleId: 0 })
@@ -112,11 +114,13 @@ export default function AdminUtilisateurs() {
                     <td><span className={`badge ${u.actif ? 'badge-success' : 'badge-danger'}`}>{u.actif ? 'Actif' : 'Inactif'}</span></td>
                     <td>{u.doitChangerMdp ? <span className="badge badge-warning">À changer</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button className="btn btn-secondary btn-icon" title="Modifier" onClick={() => { setEditId(u.id); setEditForm({ nom: u.nom, prenom: u.prenom, login: u.login, roleId: u.role?.id, actif: u.actif }) }}><Pencil size={14} /></button>
-                        <button className="btn btn-secondary btn-icon" title="Réinitialiser le mot de passe" onClick={() => handleReinitMdp(u.id)}><RefreshCw size={14} /></button>
-                        <button className="btn btn-danger btn-icon" title="Supprimer" onClick={() => setModal({ type: 'delete', id: u.id })}><Trash2 size={14} /></button>
-                      </div>
+                      {isAdmin && (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="btn btn-secondary btn-icon" title="Modifier" onClick={() => { setEditId(u.id); setEditForm({ nom: u.nom, prenom: u.prenom, login: u.login, roleId: u.role?.id, actif: u.actif }) }}><Pencil size={14} /></button>
+                          <button className="btn btn-secondary btn-icon" title="Réinitialiser le mot de passe" onClick={() => handleReinitMdp(u.id)}><RefreshCw size={14} /></button>
+                          <button className="btn btn-danger btn-icon" title="Supprimer" onClick={() => setModal({ type: 'delete', id: u.id })}><Trash2 size={14} /></button>
+                        </div>
+                      )}
                     </td>
                   </>
                 )}
@@ -148,7 +152,7 @@ export default function AdminUtilisateurs() {
                 {roles.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
             </div>
-            <button type="submit" className="btn btn-primary">+ Créer</button>
+            {isAdmin && <button type="submit" className="btn btn-primary">+ Créer</button>}
           </form>
           <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '10px' }}>Un mot de passe sécurisé sera généré automatiquement et affiché une seule fois.</p>
         </div>
