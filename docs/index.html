@@ -25,13 +25,36 @@
         placeholder: 'Rechercher...',
         noData: 'Aucun résultat',
       },
-      plugins: []
+      markdown: {
+        renderer: {
+          code: function(code, lang) {
+            if (lang === 'mermaid') {
+              return '<div class="mermaid">' + code + '</div>'
+            }
+            return this.origin.code.apply(this, arguments)
+          }
+        }
+      }
     }
   </script>
   <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docsify-mermaid@latest/dist/docsify-mermaid.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-  <script>mermaid.initialize({ startOnLoad: false })</script>
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
+    document.addEventListener('DOMContentLoaded', function() {
+      document.body.addEventListener('rendered.docsify', function() {
+        mermaid.init(undefined, '.mermaid')
+      })
+    })
+    // Hook Docsify pour relancer Mermaid après chaque changement de page
+    window.$docsify.plugins = [
+      function(hook) {
+        hook.doneEach(function() {
+          mermaid.init(undefined, '.mermaid')
+        })
+      }
+    ]
+  </script>
 </body>
 </html>
