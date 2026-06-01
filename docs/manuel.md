@@ -1,6 +1,6 @@
 # Manuel Utilisateur — SMAC
 
-**Version 0.4.0 — Mai 2026**
+**Version 0.5.0 — Juin 2026**
 
 > 📥 [Télécharger le manuel au format Word](SMAC_Manuel_Utilisateur.docx)
 
@@ -136,10 +136,12 @@ La section **CATALOGUE** regroupe les pages de consultation et de saisie des art
 ### 7.1 Articles / Clients / Plateformes
 
 - Le bouton **« + Ajouter »** ouvre un formulaire de saisie avec les champs actifs du site.
-- Le bouton **crayon** permet de modifier un enregistrement existant.
+- Le bouton **crayon** permet de modifier un enregistrement existant — une modal pré-remplie s'ouvre.
 - Le bouton **poubelle** supprime un enregistrement après confirmation.
 
 > ℹ️ Si aucun champ n'est configuré, la page affiche un message vous invitant à passer par la section Configuration avant de saisir des données.
+
+> 🔒 Les boutons Ajouter, Modifier et Supprimer sont visibles uniquement si votre rôle dispose des permissions correspondantes.
 
 ---
 
@@ -153,13 +155,15 @@ Accessible via **CONFIGURATION > Rôles**. Permet de définir les rôles utilisa
 |---|---|
 | Code | Identifiant technique unique (ex : TECHNICIEN) |
 | Label | Nom affiché (ex : Technicien) |
-| Permissions | Cochez chaque page et action (Voir / Modifier / Supprimer) |
+| Permissions | Pour chaque page : cochez les actions autorisées (Voir / Modifier / Supprimer) |
+
+Les permissions sont **granulaires** : un technicien peut par exemple avoir accès à la consultation du catalogue sans pouvoir modifier ou supprimer.
 
 ### 8.2 Modifier un rôle
 
 Cliquez sur l'icône **crayon** pour modifier le label ou les permissions. Les accès sont mis à jour à la prochaine connexion de l'utilisateur.
 
-> ℹ️ Le rôle **ADMIN** a accès à toutes les pages par défaut, quelle que soit la configuration.
+> ℹ️ Le rôle **ADMIN** a accès à toutes les pages et toutes les actions par défaut, quelle que soit la configuration.
 
 ---
 
@@ -212,4 +216,4 @@ En cas d'oubli, l'administrateur peut réinitialiser le mot de passe via le bout
 
 ---
 
-*Document à jour au 29 mai 2026 — Version 0.4.0*
+*Document à jour au 01 juin 2026 — Version 0.5.0*

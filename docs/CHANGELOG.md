@@ -6,6 +6,37 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [0.5.0] - 2026-06-01
+
+### Ajouté
+- **Permissions granulaires** par rôle : actions Voir / Modifier / Supprimer configurables page par page
+- **Bouton Modifier** sur les pages Catalogue (Articles, Clients, Plateformes) — modal pré-remplie
+- **Redirection automatique** vers `/login` en cas de token expiré (401)
+- **Middleware global d'erreurs** backend — gestion propre des doublons (P2002) et enregistrements introuvables (P2025)
+- **Message d'erreur inline** dans les formulaires (ex : code de champ déjà existant)
+- **GitHub Pages avec Docsify** — documentation en ligne accessible publiquement
+- **Manuel utilisateur en Markdown** disponible sur le site de documentation
+- Utilitaire partagé `utils/permissions.ts` pour la gestion des droits dans le frontend
+
+### Design
+- Refonte complète de la sidebar : espacement réduit, fond bleuté, lien actif plein bleu, accordéon (une section à la fois)
+- Harmonisation du design sur toutes les pages : padding, cards, tableaux, formulaires, modals
+- Titre de page avec barre bleue à gauche
+- En-tête tableau bleuté
+- Renommage **BASE DE DONNÉES → CATALOGUE**, sous-sections Configuration préfixées **"Structure"**
+
+### Sécurité
+- Champ `action` ajouté sur `permissionRole` — permissions en format `page:action`
+- Boutons d'action masqués côté frontend selon les permissions du rôle connecté
+- Pages Configuration réservées à l'ADMIN pour toute modification
+
+### Documentation
+- README enrichi : schéma workflow Mermaid, architecture technique, identification des besoins
+- CHANGELOG déplacé dans `docs/`
+- Site de documentation GitHub Pages mis en place (Docsify + Mermaid)
+
+---
+
 ## [0.4.0] - 2026-05-29
 
 ### Ajouté
