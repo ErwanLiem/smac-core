@@ -80,44 +80,6 @@ graph TD
 
 ---
 
-## Modules fonctionnels
-
-```mermaid
-graph LR
-    SMAC["🏭 SMAC"]
-
-    SMAC --> LOG["📦 Logistique"]
-    SMAC --> PROD["🔧 Production"]
-    SMAC --> ADMIN["⚙️ Administration"]
-    SMAC --> COM["💼 Commercial"]
-
-    LOG --> L1["Planning"]
-    LOG --> L2["Transferts"]
-    LOG --> L3["Inventaire / Stock"]
-    LOG --> L4["Entrée stock"]
-    LOG --> L5["Gestion PDA"]
-
-    PROD --> P1["Réparation"]
-    PROD --> P2["PDA Labo"]
-    PROD --> P3["Suivi MAJ"]
-    PROD --> P4["Attente info / firmware"]
-    PROD --> P5["Injection 🚧"]
-    PROD --> P6["Contrôle qualité 🚧"]
-
-    ADMIN --> A1["Utilisateurs & Rôles"]
-    ADMIN --> A2["Clients / Plateformes"]
-    ADMIN --> A3["Pannes constatées"]
-    ADMIN --> A4["Articles"]
-
-    COM --> C1["Expédition 🚧"]
-    COM --> C2["Facturation 🔜"]
-    COM --> C3["Devis 🔜"]
-```
-
-> 🚧 En cours — 🔜 Prévu
-
----
-
 ## Stack technique
 
 | Technologie | Rôle |
@@ -149,49 +111,3 @@ smac-core/
 └── README.md
 ```
 
----
-
-## Démarrage
-
-### Prérequis
-
-- Node.js ≥ 18
-- XAMPP avec MySQL démarré
-- Base de données `smac` créée
-
-### Installation
-
-```bash
-# Frontend
-cd frontend
-npm install
-npm run dev        # http://localhost:5173
-
-# Backend (dans un terminal séparé)
-cd backend
-npm install
-npx prisma generate
-npm run dev        # http://localhost:5000
-```
-
-### Accès réseau local (douchette / autre poste)
-
-Vite est configuré avec `host: true`. Les appareils sur le même réseau WiFi peuvent accéder à l'application via :
-
-```
-http://<IP-du-poste>:5173
-```
-
----
-
-## Feuille de route
-
-| Priorité | Module | Fonctionnalité |
-|---|---|---|
-| ✅ Fait | Logistique | Planning, Transferts, Stock, Entrée stock |
-| ✅ Fait | Production | Réparation, Fiche réparation, Suivi statuts |
-| ✅ Fait | Production | Gestion PDA Labo / Logistique |
-| ✅ Fait | Administration | Utilisateurs, Rôles, Clients, Plateformes, Articles |
-| 🚧 En cours | Production | Injection, Contrôle qualité |
-| 🔜 À venir | Production | Lien pièces utilisées ↔ stock PDA labo |
-| 🔜 À venir | Commercial | Expédition, Facturation, Devis |
