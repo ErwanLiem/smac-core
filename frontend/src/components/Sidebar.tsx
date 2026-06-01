@@ -17,7 +17,7 @@ import type { Utilisateur } from '../types'
 export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [expandedSections, setExpandedSections] = useState<string[]>(['ACCUEIL', 'PRODUCTION'])
+  const [expandedSection, setExpandedSection] = useState<string | null>('ACCUEIL')
 
   const utilisateur: Utilisateur | null = JSON.parse(localStorage.getItem('utilisateur') || 'null')
   const permissions: string[] = utilisateur?.permissions ?? []
@@ -34,9 +34,7 @@ export default function Sidebar() {
   }
 
   function toggleSection(section: string) {
-    setExpandedSections(prev =>
-      prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
-    )
+    setExpandedSection(prev => prev === section ? null : section)
   }
 
   const menuSections = [
@@ -47,7 +45,7 @@ export default function Sidebar() {
       ],
     },
     {
-      title: 'BASE DE DONNÉES',
+      title: 'CATALOGUE',
       items: [
         { name: 'Articles', path: '/articles', icon: Package },
         { name: 'Clients', path: '/clients', icon: Users },
@@ -63,9 +61,9 @@ export default function Sidebar() {
     {
       title: 'CONFIGURATION',
       items: [
-        { name: 'Articles', path: '/admin/articles', icon: Database },
-        { name: 'Clients', path: '/admin/clients', icon: Users },
-        { name: 'Plateformes', path: '/admin/plateformes', icon: Building2 },
+        { name: 'Structure articles', path: '/admin/articles', icon: Database },
+        { name: 'Structure clients', path: '/admin/clients', icon: Users },
+        { name: 'Structure plateformes', path: '/admin/plateformes', icon: Building2 },
         { name: 'Workflow', path: '/admin/workflow', icon: Settings },
         { name: 'Rôles', path: '/admin/roles', icon: Settings },
         { name: 'Utilisateurs', path: '/admin/utilisateurs', icon: Users },
@@ -97,7 +95,7 @@ export default function Sidebar() {
       {/* Menu */}
       <nav className="sidebar-nav">
         {menuSections.map((section) => {
-          const isExpanded = expandedSections.includes(section.title)
+          const isExpanded = expandedSection === section.title
           return (
             <div key={section.title} className={`sidebar-section ${isExpanded ? '' : 'collapsed'}`}>
               <button onClick={() => toggleSection(section.title)} className="sidebar-section-header">
