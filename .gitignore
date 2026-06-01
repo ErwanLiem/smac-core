@@ -12,3 +12,8 @@ backend/src/generated/
 # OS
 .DS_Store
 Thumbs.db
+
+# Script génération manuel
+docs/package.json
+docs/package-lock.json
+docs/node_modules/
