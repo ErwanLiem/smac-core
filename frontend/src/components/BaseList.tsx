@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trash2, Plus, X, Check, Pencil, Search } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 
@@ -41,8 +41,10 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   const peutCreer   = isAdmin || permissions.includes(`${pagePath}:edit`)
 
   const [champs, setChamps] = useState<Champ[]>([])
+  const [colonnesOrdre, setColonnesOrdre] = useState<number[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const dragColonne = useRef<number | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [formValeurs, setFormValeurs] = useState<Record<number, string>>({})
   const [modal, setModal] = useState<{ id: number } | null>(null)
@@ -64,8 +66,37 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
       get<Champ[]>(`${baseUrl}/${siteId}/champs`),
       get<Item[]>(`${baseUrl}/${siteId}`)
     ])
-    setChamps(c.filter(ch => ch.actif))
+    const champsActifs = c.filter(ch => ch.actif)
+    setChamps(champsActifs)
+    const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
+    const storageKey = `${baseUrl}_colonnes_${login}`
+    const savedOrdre = JSON.parse(localStorage.getItem(storageKey) || '[]') as number[]
+    const ids = champsActifs.map(ch => ch.id)
+    const restored = [
+      ...savedOrdre.filter(id => ids.includes(id)),
+      ...ids.filter(id => !savedOrdre.includes(id))
+    ]
+    setColonnesOrdre(restored)
     setItems(i)
+  }
+
+  const champsOrdonnes = colonnesOrdre.map(id => champs.find(c => c.id === id)).filter(Boolean) as Champ[]
+
+  function onDragStart(champId: number) {
+    dragColonne.current = champId
+  }
+
+  function onDrop(champId: number) {
+    if (dragColonne.current === null || dragColonne.current === champId) return
+    const from = colonnesOrdre.indexOf(dragColonne.current)
+    const to = colonnesOrdre.indexOf(champId)
+    const newOrdre = [...colonnesOrdre]
+    newOrdre.splice(from, 1)
+    newOrdre.splice(to, 0, dragColonne.current)
+    setColonnesOrdre(newOrdre)
+    const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
+    localStorage.setItem(`${baseUrl}_colonnes_${login}`, JSON.stringify(newOrdre))
+    dragColonne.current = null
   }
 
   function getValeur(item: Item, champId: number) {
@@ -148,20 +179,30 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
           <table className="table">
             <thead>
               <tr>
-                {champs.map(c => <th key={c.id}>{c.label}</th>)}
-                <th>Ajouté le</th>
+                {champsOrdonnes.map(c => (
+                  <th key={c.id}
+                    draggable
+                    onDragStart={() => onDragStart(c.id)}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={() => onDrop(c.id)}
+                    style={{ cursor: 'grab', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    title="Glisser pour déplacer"
+                  >
+                    {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>⠿</span>
+                  </th>
+                ))}
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {filteredItems.length === 0 && (
-                <tr><td colSpan={champs.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
+                <tr><td colSpan={champsOrdonnes.length + 1} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
                   {searchQuery ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
               {filteredItems.map(item => (
                 <tr key={item.id}>
-                  {champs.map(c => (
+                  {champsOrdonnes.map(c => (
                     <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>
