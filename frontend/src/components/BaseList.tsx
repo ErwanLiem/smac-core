@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Trash2, Plus, X, Check, Pencil, Search } from 'lucide-react'
+import { Trash2, Plus, X, Check, Pencil } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 
 interface Champ {
@@ -43,20 +43,22 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   const [champs, setChamps] = useState<Champ[]>([])
   const [colonnesOrdre, setColonnesOrdre] = useState<number[]>([])
   const [items, setItems] = useState<Item[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
+  const [filtres, setFiltres] = useState<Record<string, string>>({})
   const dragColonne = useRef<number | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [formValeurs, setFormValeurs] = useState<Record<number, string>>({})
   const [modal, setModal] = useState<{ id: number } | null>(null)
   const [editItem, setEditItem] = useState<{ id: number; valeurs: Record<number, string> } | null>(null)
 
-  // Filtrer les items selon la recherche
+  const hasActiveFiltres = Object.values(filtres).some(v => v.trim() !== '')
+
   const filteredItems = items.filter(item => {
-    if (!searchQuery.trim()) return true
-    const query = searchQuery.toLowerCase()
-    return item.valeurs.some(v =>
-      String(v.valeur ?? '').toLowerCase().includes(query)
-    )
+    for (const [champId, val] of Object.entries(filtres)) {
+      if (!val.trim()) continue
+      const valeur = String(item.valeurs.find(v => v.champId === Number(champId))?.valeur ?? '')
+      if (!valeur.toLowerCase().includes(val.toLowerCase())) return false
+    }
+    return true
   })
 
   useEffect(() => { reload() }, [siteId])
@@ -138,36 +140,21 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
       <div className="page-header">
         <div>
           <h1 className="page-title">{titre}</h1>
-          <p className="page-subtitle">{filteredItems.length} enregistrement{filteredItems.length !== 1 ? 's' : ''}{searchQuery && ` (sur ${items.length})`}</p>
+          <p className="page-subtitle">{filteredItems.length} enregistrement{filteredItems.length !== 1 ? 's' : ''}{hasActiveFiltres && ` (sur ${items.length})`}</p>
         </div>
-        {peutCreer && (
-          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-            <Plus size={16} /> Ajouter
-          </button>
-        )}
-      </div>
-
-      {items.length > 0 && (
-        <div style={{ marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <Search size={18} style={{ color: '#9ca3af' }} />
-          <input
-            type="text"
-            placeholder="Rechercher dans tous les champs..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="form-input"
-            style={{ flex: 1, maxWidth: '400px' }}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
-            >
-              <X size={18} />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {hasActiveFiltres && (
+            <button className="btn btn-secondary" onClick={() => setFiltres({})}>
+              <X size={14} /> Effacer filtres
+            </button>
+          )}
+          {peutCreer && (
+            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+              <Plus size={16} /> Ajouter
             </button>
           )}
         </div>
-      )}
+      </div>
 
       {champs.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
@@ -194,11 +181,23 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                 <th>Ajouté le</th>
                 <th></th>
               </tr>
+              <tr style={{ background: '#f8faff' }}>
+                {champsOrdonnes.map(c => (
+                  <td key={c.id} style={{ padding: '4px 8px' }}>
+                    <input className="form-input" placeholder="Filtrer..."
+                      value={filtres[String(c.id)] ?? ''}
+                      onChange={e => setFiltres(f => ({ ...f, [c.id]: e.target.value }))}
+                      style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
+                  </td>
+                ))}
+                <td style={{ padding: '4px 8px' }}></td>
+                <td style={{ padding: '4px 8px' }}></td>
+              </tr>
             </thead>
             <tbody>
               {filteredItems.length === 0 && (
-                <tr><td colSpan={champsOrdonnes.length + 1} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
-                  {searchQuery ? 'Aucun résultat' : 'Aucune donnée'}
+                <tr><td colSpan={champsOrdonnes.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
+                  {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
               {filteredItems.map(item => (
