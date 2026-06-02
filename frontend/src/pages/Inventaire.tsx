@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trash2, Plus, Pencil, X } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get } from '../api/client'
@@ -56,10 +56,12 @@ export default function Inventaire() {
   const peutCreer = isAdmin
 
   const [champs, setChamps] = useState<Champ[]>([])
+  const [colonnesOrdre, setColonnesOrdre] = useState<number[]>([])
   const [articles, setArticles] = useState<any[]>([])
   const [statuts, setStatuts] = useState<Statut[]>([])
   const [inventaires, setInventaires] = useState<Inventaire[]>([])
   const [filtres, setFiltres] = useState<Record<string, string>>({})
+  const dragColonne = useRef<number | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [formArticleId, setFormArticleId] = useState<number>(0)
   const [formStatutId, setFormStatutId] = useState<number>(0)
@@ -76,7 +78,17 @@ export default function Inventaire() {
       get(`/workflow/${siteId}/statuts`),
       inventaireApi.getAll(siteId)
     ])
-    setChamps(c.filter(ch => ch.actif))
+    const champsActifs = c.filter(ch => ch.actif)
+    setChamps(champsActifs)
+    // Restaurer l'ordre sauvegardé, en ignorant les champs supprimés et ajoutant les nouveaux
+    const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
+    const savedOrdre = JSON.parse(localStorage.getItem(`inventaire_colonnes_${login}`) || '[]') as number[]
+    const ids = champsActifs.map(ch => ch.id)
+    const restored = [
+      ...savedOrdre.filter(id => ids.includes(id)),
+      ...ids.filter(id => !savedOrdre.includes(id))
+    ]
+    setColonnesOrdre(restored)
     setArticles(a)
     setStatuts(s)
     setInventaires(i)
@@ -84,6 +96,26 @@ export default function Inventaire() {
 
   function getValeur(item: Inventaire, champId: number) {
     return item.valeurs.find(v => v.champId === champId)?.valeur ?? '—'
+  }
+
+  // Colonnes triées selon l'ordre drag & drop
+  const champsOrdonnes = colonnesOrdre.map(id => champs.find(c => c.id === id)).filter(Boolean) as Champ[]
+
+  function onDragStart(champId: number) {
+    dragColonne.current = champId
+  }
+
+  function onDrop(champId: number) {
+    if (dragColonne.current === null || dragColonne.current === champId) return
+    const from = colonnesOrdre.indexOf(dragColonne.current)
+    const to = colonnesOrdre.indexOf(champId)
+    const newOrdre = [...colonnesOrdre]
+    newOrdre.splice(from, 1)
+    newOrdre.splice(to, 0, dragColonne.current)
+    setColonnesOrdre(newOrdre)
+    const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
+    localStorage.setItem(`inventaire_colonnes_${login}`, JSON.stringify(newOrdre))
+    dragColonne.current = null
   }
 
   const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
@@ -205,34 +237,39 @@ export default function Inventaire() {
               <tr>
                 <th>Article</th>
                 <th>Statut</th>
-                {champs.map(c => <th key={c.id}>{c.label}</th>)}
+                {champsOrdonnes.map(c => (
+                  <th key={c.id}
+                    draggable
+                    onDragStart={() => onDragStart(c.id)}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={() => onDrop(c.id)}
+                    style={{ cursor: 'grab', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    title="Glisser pour déplacer"
+                  >
+                    {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>⠿</span>
+                  </th>
+                ))}
                 <th></th>
               </tr>
               <tr style={{ background: '#f8faff' }}>
                 <td style={{ padding: '4px 8px' }}>
-                  <input
-                    className="form-input" placeholder="Filtrer..."
+                  <input className="form-input" placeholder="Filtrer..."
                     value={filtres['article'] ?? ''}
                     onChange={e => setFiltres(f => ({ ...f, article: e.target.value }))}
-                    style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }}
-                  />
+                    style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
                 </td>
                 <td style={{ padding: '4px 8px' }}>
-                  <input
-                    className="form-input" placeholder="Filtrer..."
+                  <input className="form-input" placeholder="Filtrer..."
                     value={filtres['statut'] ?? ''}
                     onChange={e => setFiltres(f => ({ ...f, statut: e.target.value }))}
-                    style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }}
-                  />
+                    style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
                 </td>
-                {champs.map(c => (
+                {champsOrdonnes.map(c => (
                   <td key={c.id} style={{ padding: '4px 8px' }}>
-                    <input
-                      className="form-input" placeholder="Filtrer..."
+                    <input className="form-input" placeholder="Filtrer..."
                       value={filtres[String(c.id)] ?? ''}
                       onChange={e => setFiltres(f => ({ ...f, [c.id]: e.target.value }))}
-                      style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }}
-                    />
+                      style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
                   </td>
                 ))}
                 <td style={{ padding: '4px 8px' }}></td>
@@ -248,7 +285,7 @@ export default function Inventaire() {
                 <tr key={item.id}>
                   <td style={{ fontWeight: 500 }}>{getArticleLabel(item.articleId)}</td>
                   <td><StatutBadge statut={item.statut} /></td>
-                  {champs.map(c => (
+                  {champsOrdonnes.map(c => (
                     <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
                   <td style={{ display: 'flex', gap: '6px' }}>
