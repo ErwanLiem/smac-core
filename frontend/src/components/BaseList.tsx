@@ -192,7 +192,9 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
           <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Ajouter — {titre}</h3>
             <form onSubmit={handleCreate}>
-              {champs.map(c => (
+              {champs.map(c => {
+                const opts = c.options ? (() => { try { return JSON.parse(c.options) } catch { return [] } })() : []
+                return (
                 <div className="form-group" key={c.id}>
                   <label className="form-label">
                     {c.label}
@@ -206,13 +208,20 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                     <input type="number" required={c.obligatoire} className="form-input"
                       value={formValeurs[c.id] ?? ''}
                       onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))} />
+                  ) : c.type === 'SELECT' ? (
+                    <select required={c.obligatoire} className="form-input"
+                      value={formValeurs[c.id] ?? ''}
+                      onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))}>
+                      <option value="">— Choisir —</option>
+                      {opts.map((o: string) => <option key={o} value={o}>{o}</option>)}
+                    </select>
                   ) : (
                     <input type="text" required={c.obligatoire} className="form-input"
                       value={formValeurs[c.id] ?? ''}
                       onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))} />
                   )}
                 </div>
-              ))}
+              )})}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowForm(false); setFormValeurs({}) }}>Annuler</button>
                 <button type="submit" className="btn btn-primary">Enregistrer</button>
@@ -228,7 +237,9 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
           <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Modifier — {titre}</h3>
             <form onSubmit={handleEdit}>
-              {champs.map(c => (
+              {champs.map(c => {
+                const opts = c.options ? (() => { try { return JSON.parse(c.options) } catch { return [] } })() : []
+                return (
                 <div className="form-group" key={c.id}>
                   <label className="form-label">
                     {c.label}
@@ -242,13 +253,20 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                     <input type="number" required={c.obligatoire} className="form-input"
                       value={editItem.valeurs[c.id] ?? ''}
                       onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />
+                  ) : c.type === 'SELECT' ? (
+                    <select required={c.obligatoire} className="form-input"
+                      value={editItem.valeurs[c.id] ?? ''}
+                      onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)}>
+                      <option value="">— Choisir —</option>
+                      {opts.map((o: string) => <option key={o} value={o}>{o}</option>)}
+                    </select>
                   ) : (
                     <input type="text" required={c.obligatoire} className="form-input"
                       value={editItem.valeurs[c.id] ?? ''}
                       onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />
                   )}
                 </div>
-              ))}
+              )})}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setEditItem(null)}>Annuler</button>
                 <button type="submit" className="btn btn-primary">Enregistrer</button>
