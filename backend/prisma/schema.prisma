@@ -174,7 +174,7 @@ model valeurChampInventaire {
   inventaireId Int
   champId     Int
   valeur      String?          @db.LongText
-  inventaire  inventaire       @relation(fields: [inventaireId], references: [id], map: "ValeurChampInventaire_inventaireId_fkey")
+  inventaire  inventaire       @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "ValeurChampInventaire_inventaireId_fkey")
   champ       champInventaire  @relation(fields: [champId], references: [id], map: "ValeurChampInventaire_champId_fkey")
 
   @@unique([inventaireId, champId], map: "ValeurChampInventaire_inventaireId_champId_key")

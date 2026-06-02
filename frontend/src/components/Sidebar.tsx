@@ -61,6 +61,7 @@ export default function Sidebar() {
     {
       title: 'LOGISTIQUE',
       items: [
+        { name: 'Réception', path: '/reception', icon: Package },
         { name: 'Inventaire', path: '/inventaire', icon: Warehouse },
       ],
     },

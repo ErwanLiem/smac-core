@@ -202,7 +202,6 @@ export default function Inventaire() {
                 <th>Article</th>
                 <th>Statut</th>
                 {champs.map(c => <th key={c.id}>{c.label}</th>)}
-                <th>Ajouté le</th>
                 <th></th>
               </tr>
               <tr style={{ background: '#f8faff' }}>
@@ -233,7 +232,6 @@ export default function Inventaire() {
                   </td>
                 ))}
                 <td style={{ padding: '4px 8px' }}></td>
-                <td style={{ padding: '4px 8px' }}></td>
               </tr>
             </thead>
             <tbody>
@@ -249,9 +247,6 @@ export default function Inventaire() {
                   {champs.map(c => (
                     <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
-                  <td style={{ color: '#9ca3af', fontSize: '13px' }}>
-                    {new Date(item.createdAt).toLocaleDateString('fr-FR')}
-                  </td>
                   <td style={{ display: 'flex', gap: '6px' }}>
                     {peutEditer && (
                       <button className="btn btn-secondary btn-icon" onClick={() => openEdit(item)}>

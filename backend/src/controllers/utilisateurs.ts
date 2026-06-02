@@ -9,6 +9,7 @@ const PAGES_DISPONIBLES = [
   { path: '/articles',           label: 'Catalogue — Articles',               actions: ['view', 'edit', 'delete'] },
   { path: '/clients',            label: 'Catalogue — Clients',                actions: ['view', 'edit', 'delete'] },
   { path: '/plateformes',        label: 'Catalogue — Plateformes',            actions: ['view', 'edit', 'delete'] },
+  { path: '/reception',          label: 'Logistique — Réception',             actions: ['view'] },
   { path: '/inventaire',         label: 'Logistique — Inventaire',            actions: ['view', 'edit', 'delete'] },
   { path: '/suivi',              label: 'Production — Suivi',                 actions: ['view'] },
   { path: '/admin/articles',     label: 'Configuration — Structure articles', actions: ['view'] },
