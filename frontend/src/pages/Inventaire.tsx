@@ -86,11 +86,15 @@ export default function Inventaire() {
     return item.valeurs.find(v => v.champId === champId)?.valeur ?? '—'
   }
 
+  const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
+
   function getArticleLabel(articleId: number): string {
     const art = articles.find(a => a.id === articleId)
     if (!art) return `Article #${articleId}`
-    const valeurs = art.valeurs.map(v => v.valeur).filter(Boolean).join(' ')
-    return valeurs || `Article #${articleId}`
+    const desig = art.valeurs.find(v =>
+      CODES_DESIGNATION.includes(v.champ?.code?.toUpperCase?.() ?? '')
+    )?.valeur
+    return desig || art.valeurs.map(v => v.valeur).filter(Boolean)[0] || `Article #${articleId}`
   }
 
   const hasActiveFiltres = Object.values(filtres).some(v => v.trim() !== '')
@@ -180,7 +184,7 @@ export default function Inventaire() {
               <X size={14} /> Effacer filtres
             </button>
           )}
-          {peutCreer && (
+          {false && (
             <button className="btn btn-primary" onClick={() => setShowForm(true)}>
               <Plus size={16} /> Ajouter
             </button>

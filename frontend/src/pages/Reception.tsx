@@ -50,7 +50,7 @@ interface LotPrepare {
 }
 
 const CODES = {
-  BL:           ['BL', 'BON_LIVRAISON', 'BON_DE_LIVRAISON'],
+  BL:           ['BL', 'RMA', 'BON_LIVRAISON', 'BON_DE_LIVRAISON'],
   BT:           ['BT', 'BT_RECEP', 'BON_TRANSPORT', 'BON_DE_TRANSPORT'],
   RMA_CREATION: ['RMA_CREATION', 'RMA_CREATION', 'DATE_CREATION_BL', 'DATE_BL', 'DATE_CREATION'],
   DATE_RIC:     ['DATE_RIC', 'DATE_RECEPTION', 'DATE_REC'],
