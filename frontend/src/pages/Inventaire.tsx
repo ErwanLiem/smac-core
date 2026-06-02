@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Trash2, Plus, Pencil, Search, X } from 'lucide-react'
+import { Trash2, Plus, Pencil, X } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get } from '../api/client'
 import { getPermissions } from '../utils/permissions'
@@ -59,7 +59,7 @@ export default function Inventaire() {
   const [articles, setArticles] = useState<any[]>([])
   const [statuts, setStatuts] = useState<Statut[]>([])
   const [inventaires, setInventaires] = useState<Inventaire[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
+  const [filtres, setFiltres] = useState<Record<string, string>>({})
   const [showForm, setShowForm] = useState(false)
   const [formArticleId, setFormArticleId] = useState<number>(0)
   const [formStatutId, setFormStatutId] = useState<number>(0)
@@ -72,8 +72,8 @@ export default function Inventaire() {
   async function reload() {
     const [c, a, s, i] = await Promise.all([
       inventaireApi.getChamps(siteId),
-      get(`/api/articles/${siteId}`),
-      get(`/api/workflow/${siteId}/statuts`),
+      get(`/articles/${siteId}`),
+      get(`/workflow/${siteId}/statuts`),
       inventaireApi.getAll(siteId)
     ])
     setChamps(c.filter(ch => ch.actif))
@@ -93,14 +93,32 @@ export default function Inventaire() {
     return valeurs || `Article #${articleId}`
   }
 
+  const hasActiveFiltres = Object.values(filtres).some(v => v.trim() !== '')
+
   const filteredInventaires = inventaires.filter(inv => {
-    if (!searchQuery.trim()) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      getArticleLabel(inv.articleId).toLowerCase().includes(query) ||
-      inv.valeurs.some(v => String(v.valeur ?? '').toLowerCase().includes(query))
-    )
+    // Filtre Article
+    if (filtres['article']?.trim()) {
+      if (!getArticleLabel(inv.articleId).toLowerCase().includes(filtres['article'].toLowerCase())) return false
+    }
+    // Filtre Statut
+    if (filtres['statut']?.trim()) {
+      const label = inv.statut?.label ?? ''
+      if (!label.toLowerCase().includes(filtres['statut'].toLowerCase())) return false
+    }
+    // Filtres champs dynamiques
+    for (const champ of champs) {
+      const filtre = filtres[String(champ.id)]?.trim()
+      if (filtre) {
+        const valeur = String(inv.valeurs.find(v => v.champId === champ.id)?.valeur ?? '')
+        if (!valeur.toLowerCase().includes(filtre.toLowerCase())) return false
+      }
+    }
+    return true
   })
+
+  function resetFiltres() {
+    setFiltres({})
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -151,33 +169,24 @@ export default function Inventaire() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Inventaire</h1>
-          <p className="page-subtitle">{filteredInventaires.length} enregistrement{filteredInventaires.length !== 1 ? 's' : ''}{searchQuery && ` (sur ${inventaires.length})`}</p>
+          <p className="page-subtitle">
+            {filteredInventaires.length} enregistrement{filteredInventaires.length !== 1 ? 's' : ''}
+            {hasActiveFiltres && ` (sur ${inventaires.length})`}
+          </p>
         </div>
-        {peutCreer && (
-          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-            <Plus size={16} /> Ajouter
-          </button>
-        )}
-      </div>
-
-      {inventaires.length > 0 && (
-        <div style={{ marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <Search size={18} style={{ color: '#9ca3af' }} />
-          <input
-            type="text"
-            placeholder="Rechercher dans tous les champs..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="form-input"
-            style={{ flex: 1, maxWidth: '400px' }}
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
-              <X size={18} />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {hasActiveFiltres && (
+            <button className="btn btn-secondary" onClick={resetFiltres}>
+              <X size={14} /> Effacer filtres
+            </button>
+          )}
+          {peutCreer && (
+            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+              <Plus size={16} /> Ajouter
             </button>
           )}
         </div>
-      )}
+      </div>
 
       {champs.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
@@ -186,7 +195,8 @@ export default function Inventaire() {
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table className="table">
+          <div style={{ overflowX: 'auto' }}>
+          <table className="table" style={{ minWidth: 'max-content' }}>
             <thead>
               <tr>
                 <th>Article</th>
@@ -195,11 +205,41 @@ export default function Inventaire() {
                 <th>Ajouté le</th>
                 <th></th>
               </tr>
+              <tr style={{ background: '#f8faff' }}>
+                <td style={{ padding: '4px 8px' }}>
+                  <input
+                    className="form-input" placeholder="Filtrer..."
+                    value={filtres['article'] ?? ''}
+                    onChange={e => setFiltres(f => ({ ...f, article: e.target.value }))}
+                    style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }}
+                  />
+                </td>
+                <td style={{ padding: '4px 8px' }}>
+                  <input
+                    className="form-input" placeholder="Filtrer..."
+                    value={filtres['statut'] ?? ''}
+                    onChange={e => setFiltres(f => ({ ...f, statut: e.target.value }))}
+                    style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }}
+                  />
+                </td>
+                {champs.map(c => (
+                  <td key={c.id} style={{ padding: '4px 8px' }}>
+                    <input
+                      className="form-input" placeholder="Filtrer..."
+                      value={filtres[String(c.id)] ?? ''}
+                      onChange={e => setFiltres(f => ({ ...f, [c.id]: e.target.value }))}
+                      style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }}
+                    />
+                  </td>
+                ))}
+                <td style={{ padding: '4px 8px' }}></td>
+                <td style={{ padding: '4px 8px' }}></td>
+              </tr>
             </thead>
             <tbody>
               {filteredInventaires.length === 0 && (
                 <tr><td colSpan={champs.length + 4} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
-                  {searchQuery ? 'Aucun résultat' : 'Aucune donnée'}
+                  {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
               {filteredInventaires.map(item => (
@@ -228,6 +268,7 @@ export default function Inventaire() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

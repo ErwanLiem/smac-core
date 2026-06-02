@@ -1,5 +1,7 @@
 import { Request, Response } from 'express'
-import { prisma } from '../index'
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
 
 // CHAMPS INVENTAIRE
 export async function getChamps(req: Request, res: Response) {
