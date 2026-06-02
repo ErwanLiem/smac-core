@@ -5,12 +5,14 @@ import AdminWorkflow from './pages/AdminWorkflow'
 import AdminArticles from './pages/AdminArticles'
 import AdminClients from './pages/AdminClients'
 import AdminPlateformes from './pages/AdminPlateformes'
+import AdminInventaire from './pages/AdminInventaire'
 import AdminRoles from './pages/AdminRoles'
 import AdminUtilisateurs from './pages/AdminUtilisateurs'
 import Suivi from './pages/Suivi'
 import Articles from './pages/Articles'
 import Clients from './pages/Clients'
 import Plateformes from './pages/Plateformes'
+import Inventaire from './pages/Inventaire'
 import Layout from './components/Layout'
 
 function isConnecte() {
@@ -35,9 +37,11 @@ function App() {
             <Route path="/admin/articles" element={<AdminArticles />} />
             <Route path="/admin/clients" element={<AdminClients />} />
             <Route path="/admin/plateformes" element={<AdminPlateformes />} />
+            <Route path="/admin/inventaire" element={<AdminInventaire />} />
             <Route path="/articles" element={<Articles />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/plateformes" element={<Plateformes />} />
+            <Route path="/inventaire" element={<Inventaire />} />
             <Route path="/admin/roles" element={<AdminRoles />} />
             <Route path="/admin/utilisateurs" element={<AdminUtilisateurs />} />
           </Route>

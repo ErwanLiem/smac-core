@@ -59,11 +59,18 @@ export default function Sidebar() {
       ],
     },
     {
+      title: 'LOGISTIQUE',
+      items: [
+        { name: 'Inventaire', path: '/inventaire', icon: Warehouse },
+      ],
+    },
+    {
       title: 'CONFIGURATION',
       items: [
         { name: 'Structure articles', path: '/admin/articles', icon: Database },
         { name: 'Structure clients', path: '/admin/clients', icon: Users },
         { name: 'Structure plateformes', path: '/admin/plateformes', icon: Building2 },
+        { name: 'Structure inventaire', path: '/admin/inventaire', icon: Database },
         { name: 'Workflow', path: '/admin/workflow', icon: Settings },
         { name: 'Rôles', path: '/admin/roles', icon: Settings },
         { name: 'Utilisateurs', path: '/admin/utilisateurs', icon: Users },
@@ -96,9 +103,11 @@ export default function Sidebar() {
       <nav className="sidebar-nav">
         {menuSections.map((section) => {
           const isExpanded = expandedSection === section.title
+          const hasActiveItem = section.items.some(item => location.pathname === item.path)
+          const isSectionHighlighted = isExpanded || hasActiveItem
           return (
-            <div key={section.title} className={`sidebar-section ${isExpanded ? '' : 'collapsed'}`}>
-              <button onClick={() => toggleSection(section.title)} className="sidebar-section-header">
+            <div key={section.title} className={`sidebar-section ${isExpanded ? '' : 'collapsed'} ${isSectionHighlighted ? 'has-active' : ''}`}>
+              <button onClick={() => toggleSection(section.title)} className="sidebar-section-header" style={isSectionHighlighted ? { color: '#2563eb', fontWeight: 600 } : {}}>
                 <span>{section.title}</span>
                 <ChevronDown className="sidebar-section-icon" size={16} />
               </button>

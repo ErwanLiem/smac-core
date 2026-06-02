@@ -25,15 +25,18 @@ export default function Suivi() {
   }
 
   function getTransitionsDisponibles(article: Article) {
+    if (!article.statutId) return []
     return transitions.filter(t => t.statutFromId === article.statutId)
   }
+
+  const articlesAvecStatut = articles.filter(a => a.statutId)
 
   return (
     <div>
       <div className="page-header">
         <div>
           <h1 className="page-title">Suivi articles</h1>
-          <p className="page-subtitle">{articles.length} article{articles.length !== 1 ? 's' : ''} en cours</p>
+          <p className="page-subtitle">{articlesAvecStatut.length} article{articlesAvecStatut.length !== 1 ? 's' : ''} en cours</p>
         </div>
       </div>
 
@@ -49,27 +52,31 @@ export default function Suivi() {
             </tr>
           </thead>
           <tbody>
-            {articles.map(article => (
+            {articlesAvecStatut.map(article => (
               <tr key={article.id}>
                 <td style={{ fontWeight: 500 }}>{article.reference}</td>
                 <td>{article.designation}</td>
                 <td style={{ color: '#6b7280', fontFamily: 'monospace', fontSize: '13px' }}>{article.serialNumber ?? '—'}</td>
                 <td>
-                  <span style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '3px 10px',
-                    borderRadius: '5px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    background: article.statut.couleur + '1F',
-                    color: article.statut.couleur,
-                    border: `1px solid ${article.statut.couleur}33`,
-                  }}>
-                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: article.statut.couleur }} />
-                    {article.statut.label}
-                  </span>
+                  {article.statut ? (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '3px 10px',
+                      borderRadius: '5px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      background: article.statut.couleur + '1F',
+                      color: article.statut.couleur,
+                      border: `1px solid ${article.statut.couleur}33`,
+                    }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: article.statut.couleur }} />
+                      {article.statut.label}
+                    </span>
+                  ) : (
+                    <span style={{ color: '#d1d5db' }}>—</span>
+                  )}
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>

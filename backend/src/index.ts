@@ -5,6 +5,7 @@ import workflowRouter from './routes/workflow'
 import articlesRouter from './routes/articles'
 import clientsRouter from './routes/clients'
 import plateformesRouter from './routes/plateformes'
+import inventaireRouter from './routes/inventaire'
 import utilisateursRouter from './routes/utilisateurs'
 import authRouter from './routes/auth'
 import { requireAuth } from './middleware/auth'
@@ -33,6 +34,7 @@ app.use('/api/workflow', requireAuth, workflowRouter)
 app.use('/api/articles', requireAuth, articlesRouter)
 app.use('/api/clients', requireAuth, clientsRouter)
 app.use('/api/plateformes', requireAuth, plateformesRouter)
+app.use('/api/inventaire', requireAuth, inventaireRouter)
 app.use('/api/gestion', requireAuth, utilisateursRouter)
 
 // Middleware global de gestion des erreurs

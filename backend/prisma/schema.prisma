@@ -17,6 +17,7 @@ model article {
   statut           statut?            @relation(fields: [statutId], references: [id], map: "Article_statutId_fkey")
   historiquestatut historiquestatut[]
   valeurs          valeurChamp[]
+  inventaires      inventaire[]
 
   @@index([siteId], map: "Article_siteId_fkey")
   @@index([statutId], map: "Article_statutId_fkey")
@@ -134,6 +135,53 @@ model valeurChampPlateforme {
   @@index([champId], map: "ValeurChampPlateforme_champId_fkey")
 }
 
+model inventaire {
+  id               Int                @id @default(autoincrement())
+  siteId           Int
+  articleId        Int
+  statutId         Int?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  site             site               @relation(fields: [siteId], references: [id], map: "Inventaire_siteId_fkey")
+  article          article            @relation(fields: [articleId], references: [id], map: "Inventaire_articleId_fkey")
+  statut           statut?            @relation(fields: [statutId], references: [id], onDelete: Cascade, map: "Inventaire_statutId_fkey")
+  valeurs          valeurChampInventaire[]
+
+  @@index([siteId], map: "Inventaire_siteId_fkey")
+  @@index([articleId], map: "Inventaire_articleId_fkey")
+  @@index([statutId], map: "Inventaire_statutId_fkey")
+}
+
+model champInventaire {
+  id          Int                     @id @default(autoincrement())
+  siteId      Int
+  code        String
+  label       String
+  type        String                  @default("TEXT") // TEXT, NUMBER, DATE, SELECT
+  options     String?                 @db.LongText     // JSON array pour les SELECT
+  obligatoire Boolean                 @default(false)
+  ordre       Int                     @default(0)
+  actif       Boolean                 @default(true)
+  site        site                    @relation(fields: [siteId], references: [id], map: "ChampInventaire_siteId_fkey")
+  valeurs     valeurChampInventaire[]
+
+  @@unique([siteId, code], map: "ChampInventaire_siteId_code_key")
+  @@index([siteId], map: "ChampInventaire_siteId_fkey")
+}
+
+model valeurChampInventaire {
+  id          Int              @id @default(autoincrement())
+  inventaireId Int
+  champId     Int
+  valeur      String?          @db.LongText
+  inventaire  inventaire       @relation(fields: [inventaireId], references: [id], map: "ValeurChampInventaire_inventaireId_fkey")
+  champ       champInventaire  @relation(fields: [champId], references: [id], map: "ValeurChampInventaire_champId_fkey")
+
+  @@unique([inventaireId, champId], map: "ValeurChampInventaire_inventaireId_champId_key")
+  @@index([inventaireId], map: "ValeurChampInventaire_inventaireId_fkey")
+  @@index([champId], map: "ValeurChampInventaire_champId_fkey")
+}
+
 model historiquestatut {
   id          Int      @id @default(autoincrement())
   articleId   Int
@@ -176,6 +224,8 @@ model site {
   champClient     champClient[]
   plateforme      plateforme[]
   champPlateforme champPlateforme[]
+  inventaire      inventaire[]
+  champInventaire champInventaire[]
 }
 
 model statut {
@@ -188,6 +238,7 @@ model statut {
   ordre                                      Int                @default(0)
   estFinal                                   Boolean            @default(false)
   article                                    article[]
+  inventaire                                 inventaire[]
   historiquestatut                           historiquestatut[]
   site                                       site               @relation(fields: [siteId], references: [id], map: "Statut_siteId_fkey")
   transitionsFrom transition[] @relation("transition_statutFromIdTostatut")
