@@ -46,7 +46,7 @@ interface LotPrepare {
   garantie: string
   statut: string | null
   statutId: number | null
-  lignes: { sn: string; accessoiresIds: number[]; accessoiresLabels: string[] }[]
+  lignes: { sn: string; accessoiresIds: number[]; accessoiresLabels: string[]; quantite?: number }[]
 }
 
 const CODES = {
@@ -92,6 +92,7 @@ export default function Reception() {
   const [garantie, setGarantie] = useState('')
   const [lignesSN, setLignesSN] = useState<LigneSN[]>([])
   const [snCurrent, setSnCurrent] = useState('')
+  const [quantite, setQuantite] = useState<number>(1)
 
   // Lot préparé (tableau de droite)
   const [lotPrepare, setLotPrepare] = useState<LotPrepare | null>(null)
@@ -136,10 +137,19 @@ export default function Reception() {
     return art ? getArticleLabel(art) : `#${id}`
   }
 
-  function isTPE(artId = articleId): boolean {
+  function getTypeArticle(artId = articleId): string {
     const art = articles.find(a => a.id === artId)
-    if (!art) return false
-    return art.valeurs.some(v => String(v.valeur ?? '').toUpperCase() === 'TPE')
+    if (!art) return ''
+    const champsTypeIds = champsArticles.filter(c => CODES_TYPE.includes(c.code.toUpperCase())).map(c => c.id)
+    return art.valeurs.find(v => champsTypeIds.includes(v.champId))?.valeur?.toUpperCase() ?? ''
+  }
+
+  function isTPE(artId = articleId): boolean {
+    return getTypeArticle(artId) === 'TPE'
+  }
+
+  function isPDA(artId = articleId): boolean {
+    return getTypeArticle(artId) === 'PDA'
   }
 
   function getStatutStock(): number | null {
@@ -175,12 +185,26 @@ export default function Reception() {
   function handlePreparer(e: React.FormEvent) {
     e.preventDefault()
     if (!articleId) return
-    if (lignesSN.length === 0) { setErreur('Ajoutez au moins un S/N'); return }
+    if (isPDA()) {
+      if (quantite < 1) { setErreur('La quantité doit être supérieure à 0'); return }
+    } else {
+      if (lignesSN.length === 0) { setErreur('Ajoutez au moins un S/N'); return }
+    }
     setErreur(null)
 
     const art = articles.find(a => a.id === articleId)!
     const stockId = isTPE() ? getStatutStock() : null
     const statutLabel = statuts.find(s => s.id === stockId)?.label ?? null
+
+    // Pour PDA : une seule ligne avec quantité
+    const lignes = isPDA()
+      ? [{ sn: '', accessoiresIds: [], accessoiresLabels: [], quantite }]
+      : lignesSN.map(l => ({
+          sn: l.sn,
+          accessoiresIds: l.accessoires,
+          accessoiresLabels: l.accessoires.map(id => getArticleLabelById(id)),
+          quantite: 1
+        }))
 
     setLotPrepare({
       articleId,
@@ -188,11 +212,7 @@ export default function Reception() {
       bl, bt, dateCreationBL, dateReception, garantie,
       statut: statutLabel,
       statutId: stockId,
-      lignes: lignesSN.map(l => ({
-        sn: l.sn,
-        accessoiresIds: l.accessoires,
-        accessoiresLabels: l.accessoires.map(id => getArticleLabelById(id))
-      }))
+      lignes
     })
   }
 
@@ -219,6 +239,11 @@ export default function Reception() {
         if (idSN && ligne.sn)                   valeurs.push({ champId: idSN, valeur: ligne.sn })
         if (idAcc && ligne.accessoiresLabels.length > 0)
           valeurs.push({ champId: idAcc, valeur: ligne.accessoiresLabels.join(', ') })
+        // PDA : champ quantité
+        if (ligne.quantite && ligne.quantite > 0) {
+          const idQte = findChampId(champsInv, ['QUANTITE', 'QTE', 'QUANTITY'])
+          if (idQte) valeurs.push({ champId: idQte, valeur: String(ligne.quantite) })
+        }
 
         await inventaireApi.create(siteId, {
           articleId: lotPrepare.articleId,
@@ -240,11 +265,11 @@ export default function Reception() {
   }
 
   function handleGarderBL() {
-    // Garde BL, BT, dates — reset article, garantie, SNs
     setArticleId(0)
     setGarantie('')
     setLignesSN([])
     setSnCurrent('')
+    setQuantite(1)
     setShowModalReset(false)
   }
 
@@ -257,6 +282,7 @@ export default function Reception() {
     setGarantie('')
     setLignesSN([])
     setSnCurrent('')
+    setQuantite(1)
     setShowModalReset(false)
   }
 
@@ -340,23 +366,33 @@ export default function Reception() {
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />
 
-            <div className="form-group" style={{ marginBottom: '8px' }}>
-              <label className="form-label">Saisie S/N <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Entrée pour ajouter)</span></label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  ref={snInputRef}
-                  className="form-input"
-                  placeholder="Scanner ou saisir un S/N..."
-                  value={snCurrent}
-                  onChange={e => setSnCurrent(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSN() } }}
-                />
-                <button type="button" className="btn btn-secondary btn-icon" onClick={addSN}><Plus size={16} /></button>
+            {isPDA() ? (
+              <div className="form-group">
+                <label className="form-label">Quantité *</label>
+                <input type="number" min={1} required className="form-input" style={{ maxWidth: '120px' }}
+                  value={quantite} onChange={e => setQuantite(Number(e.target.value))} />
               </div>
-            </div>
+            ) : (
+              <>
+              <div className="form-group" style={{ marginBottom: '8px' }}>
+                <label className="form-label">Saisie S/N <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Entrée pour ajouter)</span></label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    ref={snInputRef}
+                    className="form-input"
+                    placeholder="Scanner ou saisir un S/N..."
+                    value={snCurrent}
+                    onChange={e => setSnCurrent(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSN() } }}
+                  />
+                  <button type="button" className="btn btn-secondary btn-icon" onClick={addSN}><Plus size={16} /></button>
+                </div>
+              </div>
+              </>
+            )}
 
             {/* Tableau S/N compact */}
-            {lignesSN.length > 0 && (
+            {!isPDA() && lignesSN.length > 0 && (
               <div style={{ marginBottom: '12px', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
@@ -400,8 +436,9 @@ export default function Reception() {
               </div>
             )}
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={lignesSN.length === 0}>
-              Préparer la réception {lignesSN.length > 0 ? `(${lignesSN.length} produit${lignesSN.length > 1 ? 's' : ''})` : ''}
+            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}
+              disabled={isPDA() ? quantite < 1 : lignesSN.length === 0}>
+              Préparer la réception {isPDA() ? `(${quantite} unité${quantite > 1 ? 's' : ''})` : lignesSN.length > 0 ? `(${lignesSN.length} S/N)` : ''}
             </button>
           </form>
         </div>
@@ -447,16 +484,30 @@ export default function Reception() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: '#eff6ff' }}>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
-                        S/N ({lotPrepare.lignes.length})
-                      </th>
-                      <th style={{ padding: '8px 12px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
-                        Accessoires
-                      </th>
+                      {isPDA(lotPrepare.articleId) ? (
+                        <th style={{ padding: '8px 12px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
+                          Quantité
+                        </th>
+                      ) : (
+                        <>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
+                            S/N ({lotPrepare.lignes.length})
+                          </th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
+                            Accessoires
+                          </th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {lotPrepare.lignes.map((ligne, i) => (
+                    {isPDA(lotPrepare.articleId) ? (
+                      <tr>
+                        <td style={{ padding: '8px 12px', fontWeight: 600, fontSize: '20px', color: '#1d4ed8' }}>
+                          {lotPrepare.lignes[0]?.quantite} unité{(lotPrepare.lignes[0]?.quantite ?? 0) > 1 ? 's' : ''}
+                        </td>
+                      </tr>
+                    ) : lotPrepare.lignes.map((ligne, i) => (
                       <tr key={ligne.sn} style={{ borderBottom: i < lotPrepare.lignes.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
                         <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8' }}>{ligne.sn}</td>
                         <td style={{ padding: '6px 12px', color: '#6b7280' }}>

@@ -191,6 +191,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                     {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>⠿</span>
                   </th>
                 ))}
+                <th>Ajouté le</th>
                 <th></th>
               </tr>
             </thead>
