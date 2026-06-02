@@ -10,11 +10,11 @@ datasource db {
 model article {
   id               Int                @id @default(autoincrement())
   siteId           Int
-  statutId         Int
+  statutId         Int?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   site             site               @relation(fields: [siteId], references: [id], map: "Article_siteId_fkey")
-  statut           statut             @relation(fields: [statutId], references: [id], map: "Article_statutId_fkey")
+  statut           statut?            @relation(fields: [statutId], references: [id], map: "Article_statutId_fkey")
   historiquestatut historiquestatut[]
   valeurs          valeurChamp[]
 
@@ -205,8 +205,8 @@ model transition {
   couleurBouton                          String @default("#3b82f6")
   ordre                                  Int    @default(0)
   site                                   site   @relation(fields: [siteId], references: [id], map: "Transition_siteId_fkey")
-  statutFrom statut @relation("transition_statutFromIdTostatut", fields: [statutFromId], references: [id], map: "Transition_statutFromId_fkey")
-  statutTo   statut @relation("transition_statutToIdTostatut", fields: [statutToId], references: [id], map: "Transition_statutToId_fkey")
+  statutFrom statut @relation("transition_statutFromIdTostatut", fields: [statutFromId], references: [id], onDelete: Cascade, map: "Transition_statutFromId_fkey")
+  statutTo   statut @relation("transition_statutToIdTostatut", fields: [statutToId], references: [id], onDelete: Cascade, map: "Transition_statutToId_fkey")
 
   @@index([siteId], map: "Transition_siteId_fkey")
   @@index([statutFromId], map: "Transition_statutFromId_fkey")
