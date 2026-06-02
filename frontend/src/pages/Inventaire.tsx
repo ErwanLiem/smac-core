@@ -132,10 +132,6 @@ export default function Inventaire() {
   const hasActiveFiltres = Object.values(filtres).some(v => v.trim() !== '')
 
   const filteredInventaires = inventaires.filter(inv => {
-    // Filtre Article
-    if (filtres['article']?.trim()) {
-      if (!getArticleLabel(inv.articleId).toLowerCase().includes(filtres['article'].toLowerCase())) return false
-    }
     // Filtre Statut
     if (filtres['statut']?.trim()) {
       const label = inv.statut?.label ?? ''
@@ -235,7 +231,6 @@ export default function Inventaire() {
           <table className="table" style={{ minWidth: 'max-content' }}>
             <thead>
               <tr>
-                <th>Article</th>
                 <th>Statut</th>
                 {champsOrdonnes.map(c => (
                   <th key={c.id}
@@ -252,12 +247,6 @@ export default function Inventaire() {
                 <th></th>
               </tr>
               <tr style={{ background: '#f8faff' }}>
-                <td style={{ padding: '4px 8px' }}>
-                  <input className="form-input" placeholder="Filtrer..."
-                    value={filtres['article'] ?? ''}
-                    onChange={e => setFiltres(f => ({ ...f, article: e.target.value }))}
-                    style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
-                </td>
                 <td style={{ padding: '4px 8px' }}>
                   <input className="form-input" placeholder="Filtrer..."
                     value={filtres['statut'] ?? ''}
@@ -277,13 +266,12 @@ export default function Inventaire() {
             </thead>
             <tbody>
               {filteredInventaires.length === 0 && (
-                <tr><td colSpan={champs.length + 4} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
+                <tr><td colSpan={champs.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
                   {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
               {filteredInventaires.map(item => (
                 <tr key={item.id}>
-                  <td style={{ fontWeight: 500 }}>{getArticleLabel(item.articleId)}</td>
                   <td><StatutBadge statut={item.statut} /></td>
                   {champsOrdonnes.map(c => (
                     <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>

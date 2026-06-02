@@ -62,6 +62,7 @@ const CODES = {
 const CODES_PN          = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO']
 const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
 const CODES_TYPE        = ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE']
+const CODES_TYPE_INV    = ['TYPE', 'TYPE_ARTICLE', 'TYPE_PRODUIT']
 
 function normalize(str: string): string {
   return str.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
@@ -94,12 +95,12 @@ export default function Reception() {
   const [snCurrent, setSnCurrent] = useState('')
   const [quantite, setQuantite] = useState<number>(1)
 
-  // Lot préparé (tableau de droite)
-  const [lotPrepare, setLotPrepare] = useState<LotPrepare | null>(null)
+  // Lots en attente de validation (tableau de droite)
+  const [lotsEnAttente, setLotsEnAttente] = useState<LotPrepare[]>([])
 
-  const [validation, setValidation] = useState(false)
   const [showModalReset, setShowModalReset] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
+  const [valide, setValide] = useState(false)
 
   useEffect(() => { reload() }, [siteId])
 
@@ -195,8 +196,8 @@ export default function Reception() {
     const art = articles.find(a => a.id === articleId)!
     const stockId = isTPE() ? getStatutStock() : null
     const statutLabel = statuts.find(s => s.id === stockId)?.label ?? null
+    const typeValeur = getTypeArticle()
 
-    // Pour PDA : une seule ligne avec quantité
     const lignes = isPDA()
       ? [{ sn: '', accessoiresIds: [], accessoiresLabels: [], quantite }]
       : lignesSN.map(l => ({
@@ -206,19 +207,27 @@ export default function Reception() {
           quantite: 1
         }))
 
-    setLotPrepare({
+    const nouveauLot: LotPrepare = {
       articleId,
       articleLabel: getArticleLabel(art),
       bl, bt, dateCreationBL, dateReception, garantie,
       statut: statutLabel,
       statutId: stockId,
       lignes
-    })
+    }
+
+    setLotsEnAttente(prev => [...prev, nouveauLot])
+
+    // Reset article et S/N mais garde BL/BT/dates
+    setArticleId(0)
+    setLignesSN([])
+    setSnCurrent('')
+    setQuantite(1)
   }
 
   // Étape 2 : Valider → envoie en BDD
   async function handleValider() {
-    if (!lotPrepare) return
+    if (lotsEnAttente.length === 0) return
     setErreur(null)
     try {
       const idBL       = findChampId(champsInv, CODES.BL)
@@ -228,36 +237,72 @@ export default function Reception() {
       const idGarantie = findChampId(champsInv, CODES.GARANTIE)
       const idSN       = findChampId(champsInv, CODES.SN)
       const idAcc      = findChampId(champsInv, CODES.ACCESSOIRES)
+      const idPN       = findChampId(champsInv, CODES_PN)
+      const idDesig    = findChampId(champsInv, CODES_DESIGNATION)
+      const idQte      = findChampId(champsInv, ['QUANTITE', 'QTE', 'QUANTITY'])
+      const idTypeInv  = findChampId(champsInv, CODES_TYPE_INV)
 
-      for (const ligne of lotPrepare.lignes) {
-        const valeurs: { champId: number; valeur: string }[] = []
-        if (idBL && lotPrepare.bl)              valeurs.push({ champId: idBL, valeur: lotPrepare.bl })
-        if (idBT && lotPrepare.bt)              valeurs.push({ champId: idBT, valeur: lotPrepare.bt })
-        if (idRMA && lotPrepare.dateCreationBL) valeurs.push({ champId: idRMA, valeur: lotPrepare.dateCreationBL })
-        if (idRIC && lotPrepare.dateReception)  valeurs.push({ champId: idRIC, valeur: lotPrepare.dateReception })
-        if (idGarantie && lotPrepare.garantie)  valeurs.push({ champId: idGarantie, valeur: lotPrepare.garantie })
-        if (idSN && ligne.sn)                   valeurs.push({ champId: idSN, valeur: ligne.sn })
-        if (idAcc && ligne.accessoiresLabels.length > 0)
-          valeurs.push({ champId: idAcc, valeur: ligne.accessoiresLabels.join(', ') })
-        // PDA : champ quantité
-        if (ligne.quantite && ligne.quantite > 0) {
-          const idQte = findChampId(champsInv, ['QUANTITE', 'QTE', 'QUANTITY'])
-          if (idQte) valeurs.push({ champId: idQte, valeur: String(ligne.quantite) })
+      // Charger l'inventaire existant pour trouver les lignes PDA à mettre à jour
+      const inventaireExistant: any[] = await inventaireApi.getAll(siteId)
+
+      for (const lot of lotsEnAttente) {
+        const artSource   = [...articles, ...articlesAccessoires].find(a => a.id === lot.articleId)
+        const pnValeur    = artSource?.valeurs.find(v => CODES_PN.includes(normalize(v.champ?.code ?? '')))?.valeur ?? ''
+        const desigValeur = artSource?.valeurs.find(v => CODES_DESIGNATION.includes(normalize(v.champ?.code ?? '')))?.valeur ?? ''
+        const typeValeur  = getTypeArticle(lot.articleId)
+        const isPDALot    = isPDA(lot.articleId)
+
+        if (isPDALot) {
+          // Chercher une ligne existante pour cet article
+          const ligneExistante = inventaireExistant.find(inv => inv.articleId === lot.articleId)
+          const nouvelleQte = lot.lignes[0]?.quantite ?? 1
+
+          if (ligneExistante) {
+            // Additionner à la quantité existante
+            const qteActuelle = Number(ligneExistante.valeurs.find((v: any) => v.champId === idQte)?.valeur ?? 0)
+            const valeurs: { champId: number; valeur: string }[] = []
+
+            // Reprendre toutes les valeurs existantes sauf quantité
+            for (const v of ligneExistante.valeurs) {
+              if (v.champId !== idQte) valeurs.push({ champId: v.champId, valeur: v.valeur ?? '' })
+            }
+            if (idQte) valeurs.push({ champId: idQte, valeur: String(qteActuelle + nouvelleQte) })
+
+            await inventaireApi.update(ligneExistante.id, { statutId: ligneExistante.statutId, valeurs })
+          } else {
+            // Créer une nouvelle ligne
+            const valeurs: { champId: number; valeur: string }[] = []
+            if (idPN && pnValeur)        valeurs.push({ champId: idPN, valeur: pnValeur })
+            if (idDesig && desigValeur)  valeurs.push({ champId: idDesig, valeur: desigValeur })
+            if (idTypeInv && typeValeur) valeurs.push({ champId: idTypeInv, valeur: typeValeur })
+            if (idBL && lot.bl)          valeurs.push({ champId: idBL, valeur: lot.bl })
+            if (idBT && lot.bt)          valeurs.push({ champId: idBT, valeur: lot.bt })
+            if (idQte)                   valeurs.push({ champId: idQte, valeur: String(nouvelleQte) })
+            await inventaireApi.create(siteId, { articleId: lot.articleId, statutId: lot.statutId, valeurs })
+          }
+        } else {
+          // TPE / autre : créer une ligne par S/N
+          for (const ligne of lot.lignes) {
+            const valeurs: { champId: number; valeur: string }[] = []
+            if (idPN && pnValeur)              valeurs.push({ champId: idPN, valeur: pnValeur })
+            if (idDesig && desigValeur)        valeurs.push({ champId: idDesig, valeur: desigValeur })
+            if (idTypeInv && typeValeur)       valeurs.push({ champId: idTypeInv, valeur: typeValeur })
+            if (idBL && lot.bl)               valeurs.push({ champId: idBL, valeur: lot.bl })
+            if (idBT && lot.bt)               valeurs.push({ champId: idBT, valeur: lot.bt })
+            if (idRMA && lot.dateCreationBL)  valeurs.push({ champId: idRMA, valeur: lot.dateCreationBL })
+            if (idRIC && lot.dateReception)   valeurs.push({ champId: idRIC, valeur: lot.dateReception })
+            if (idGarantie && lot.garantie)   valeurs.push({ champId: idGarantie, valeur: lot.garantie })
+            if (idSN && ligne.sn)             valeurs.push({ champId: idSN, valeur: ligne.sn })
+            if (idAcc && ligne.accessoiresLabels.length > 0)
+              valeurs.push({ champId: idAcc, valeur: ligne.accessoiresLabels.join(', ') })
+            await inventaireApi.create(siteId, { articleId: lot.articleId, statutId: lot.statutId, valeurs })
+          }
         }
-
-        await inventaireApi.create(siteId, {
-          articleId: lotPrepare.articleId,
-          statutId: lotPrepare.statutId,
-          valeurs
-        })
       }
 
-      setLotPrepare(null)
-      setLignesSN([])
-      setSnCurrent('')
-      setValidation(true)
-      setTimeout(() => setValidation(false), 3000)
-      // Demander si on garde les infos BL
+      setLotsEnAttente([])
+      setValide(true)
+      setTimeout(() => setValide(false), 3000)
       setShowModalReset(true)
     } catch {
       setErreur('Erreur lors de l\'enregistrement')
@@ -283,6 +328,7 @@ export default function Reception() {
     setLignesSN([])
     setSnCurrent('')
     setQuantite(1)
+    setLotsEnAttente([])
     setShowModalReset(false)
   }
 
@@ -347,21 +393,25 @@ export default function Reception() {
                 <input className="form-input" placeholder="N° bon de transport" value={bt} onChange={e => setBt(e.target.value)} />
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Date création BL</label>
-                <input type="date" className="form-input" value={dateCreationBL} onChange={e => setDateCreationBL(e.target.value)} />
-              </div>
-              <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Date réception</label>
                 <input type="date" className="form-input" value={dateReception} onChange={e => setDateReception(e.target.value)} />
               </div>
-              <div className="form-group" style={{ margin: 0, gridColumn: 'span 2' }}>
-                <label className="form-label">Garantie</label>
-                <select className="form-input" value={garantie} onChange={e => setGarantie(e.target.value)}>
-                  <option value="">— Choisir —</option>
-                  <option value="Garantie">Garantie</option>
-                  <option value="Hors garantie">Hors garantie</option>
-                </select>
-              </div>
+              {!isPDA() && (
+                <>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Date création BL</label>
+                    <input type="date" className="form-input" value={dateCreationBL} onChange={e => setDateCreationBL(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0, gridColumn: 'span 2' }}>
+                    <label className="form-label">Garantie</label>
+                    <select className="form-input" value={garantie} onChange={e => setGarantie(e.target.value)}>
+                      <option value="">— Choisir —</option>
+                      <option value="Garantie">Garantie</option>
+                      <option value="Hors garantie">Hors garantie</option>
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />
@@ -443,87 +493,78 @@ export default function Reception() {
           </form>
         </div>
 
-        {/* Tableau de vérification */}
+        {/* Panneau de droite — liste cumulative + validation */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>Vérification avant validation</h2>
-            {lotPrepare && (
-              <button className="btn btn-secondary" style={{ fontSize: '12px' }} onClick={() => setLotPrepare(null)}>
-                <Trash2 size={13} /> Annuler
+            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>
+              À valider — {lotsEnAttente.reduce((acc, l) => acc + (isPDA(l.articleId) ? (l.lignes[0]?.quantite ?? 0) : l.lignes.length), 0)} produit{lotsEnAttente.reduce((acc, l) => acc + l.lignes.length, 0) !== 1 ? 's' : ''}
+            </h2>
+            {lotsEnAttente.length > 0 && (
+              <button className="btn btn-secondary" style={{ fontSize: '12px' }} onClick={() => setLotsEnAttente([])}>
+                <Trash2 size={13} /> Vider
               </button>
             )}
           </div>
 
-          {validation && (
+          {valide && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', color: '#16a34a', fontSize: '14px', marginBottom: '16px' }}>
               <CheckCircle size={18} /> Réception validée et enregistrée dans l'inventaire !
             </div>
           )}
 
-          {!lotPrepare ? (
+          {lotsEnAttente.length === 0 ? (
             <p style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center', padding: '48px 0' }}>
-              Remplissez le formulaire et cliquez sur "Préparer la réception"
+              Préparez des articles pour les voir apparaître ici
             </p>
           ) : (
             <>
-              {/* Résumé lot */}
-              <div style={{ background: '#f8faff', border: '1px solid #e0e7ff', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px' }}>
-                <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '8px' }}>{lotPrepare.articleLabel}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                  {lotPrepare.bl && <span><span style={{ color: '#6b7280' }}>BL :</span> {lotPrepare.bl}</span>}
-                  {lotPrepare.bt && <span><span style={{ color: '#6b7280' }}>BT :</span> {lotPrepare.bt}</span>}
-                  {lotPrepare.dateCreationBL && <span><span style={{ color: '#6b7280' }}>Date création BL :</span> {new Date(lotPrepare.dateCreationBL).toLocaleDateString('fr-FR')}</span>}
-                  {lotPrepare.dateReception && <span><span style={{ color: '#6b7280' }}>Date réception :</span> {new Date(lotPrepare.dateReception).toLocaleDateString('fr-FR')}</span>}
-                  {lotPrepare.garantie && <span><span style={{ color: '#6b7280' }}>Garantie :</span> {lotPrepare.garantie}</span>}
-                  {lotPrepare.statut && <span><span style={{ color: '#6b7280' }}>Statut :</span> {lotPrepare.statut}</span>}
+              {lotsEnAttente.map((lot, idx) => (
+                <div key={idx} style={{ border: '1px solid #e5e7eb', borderRadius: '8px', marginBottom: '12px', overflow: 'hidden' }}>
+                  <div style={{ background: '#f8faff', padding: '10px 14px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontWeight: 600, fontSize: '13px' }}>{lot.articleLabel}</span>
+                      <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '10px' }}>
+                        {lot.bl && `BL : ${lot.bl}`}{lot.bt && ` · BT : ${lot.bt}`}
+                        {lot.dateReception && ` · ${new Date(lot.dateReception).toLocaleDateString('fr-FR')}`}
+                        {lot.garantie && ` · ${lot.garantie}`}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', background: '#e0e7ff', color: '#3730a3', borderRadius: '4px', padding: '2px 8px' }}>
+                        {isPDA(lot.articleId) ? `${lot.lignes[0]?.quantite} unité${(lot.lignes[0]?.quantite ?? 0) > 1 ? 's' : ''}` : `${lot.lignes.length} S/N`}
+                      </span>
+                      <button onClick={() => setLotsEnAttente(prev => prev.filter((_, i) => i !== idx))}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  {!isPDA(lot.articleId) && (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <tbody>
+                        {lot.lignes.map((l, i) => (
+                          <tr key={l.sn} style={{ borderBottom: i < lot.lignes.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
+                            <td style={{ padding: '4px 14px', fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8' }}>{l.sn}</td>
+                            <td style={{ padding: '4px 14px', color: '#6b7280' }}>
+                              {l.accessoiresLabels.length > 0 ? l.accessoiresLabels.join(', ') : <span style={{ color: '#d1d5db' }}>—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              </div>
+              ))}
 
-              {/* Tableau S/N */}
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'auto', marginBottom: '16px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ background: '#eff6ff' }}>
-                      {isPDA(lotPrepare.articleId) ? (
-                        <th style={{ padding: '8px 12px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
-                          Quantité
-                        </th>
-                      ) : (
-                        <>
-                          <th style={{ padding: '8px 12px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
-                            S/N ({lotPrepare.lignes.length})
-                          </th>
-                          <th style={{ padding: '8px 12px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
-                            Accessoires
-                          </th>
-                        </>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isPDA(lotPrepare.articleId) ? (
-                      <tr>
-                        <td style={{ padding: '8px 12px', fontWeight: 600, fontSize: '20px', color: '#1d4ed8' }}>
-                          {lotPrepare.lignes[0]?.quantite} unité{(lotPrepare.lignes[0]?.quantite ?? 0) > 1 ? 's' : ''}
-                        </td>
-                      </tr>
-                    ) : lotPrepare.lignes.map((ligne, i) => (
-                      <tr key={ligne.sn} style={{ borderBottom: i < lotPrepare.lignes.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
-                        <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8' }}>{ligne.sn}</td>
-                        <td style={{ padding: '6px 12px', color: '#6b7280' }}>
-                          {ligne.accessoiresLabels.length > 0
-                            ? ligne.accessoiresLabels.join(', ')
-                            : <span style={{ color: '#d1d5db' }}>—</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {erreur && (
+                <div style={{ padding: '8px 12px', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626', fontSize: '13px', marginBottom: '10px' }}>
+                  {erreur}
+                </div>
+              )}
 
               <button className="btn btn-primary" style={{ width: '100%', fontSize: '15px', padding: '12px' }} onClick={handleValider}>
                 <CheckCircle size={17} style={{ marginRight: '8px' }} />
-                Valider la réception ({lotPrepare.lignes.length} produit{lotPrepare.lignes.length > 1 ? 's' : ''})
+                Valider la réception
               </button>
             </>
           )}
