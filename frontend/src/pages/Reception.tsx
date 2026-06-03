@@ -79,9 +79,16 @@ export default function Reception() {
   const [champsArticles, setChampsArticles] = useState<Champ[]>([])
   const [champsInv, setChampsInv] = useState<Champ[]>([])
   const [champsReception, setChampsReception] = useState<Champ[]>([])
+  const [champsClients, setChampsClients] = useState<Champ[]>([])
+  const [champsPlateformes, setChampsPlateformes] = useState<Champ[]>([])
   const [articles, setArticles] = useState<Article[]>([])
   const [articlesAccessoires, setArticlesAccessoires] = useState<Article[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  const [plateformes, setPlateformes] = useState<any[]>([])
   const [statuts, setStatuts] = useState<Statut[]>([])
+
+  const CODES_CLIENT     = ['CLIENT', 'CLIENTS']
+  const CODES_PLATEFORME = ['PLATEFORME', 'PLATEFORMES']
   const [lotsEnAttente, setLotsEnAttente] = useState<LotPrepare[]>([])
   const [valide, setValide] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -97,18 +104,26 @@ export default function Reception() {
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
-    const [ca, ci, a, s] = await Promise.all([
+    const [ca, ci, cc, cp, a, cl, pl, s] = await Promise.all([
       get<Champ[]>(`/articles/${siteId}/champs`),
       inventaireApi.getChamps(siteId),
+      get<Champ[]>(`/clients/${siteId}/champs`),
+      get<Champ[]>(`/plateformes/${siteId}/champs`),
       get<Article[]>(`/articles/${siteId}`),
+      get<any[]>(`/clients/${siteId}`),
+      get<any[]>(`/plateformes/${siteId}`),
       get<Statut[]>(`/workflow/${siteId}/statuts`)
     ])
     setChampsArticles(ca.filter(c => c.actif))
+    setChampsClients(cc.filter(c => c.actif))
+    setChampsPlateformes(cp.filter(c => c.actif))
+    setClients(cl)
+    setPlateformes(pl)
     setStatuts(s)
 
     const champsInvActifs = ci.filter(c => c.actif)
     setChampsInv(champsInvActifs)
-    setChampsReception(champsInvActifs) // stocke tout, filtrage dynamique selon le mode
+    setChampsReception(champsInvActifs)
 
     // Séparer articles normaux et accessoires
     const champsTypeIds = ca.filter(c => CODES_ACCESSOIRE.some(code => normalize(c.code) === normalize(code))).map(c => c.id)
@@ -127,6 +142,18 @@ export default function Reception() {
   function getArticleLabelById(id: number): string {
     const art = [...articles, ...articlesAccessoires].find(a => a.id === id)
     return art ? getArticleLabel(art) : `#${id}`
+  }
+
+  function getEntiteLabel(entite: any, champs: Champ[]): string {
+    return champs.map(c => entite.valeurs?.find((v: any) => v.champId === c.id)?.valeur).filter(Boolean).join(' — ') || `#${entite.id}`
+  }
+
+  function isChampClient(c: Champ): boolean {
+    return CODES_CLIENT.includes(normalize(c.code))
+  }
+
+  function isChampPlateforme(c: Champ): boolean {
+    return CODES_PLATEFORME.includes(normalize(c.code))
   }
 
   function getModesuivi(artId = articleId): 'SN' | 'QTE' | 'AUTRE' {
@@ -344,8 +371,8 @@ export default function Reception() {
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '4px 0 12px' }} />
 
-            {/* Champs configurés visibles à la réception */}
-            {(() => {
+            {/* Champs configurés visibles à la réception — uniquement après sélection article */}
+            {articleId > 0 && (() => {
               const champsVisibles = champsReception.filter(c =>
                 modeSuivi === 'QTE' ? c.visibleReceptionQTE : c.visibleReceptionSN
               )
@@ -362,7 +389,29 @@ export default function Reception() {
                       <label className="form-label">
                         {c.label} <span style={{ color: '#dc2626' }}>*</span>
                       </label>
-                      {c.type === 'SELECT' ? (
+                      {isChampClient(c) ? (
+                        <select required className="form-input"
+                          value={champsCommuns[c.id] ?? ''}
+                          onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
+                          <option value="">— Choisir un client —</option>
+                          {clients.map(cl => (
+                            <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>
+                              {getEntiteLabel(cl, champsClients)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : isChampPlateforme(c) ? (
+                        <select required className="form-input"
+                          value={champsCommuns[c.id] ?? ''}
+                          onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
+                          <option value="">— Choisir une plateforme —</option>
+                          {plateformes.map(pl => (
+                            <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>
+                              {getEntiteLabel(pl, champsPlateformes)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : c.type === 'SELECT' ? (
                         <select required className="form-input"
                           value={champsCommuns[c.id] ?? ''}
                           onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
@@ -388,10 +437,10 @@ export default function Reception() {
               </div>
             )})()}
 
-            <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />
+            {articleId > 0 && <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />}
 
             {/* Mode QTE */}
-            {modeSuivi === 'QTE' && (
+            {articleId > 0 && modeSuivi === 'QTE' && (
               <div className="form-group">
                 <label className="form-label">Quantité *</label>
                 <input type="number" min={1} required className="form-input" style={{ maxWidth: '120px' }}
@@ -400,7 +449,7 @@ export default function Reception() {
             )}
 
             {/* Mode SN */}
-            {(modeSuivi === 'SN' || modeSuivi === 'AUTRE') && (
+            {articleId > 0 && (modeSuivi === 'SN' || modeSuivi === 'AUTRE') && (
               <>
                 <div className="form-group" style={{ marginBottom: '8px' }}>
                   <label className="form-label">Saisie S/N <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Entrée pour ajouter)</span></label>
@@ -460,10 +509,10 @@ export default function Reception() {
               </div>
             )}
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}
+            {articleId > 0 && <button type="submit" className="btn btn-primary" style={{ width: '100%' }}
               disabled={!articleId || (modeSuivi === 'SN' && lignesSN.length === 0) || (modeSuivi === 'QTE' && quantite < 1)}>
               Préparer {modeSuivi === 'QTE' ? `(${quantite} unité${quantite > 1 ? 's' : ''})` : lignesSN.length > 0 ? `(${lignesSN.length} S/N)` : ''}
-            </button>
+            </button>}
           </form>
         </div>
 
