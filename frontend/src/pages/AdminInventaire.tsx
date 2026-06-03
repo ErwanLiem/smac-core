@@ -1,7 +1,66 @@
-import { useEffect, useState } from 'react'
-import { Trash2, Pencil, Check, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Trash2, Pencil, Check, X, Plus } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { getPermissions } from '../utils/permissions'
+
+function parseOptions(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try { return JSON.parse(raw) } catch { return [] }
+}
+
+function OptionsEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [options, setOptions] = useState<string[]>(() => {
+    const parsed = parseOptions(value)
+    return Array.isArray(parsed) ? parsed : []
+  })
+  const [newOption, setNewOption] = useState('')
+  const prevValue = useRef(value)
+
+  useEffect(() => {
+    if (value !== prevValue.current) {
+      const parsed = parseOptions(value)
+      setOptions(Array.isArray(parsed) ? parsed : [])
+      prevValue.current = value
+    }
+  }, [value])
+
+  function sync(opts: string[]) {
+    setOptions(opts)
+    onChange(JSON.stringify(opts))
+  }
+
+  function add() {
+    const trimmed = newOption.trim()
+    if (!trimmed || options.includes(trimmed)) return
+    sync([...options, trimmed])
+    setNewOption('')
+  }
+
+  function remove(opt: string) {
+    sync(options.filter(o => o !== opt))
+  }
+
+  return (
+    <div style={{ marginTop: '8px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+        {options.map(opt => (
+          <span key={opt} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '2px 8px', fontSize: '12px' }}>
+            {opt}
+            <button type="button" onClick={() => remove(opt)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#93c5fd', padding: 0 }}><X size={11} /></button>
+          </span>
+        ))}
+        {options.length === 0 && <span style={{ color: '#9ca3af', fontSize: '12px' }}>Aucune option</span>}
+      </div>
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <input className="form-input" placeholder="Nouvelle option..." value={newOption}
+          onChange={e => setNewOption(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+          style={{ fontSize: '12px', padding: '4px 8px' }} />
+        <button type="button" className="btn btn-secondary btn-icon" onClick={add}><Plus size={14} /></button>
+      </div>
+    </div>
+  )
+}
 
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
@@ -9,7 +68,7 @@ function getSiteId(): number {
   return JSON.parse(raw)?.site?.id ?? 1
 }
 
-type ChampType = 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT'
+type ChampType = 'TEXT' | 'NUMBER' | 'DATE' | 'DATE_TODAY' | 'SELECT'
 
 interface Champ {
   id: number
@@ -28,6 +87,7 @@ const typeLabels: Record<ChampType, string> = {
   TEXT: 'Texte',
   NUMBER: 'Nombre',
   DATE: 'Date',
+  DATE_TODAY: 'Date du jour',
   SELECT: 'Liste déroulante'
 }
 
@@ -125,6 +185,9 @@ export default function AdminInventaire() {
                     <select className="form-input" style={{ fontSize: '13px' }} value={editForm.type ?? c.type} onChange={e => setEditForm({ ...editForm, type: e.target.value as ChampType })}>
                       {Object.entries(typeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
+                    {editForm.type === 'SELECT' && (
+                      <OptionsEditor value={editForm.options ?? ''} onChange={v => setEditForm(f => ({ ...f, options: v }))} />
+                    )}
                   </td>
                   <td style={{ textAlign: 'center' }}><input type="checkbox" checked={editForm.obligatoire ?? false} onChange={e => setEditForm({ ...editForm, obligatoire: e.target.checked })} /></td>
                   <td style={{ textAlign: 'center' }}><input type="checkbox" checked={editForm.actif ?? true} onChange={e => setEditForm({ ...editForm, actif: e.target.checked })} /></td>
@@ -173,9 +236,15 @@ export default function AdminInventaire() {
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Type</label>
-                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as ChampType })} className="form-input">
+                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as ChampType, options: '' })} className="form-input">
                   {Object.entries(typeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
+                {form.type === 'SELECT' && (
+                  <div style={{ marginTop: '6px' }}>
+                    <label className="form-label">Options</label>
+                    <OptionsEditor value={form.options} onChange={v => setForm(f => ({ ...f, options: v }))} />
+                  </div>
+                )}
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Ordre</label>

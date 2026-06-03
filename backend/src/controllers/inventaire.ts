@@ -23,7 +23,7 @@ export async function createChamp(req: Request, res: Response, next) {
         code,
         label,
         type: type || 'TEXT',
-        options: options ? JSON.stringify(options) : null,
+        options: options || null,
         obligatoire: obligatoire ?? false,
         ordre: ordre ?? 0,
         actif: true,
@@ -46,7 +46,7 @@ export async function updateChamp(req: Request, res: Response, next) {
       data: {
         label,
         type,
-        options: options ? JSON.stringify(options) : null,
+        options: options || null,
         obligatoire,
         ordre,
         actif,

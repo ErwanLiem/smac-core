@@ -326,7 +326,7 @@ export default function Inventaire() {
                     {c.label}
                     {c.obligatoire && <span style={{ color: '#dc2626', marginLeft: '4px' }}>*</span>}
                   </label>
-                  {c.type === 'DATE' ? (
+                  {(c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
                     <input type="date" required={c.obligatoire} className="form-input"
                       value={formValeurs[c.id] ?? ''}
                       onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))} />
@@ -375,7 +375,7 @@ export default function Inventaire() {
                     {c.label}
                     {c.obligatoire && <span style={{ color: '#dc2626', marginLeft: '4px' }}>*</span>}
                   </label>
-                  {c.type === 'DATE' ? (
+                  {(c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
                     <input type="date" required={c.obligatoire} className="form-input"
                       value={editItem.valeurs[c.id] ?? ''}
                       onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />

@@ -61,15 +61,15 @@ function normalize(str: string): string {
   return str.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
 }
 
+function parseOptions(raw: string | null): string[] {
+  if (!raw) return []
+  try { return JSON.parse(raw) } catch { return [] }
+}
+
 function findChampId(champs: Champ[], codes: string[]): number | null {
   const norm = codes.map(normalize)
   const c = champs.find(ch => norm.includes(normalize(ch.code)))
   return c ? c.id : null
-}
-
-function parseOptions(raw: string | null): string[] {
-  if (!raw) return []
-  try { return JSON.parse(raw) } catch { return [] }
 }
 
 export default function Reception() {
@@ -125,6 +125,16 @@ export default function Reception() {
     setChampsInv(champsInvActifs)
     setChampsReception(champsInvActifs)
 
+    // Pré-remplir les champs DATE_TODAY avec la date du jour
+    const today = new Date().toISOString().split('T')[0]
+    const preRemplis: Record<number, string> = {}
+    champsInvActifs.forEach(c => {
+      if (c.type === 'DATE_TODAY') preRemplis[c.id] = today
+    })
+    if (Object.keys(preRemplis).length > 0) {
+      setChampsCommuns(f => ({ ...preRemplis, ...f }))
+    }
+
     // Séparer articles normaux et accessoires
     const champsTypeIds = ca.filter(c => CODES_ACCESSOIRE.some(code => normalize(c.code) === normalize(code))).map(c => c.id)
     const acc = a.filter(art => art.valeurs.some(v => champsTypeIds.includes(v.champId) && normalize(String(v.valeur ?? '')) === 'ACCESSOIRE'))
@@ -144,8 +154,17 @@ export default function Reception() {
     return art ? getArticleLabel(art) : `#${id}`
   }
 
+  const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
+
   function getEntiteLabel(entite: any, champs: Champ[]): string {
-    return champs.map(c => entite.valeurs?.find((v: any) => v.champId === c.id)?.valeur).filter(Boolean).join(' — ') || `#${entite.id}`
+    // Chercher d'abord un champ NOM
+    const champNom = champs.find(c => CODES_NOM.includes(normalize(c.code)))
+    if (champNom) {
+      const val = entite.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur
+      if (val) return val
+    }
+    // Sinon premier champ non vide
+    return champs.map(c => entite.valeurs?.find((v: any) => v.champId === c.id)?.valeur).filter(Boolean)[0] || `#${entite.id}`
   }
 
   function isChampClient(c: Champ): boolean {
@@ -383,7 +402,7 @@ export default function Reception() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {champsVisibles.map(c => {
-                  const opts = parseOptions(c.options)
+                  const opts = Array.isArray(parseOptions(c.options)) ? parseOptions(c.options) : []
                   return (
                     <div key={c.id} className="form-group" style={{ margin: 0 }}>
                       <label className="form-label">
@@ -418,9 +437,9 @@ export default function Reception() {
                           <option value="">— Choisir —</option>
                           {opts.map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
-                      ) : c.type === 'DATE' ? (
+                      ) : (c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
                         <input type="date" required className="form-input"
-                          value={champsCommuns[c.id] ?? ''}
+                          value={champsCommuns[c.id] ?? (c.type === 'DATE_TODAY' ? new Date().toISOString().split('T')[0] : '')}
                           onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
                       ) : c.type === 'NUMBER' ? (
                         <input type="number" required className="form-input"

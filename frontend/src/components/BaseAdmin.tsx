@@ -54,7 +54,7 @@ function OptionsEditor({ value, onChange }: { value: string; onChange: (v: strin
   )
 }
 
-export type ChampType = 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT'
+export type ChampType = 'TEXT' | 'NUMBER' | 'DATE' | 'DATE_TODAY' | 'SELECT'
 
 export interface Champ {
   id: number
@@ -68,7 +68,7 @@ export interface Champ {
 }
 
 const typeLabels: Record<ChampType, string> = {
-  TEXT: 'Texte', NUMBER: 'Nombre', DATE: 'Date', SELECT: 'Liste déroulante'
+  TEXT: 'Texte', NUMBER: 'Nombre', DATE: 'Date', DATE_TODAY: 'Date du jour', SELECT: 'Liste déroulante'
 }
 
 const emptyChamp = { code: '', label: '', type: 'TEXT' as ChampType, options: '', obligatoire: false, ordre: 0 }

@@ -235,6 +235,11 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
             <form onSubmit={handleCreate}>
               {champs.map(c => {
                 const opts = c.options ? (() => { try { return JSON.parse(c.options) } catch { return [] } })() : []
+                const today = new Date().toISOString().split('T')[0]
+                // Auto-remplir DATE_TODAY si pas encore de valeur
+                if (c.type === 'DATE_TODAY' && !formValeurs[c.id]) {
+                  setTimeout(() => setFormValeurs(f => f[c.id] ? f : ({ ...f, [c.id]: today })), 0)
+                }
                 return (
                 <div className="form-group" key={c.id}>
                   <label className="form-label">
@@ -244,6 +249,10 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                   {c.type === 'DATE' ? (
                     <input type="date" required={c.obligatoire} className="form-input"
                       value={formValeurs[c.id] ?? ''}
+                      onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))} />
+                  ) : c.type === 'DATE_TODAY' ? (
+                    <input type="date" required={c.obligatoire} className="form-input"
+                      value={formValeurs[c.id] ?? today}
                       onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))} />
                   ) : c.type === 'NUMBER' ? (
                     <input type="number" required={c.obligatoire} className="form-input"
@@ -286,7 +295,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                     {c.label}
                     {c.obligatoire && <span style={{ color: '#dc2626', marginLeft: '4px' }}>*</span>}
                   </label>
-                  {c.type === 'DATE' ? (
+                  {(c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
                     <input type="date" required={c.obligatoire} className="form-input"
                       value={editItem.valeurs[c.id] ?? ''}
                       onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />

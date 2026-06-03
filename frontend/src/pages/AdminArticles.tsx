@@ -60,7 +60,7 @@ function getSiteId(): number {
   return JSON.parse(raw)?.site?.id ?? 1
 }
 
-type ChampType = 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT'
+type ChampType = 'TEXT' | 'NUMBER' | 'DATE' | 'DATE_TODAY' | 'SELECT'
 
 interface Champ {
   id: number
@@ -77,6 +77,7 @@ const typeLabels: Record<ChampType, string> = {
   TEXT: 'Texte',
   NUMBER: 'Nombre',
   DATE: 'Date',
+  DATE_TODAY: 'Date du jour',
   SELECT: 'Liste déroulante'
 }
 
