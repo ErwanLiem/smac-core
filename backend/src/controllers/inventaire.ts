@@ -16,7 +16,7 @@ export async function getChamps(req: Request, res: Response) {
 export async function createChamp(req: Request, res: Response, next) {
   try {
     const { siteId } = req.params
-    const { code, label, type, options, obligatoire, ordre } = req.body
+    const { code, label, type, options, obligatoire, ordre, visibleReceptionSN, visibleReceptionQTE } = req.body
     const champ = await prisma.champInventaire.create({
       data: {
         siteId: Number(siteId),
@@ -26,7 +26,9 @@ export async function createChamp(req: Request, res: Response, next) {
         options: options ? JSON.stringify(options) : null,
         obligatoire: obligatoire ?? false,
         ordre: ordre ?? 0,
-        actif: true
+        actif: true,
+        visibleReceptionSN: visibleReceptionSN ?? false,
+        visibleReceptionQTE: visibleReceptionQTE ?? false,
       }
     })
     res.json(champ)
@@ -38,7 +40,7 @@ export async function createChamp(req: Request, res: Response, next) {
 export async function updateChamp(req: Request, res: Response, next) {
   try {
     const { id } = req.params
-    const { label, type, options, obligatoire, ordre, actif } = req.body
+    const { label, type, options, obligatoire, ordre, actif, visibleReceptionSN, visibleReceptionQTE } = req.body
     const champ = await prisma.champInventaire.update({
       where: { id: Number(id) },
       data: {
@@ -47,7 +49,9 @@ export async function updateChamp(req: Request, res: Response, next) {
         options: options ? JSON.stringify(options) : null,
         obligatoire,
         ordre,
-        actif
+        actif,
+        visibleReceptionSN,
+        visibleReceptionQTE,
       }
     })
     res.json(champ)

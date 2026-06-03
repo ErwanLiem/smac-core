@@ -153,17 +153,19 @@ model inventaire {
 }
 
 model champInventaire {
-  id          Int                     @id @default(autoincrement())
-  siteId      Int
-  code        String
-  label       String
-  type        String                  @default("TEXT") // TEXT, NUMBER, DATE, SELECT
-  options     String?                 @db.LongText     // JSON array pour les SELECT
-  obligatoire Boolean                 @default(false)
-  ordre       Int                     @default(0)
-  actif       Boolean                 @default(true)
-  site        site                    @relation(fields: [siteId], references: [id], map: "ChampInventaire_siteId_fkey")
-  valeurs     valeurChampInventaire[]
+  id                 Int                     @id @default(autoincrement())
+  siteId             Int
+  code               String
+  label              String
+  type               String                  @default("TEXT") // TEXT, NUMBER, DATE, SELECT
+  options            String?                 @db.LongText     // JSON array pour les SELECT
+  obligatoire        Boolean                 @default(false)
+  ordre              Int                     @default(0)
+  actif              Boolean                 @default(true)
+  visibleReceptionSN      Boolean             @default(false)
+  visibleReceptionQTE     Boolean             @default(false)
+  site               site                    @relation(fields: [siteId], references: [id], map: "ChampInventaire_siteId_fkey")
+  valeurs            valeurChampInventaire[]
 
   @@unique([siteId, code], map: "ChampInventaire_siteId_code_key")
   @@index([siteId], map: "ChampInventaire_siteId_fkey")
