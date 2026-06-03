@@ -184,6 +184,22 @@ model valeurChampInventaire {
   @@index([champId], map: "ValeurChampInventaire_champId_fkey")
 }
 
+model historiqueActivite {
+  id         Int      @id @default(autoincrement())
+  siteId     Int
+  userId     Int?
+  type       String   // RECEPTION, MODIFICATION, SUPPRESSION, TRANSITION_STATUT, etc.
+  entite     String   // inventaire, article, client, plateforme, etc.
+  entiteId   Int?
+  details    String?  @db.LongText // JSON avec les détails du mouvement
+  createdAt  DateTime @default(now())
+  site       site     @relation(fields: [siteId], references: [id], map: "HistoriqueActivite_siteId_fkey")
+
+  @@index([siteId], map: "HistoriqueActivite_siteId_fkey")
+  @@index([type], map: "HistoriqueActivite_type_fkey")
+  @@index([entite, entiteId], map: "HistoriqueActivite_entite_fkey")
+}
+
 model historiquestatut {
   id          Int      @id @default(autoincrement())
   articleId   Int
@@ -216,18 +232,19 @@ model site {
   slug        String        @unique(map: "Site_slug_key")
   actif       Boolean       @default(true)
   createdAt   DateTime      @default(now())
-  article         article[]
-  role            role[]
-  statut          statut[]
-  transition      transition[]
-  utilisateur     utilisateur[]
-  champArticle    champArticle[]
-  client          client[]
-  champClient     champClient[]
-  plateforme      plateforme[]
-  champPlateforme champPlateforme[]
-  inventaire      inventaire[]
-  champInventaire champInventaire[]
+  article              article[]
+  role                 role[]
+  statut               statut[]
+  transition           transition[]
+  utilisateur          utilisateur[]
+  champArticle         champArticle[]
+  client               client[]
+  champClient          champClient[]
+  plateforme           plateforme[]
+  champPlateforme      champPlateforme[]
+  inventaire           inventaire[]
+  champInventaire      champInventaire[]
+  historiqueActivite   historiqueActivite[]
 }
 
 model statut {

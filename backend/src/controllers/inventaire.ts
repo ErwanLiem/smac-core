@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { logActivite } from '../utils/historique'
 
 const prisma = new PrismaClient()
 
@@ -116,6 +117,20 @@ export async function create(req: Request, res: Response, next) {
         }
       }
     })
+
+    await logActivite({
+      siteId: Number(siteId),
+      userId: (req as any).user?.id,
+      type: 'RECEPTION',
+      entite: 'inventaire',
+      entiteId: inventaire.id,
+      details: {
+        articleId: Number(articleId),
+        statutId: statutId ? Number(statutId) : null,
+        valeurs: valeurs.map((v: any) => ({ champId: v.champId, valeur: v.valeur }))
+      }
+    })
+
     res.json(inventaire)
   } catch (e) {
     next(e)
@@ -151,6 +166,15 @@ export async function update(req: Request, res: Response, next) {
         }
       }
     })
+    await logActivite({
+      siteId: inventaire.siteId,
+      userId: (req as any).user?.id,
+      type: 'MODIFICATION',
+      entite: 'inventaire',
+      entiteId: inventaire.id,
+      details: { statutId: statutId ? Number(statutId) : null }
+    })
+
     res.json(inventaire)
   } catch (e) {
     next(e)
@@ -160,9 +184,18 @@ export async function update(req: Request, res: Response, next) {
 export async function remove(req: Request, res: Response, next) {
   try {
     const { id } = req.params
-    await prisma.inventaire.delete({
-      where: { id: Number(id) }
-    })
+    const inv = await prisma.inventaire.findUnique({ where: { id: Number(id) } })
+    await prisma.inventaire.delete({ where: { id: Number(id) } })
+    if (inv) {
+      await logActivite({
+        siteId: inv.siteId,
+        userId: (req as any).user?.id,
+        type: 'SUPPRESSION',
+        entite: 'inventaire',
+        entiteId: Number(id),
+        details: { articleId: inv.articleId }
+      })
+    }
     res.json({ success: true })
   } catch (e) {
     next(e)
