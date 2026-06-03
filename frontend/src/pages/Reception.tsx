@@ -222,6 +222,15 @@ export default function Reception() {
     if (modeSuivi === 'QTE' && quantite < 1) { setErreur('La quantité doit être supérieure à 0'); return }
     setErreur(null)
 
+    // S'assurer que les champs DATE_TODAY ont bien la date du jour
+    const today = new Date().toISOString().split('T')[0]
+    const champsAvecDateToday = { ...champsCommuns }
+    champsInv.forEach(c => {
+      if (c.type === 'DATE_TODAY' && !champsAvecDateToday[c.id]) {
+        champsAvecDateToday[c.id] = today
+      }
+    })
+
     const art = articles.find(a => a.id === articleId)!
     const statutId = modeSuivi === 'SN' ? getStatutStock() : null
     const statutLabel = statuts.find(s => s.id === statutId)?.label ?? null
@@ -235,18 +244,13 @@ export default function Reception() {
       articleId,
       articleLabel: getArticleLabel(art),
       modesuivi: modeSuivi,
-      champsCommuns: { ...champsCommuns },
+      champsCommuns: champsAvecDateToday,
       lignes,
       quantite,
       statut: statutLabel,
       statutId
     }])
 
-    // Reset article et S/N, garde les champs communs
-    setArticleId(0)
-    setLignesSN([])
-    setSnCurrent('')
-    setQuantite(1)
   }
 
   async function handleValider() {
@@ -390,8 +394,8 @@ export default function Reception() {
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '4px 0 12px' }} />
 
-            {/* Champs configurés visibles à la réception — uniquement après sélection article */}
-            {articleId > 0 && (() => {
+            {/* Champs configurés visibles à la réception — toujours visibles */}
+            {(() => {
               const champsVisibles = champsReception.filter(c =>
                 modeSuivi === 'QTE' ? c.visibleReceptionQTE : c.visibleReceptionSN
               )
@@ -456,7 +460,7 @@ export default function Reception() {
               </div>
             )})()}
 
-            {articleId > 0 && <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />}
+            <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />
 
             {/* Mode QTE */}
             {articleId > 0 && modeSuivi === 'QTE' && (

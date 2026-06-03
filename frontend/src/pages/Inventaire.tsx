@@ -69,6 +69,11 @@ export default function Inventaire() {
   const [modal, setModal] = useState<{ id: number } | null>(null)
   const [editItem, setEditItem] = useState<{ id: number; articleId: number; statutId: number | null; valeurs: Record<number, string> } | null>(null)
 
+  useEffect(() => {
+    document.querySelector('.main-content')?.classList.add('page-table')
+    return () => { document.querySelector('.main-content')?.classList.remove('page-table') }
+  }, [])
+
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
@@ -193,11 +198,11 @@ export default function Inventaire() {
 
   function StatutBadge({ statut }: { statut: Statut | null }) {
     if (!statut) return <span style={{ color: '#d1d5db' }}>—</span>
-    return <span className="badge" style={{ background: statut.couleur, color: 'white' }}>{statut.label}</span>
+    return <span style={{ background: statut.couleur, color: 'white', fontSize: '11px', fontWeight: 500, padding: '1px 7px', borderRadius: '4px', whiteSpace: 'nowrap', display: 'inline-block' }}>{statut.label}</span>
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="page-header">
         <div>
           <h1 className="page-title">Inventaire</h1>
@@ -226,10 +231,10 @@ export default function Inventaire() {
           <p style={{ fontSize: '13px' }}>Configurez d'abord les champs dans Configuration → Structure inventaire.</p>
         </div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-          <table className="table" style={{ minWidth: 'max-content' }}>
-            <thead>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
+          <table className="table" style={{ minWidth: 'max-content', fontSize: '12px' }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr>
                 <th>Statut</th>
                 {champsOrdonnes.map(c => (
@@ -270,13 +275,13 @@ export default function Inventaire() {
                   {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
-              {filteredInventaires.map(item => (
-                <tr key={item.id}>
-                  <td><StatutBadge statut={item.statut} /></td>
+              {filteredInventaires.map((item, idx) => (
+                <tr key={item.id} style={{ background: idx % 2 === 0 ? 'white' : '#e8f0fe' }}>
+                  <td style={{ padding: '4px 10px' }}><StatutBadge statut={item.statut} /></td>
                   {champsOrdonnes.map(c => (
-                    <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                    <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
-                  <td style={{ display: 'flex', gap: '6px' }}>
+                  <td style={{ padding: '4px 8px', display: 'flex', gap: '6px' }}>
                     {peutEditer && (
                       <button className="btn btn-secondary btn-icon" onClick={() => openEdit(item)}>
                         <Pencil size={14} />

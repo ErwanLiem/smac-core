@@ -145,6 +145,13 @@ body {
   padding: 20px;
 }
 
+/* Pages avec tableau full-height */
+.main-content.page-table {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Page header */
 .page-header {
   display: flex;

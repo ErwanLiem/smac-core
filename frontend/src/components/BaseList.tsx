@@ -61,6 +61,11 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
     return true
   })
 
+  useEffect(() => {
+    document.querySelector('.main-content')?.classList.add('page-table')
+    return () => { document.querySelector('.main-content')?.classList.remove('page-table') }
+  }, [])
+
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
@@ -136,7 +141,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   }
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="page-header">
         <div>
           <h1 className="page-title">{titre}</h1>
@@ -162,8 +167,9 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
           <p style={{ fontSize: '13px' }}>Configurez d'abord les champs dans la section Configuration.</p>
         </div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table className="table">
+        <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
+          <table className="table" style={{ minWidth: 'max-content' }}>
             <thead>
               <tr>
                 {champsOrdonnes.map(c => (
@@ -224,6 +230,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
