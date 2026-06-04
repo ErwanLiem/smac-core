@@ -279,31 +279,47 @@ export default function AttendusDetail() {
 
   function texteRapportEmail(): string {
     if (!rapport || !attendu) return ''
+    const rmaName = attendu.rma || 'N/A'
+    const clientName = attendu.client || 'N/A'
+    const hasEcarts = rapport.nonRecus.length > 0 || rapport.inattendus.length > 0 || (rapport.doublonsInventaire?.length ?? 0) > 0
+
     const lines: string[] = []
-    lines.push(`Rapport d'écart — RMA ${attendu.rma || 'N/A'} — BT ${attendu.bt || 'N/A'}`)
-    lines.push(`Client : ${attendu.client || 'N/A'}`)
-    lines.push(`Date : ${new Date().toLocaleDateString('fr-FR')}`)
+    lines.push('Hi everyone,')
     lines.push('')
-    if (rapport.nonRecus.length > 0) {
-      lines.push(`❌ S/N MANQUANTS (${rapport.nonRecus.length})`)
-      const byPN = groupParPN(rapport.nonRecus)
-      for (const [pn, ligs] of Object.entries(byPN)) {
-        lines.push(`  P/N ${pn} :`)
-        ligs.forEach(l => lines.push(`    - ${l.sn}`))
+
+    if (!hasEcarts) {
+      lines.push(`I confirm receipt of the RMA ${rmaName} from customer ${clientName}.`)
+      lines.push('It is complete and compliant.')
+    } else {
+      lines.push(`I confirm receipt of the RMA ${rmaName} from customer ${clientName}.`)
+      lines.push('')
+      lines.push('Errors were identified during the review.')
+      lines.push('')
+
+      if (rapport.nonRecus.length > 0) {
+        lines.push(`Missing S/N (${rapport.nonRecus.length}):`)
+        const byPN = groupParPN(rapport.nonRecus)
+        for (const [pn, ligs] of Object.entries(byPN)) {
+          lines.push(`  P/N ${pn}:`)
+          ligs.forEach(l => lines.push(`    - ${l.sn}`))
+        }
+        lines.push('')
       }
-      lines.push('')
+
+      if (rapport.inattendus.length > 0) {
+        lines.push(`Unexpected S/N (${rapport.inattendus.length}):`)
+        rapport.inattendus.forEach(l => lines.push(`  - ${l.sn} (P/N: ${l.pn})`))
+        lines.push('')
+      }
+
+      if (rapport.doublonsInventaire && rapport.doublonsInventaire.length > 0) {
+        lines.push(`S/N already in inventory (${rapport.doublonsInventaire.length}):`)
+        rapport.doublonsInventaire.forEach(l => lines.push(`  - ${l.sn} — ${l.notes || 'Already in inventory'}`))
+        lines.push('')
+      }
     }
-    if (rapport.inattendus.length > 0) {
-      lines.push(`⚠️ S/N NON ATTENDUS (${rapport.inattendus.length})`)
-      rapport.inattendus.forEach(l => lines.push(`  - ${l.sn} (P/N : ${l.pn})`))
-      lines.push('')
-    }
-    if (rapport.doublonsInventaire && rapport.doublonsInventaire.length > 0) {
-      lines.push(`🔴 S/N DÉJÀ EN INVENTAIRE (${rapport.doublonsInventaire.length})`)
-      rapport.doublonsInventaire.forEach(l => lines.push(`  - ${l.sn} — ${l.notes || 'Déjà en inventaire'}`))
-      lines.push('')
-    }
-    lines.push(`✅ S/N REÇUS : ${rapport.recus.length} / ${rapport.total}`)
+
+    lines.push('Regards,')
     return lines.join('\n')
   }
 
@@ -428,7 +444,7 @@ export default function AttendusDetail() {
                       title="Déscannerle S/N — remet en attente"
                       style={{ background: 'none', border: '1px solid #f9a8d4', borderRadius: '4px', cursor: 'pointer', color: '#be185d', padding: '2px 6px', fontSize: '11px', marginLeft: '6px', flexShrink: 0 }}
                     >
-                      ↩ Déscannerle
+                      ✕ Annuler
                     </button>
                   )}
                 </div>
@@ -441,7 +457,7 @@ export default function AttendusDetail() {
                   }}
                   style={{ marginTop: '6px', width: '100%', fontSize: '11px', padding: '4px', background: '#be185d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                 >
-                  ↩ Tout déscannerle
+                  ✕ Tout annuler
                 </button>
               )}
             </div>

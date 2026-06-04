@@ -99,6 +99,7 @@ export default function Reception() {
   const [champsCommuns, setChampsCommuns] = useState<Record<number, string>>({})
   const [lignesSN, setLignesSN] = useState<LigneSN[]>([])
   const [snCurrent, setSnCurrent] = useState('')
+  const [alerteSN, setAlerteSN] = useState<{ sn: string; statut: string | null; rma: string | null } | null>(null)
   const [quantite, setQuantite] = useState<number>(1)
 
   useEffect(() => { reload() }, [siteId])
@@ -195,12 +196,42 @@ export default function Reception() {
   const articleSelectionne = articles.find(a => a.id === articleId)
   const modeSuivi = getModesuivi()
 
-  function addSN() {
+  async function addSN() {
     const sn = snCurrent.trim()
     if (!sn || lignesSN.some(l => l.sn === sn)) return
+
+    // Vérifier si le S/N est déjà en inventaire
+    try {
+      const check = await get<any>(`/inventaire/${siteId}/check-sn/${encodeURIComponent(sn)}`)
+      if (check.existe && !check.estFinal) {
+        // S/N en inventaire avec statut non final → alerte
+        jouerSonAlerte()
+        setAlerteSN({ sn, statut: check.statut, rma: check.rma })
+        setSnCurrent('')
+        return
+      }
+    } catch {}
+
     setLignesSN(prev => [...prev, { sn, accessoires: [] }])
     setSnCurrent('')
     snInputRef.current?.focus()
+  }
+
+  function jouerSonAlerte() {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.type = 'square'
+      oscillator.frequency.setValueAtTime(880, ctx.currentTime)
+      oscillator.frequency.setValueAtTime(440, ctx.currentTime + 0.1)
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+      oscillator.start(ctx.currentTime)
+      oscillator.stop(ctx.currentTime + 0.4)
+    } catch {}
   }
 
   function removeSN(sn: string) {
@@ -617,6 +648,28 @@ export default function Reception() {
     </div>
 
     {/* Modal reset */}
+    {/* Modal alerte S/N déjà en inventaire */}
+    {alerteSN && (
+      <div className="modal-overlay" onClick={() => { setAlerteSN(null); snInputRef.current?.focus() }}>
+        <div style={{ background: 'white', borderRadius: '12px', padding: '32px', maxWidth: '420px', width: '100%', textAlign: 'center', border: '3px solid #dc2626' }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N déjà en inventaire !</h3>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N est actuellement en cours de traitement.</p>
+          <code style={{ display: 'block', background: '#fee2e2', color: '#dc2626', padding: '8px 16px', borderRadius: '6px', fontWeight: 700, fontSize: '16px', marginBottom: '12px' }}>
+            {alerteSN.sn}
+          </code>
+          {alerteSN.statut && <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Statut actuel : <strong>{alerteSN.statut}</strong></p>}
+          {alerteSN.rma && <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>RMA : <strong>{alerteSN.rma}</strong></p>}
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '20px' }}>Ce S/N n'a pas été ajouté à la réception en cours.</p>
+          <button className="btn btn-primary" style={{ width: '100%' }}
+            onClick={() => { setAlerteSN(null); snInputRef.current?.focus() }}>
+            OK — Continuer
+          </button>
+        </div>
+      </div>
+    )}
+
     {showModalReset && (
       <div className="modal-overlay">
         <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>

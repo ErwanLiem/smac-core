@@ -73,6 +73,47 @@ export async function deleteChamp(req: Request, res: Response, next) {
   }
 }
 
+// Vérification S/N en inventaire
+export async function checkSN(req: Request, res: Response) {
+  const { siteId, sn } = req.params
+
+  // Trouver le champ S/N
+  const champsInv = await prisma.champInventaire.findMany({ where: { siteId: Number(siteId) } })
+  const CODES_SN = ['SN', 'S_N', 'NUMERO_SERIE', 'NUMERO DE SERIE', 'SERIAL']
+
+  function normCode(s: string) {
+    return s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+  }
+
+  const champsSN = champsInv.filter(c => {
+    const n = normCode(c.code).replace(/\s+/g, '_')
+    const ns = normCode(c.code).replace(/\s+/g, ' ')
+    return CODES_SN.includes(n) || CODES_SN.includes(ns) || CODES_SN.includes(normCode(c.code))
+  })
+  const idsSN = champsSN.length > 0 ? champsSN.map(c => c.id) : champsInv.map(c => c.id)
+
+  const existing = await prisma.valeurChampInventaire.findFirst({
+    where: { champId: { in: idsSN }, valeur: sn },
+    include: { inventaire: { include: { statut: true } } }
+  })
+
+  if (!existing) return res.json({ existe: false })
+
+  const estFinal = existing.inventaire?.statut?.estFinal ?? false
+
+  // Chercher le RMA
+  const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normCode(c.code)))
+  let rma = null
+  if (champsRMA.length > 0) {
+    const valRMA = await prisma.valeurChampInventaire.findFirst({
+      where: { inventaireId: existing.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
+    })
+    rma = valRMA?.valeur ?? null
+  }
+
+  res.json({ existe: true, estFinal, statut: existing.inventaire?.statut?.label ?? null, rma })
+}
+
 // INVENTAIRE
 export async function getAll(req: Request, res: Response) {
   const { siteId } = req.params

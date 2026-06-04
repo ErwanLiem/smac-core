@@ -9,6 +9,9 @@ router.post('/:siteId/champs', inventaireCtrl.createChamp)
 router.put('/champs/:id', inventaireCtrl.updateChamp)
 router.delete('/champs/:id', inventaireCtrl.deleteChamp)
 
+// Vérification S/N
+router.get('/:siteId/check-sn/:sn', inventaireCtrl.checkSN)
+
 // Inventaire
 router.get('/:siteId', inventaireCtrl.getAll)
 router.post('/:siteId', inventaireCtrl.create)
