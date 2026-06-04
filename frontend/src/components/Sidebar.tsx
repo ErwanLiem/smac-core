@@ -69,10 +69,10 @@ export default function Sidebar() {
     {
       title: 'CONFIGURATION',
       items: [
-        { name: 'Structure articles', path: '/admin/articles', icon: Database },
-        { name: 'Structure clients', path: '/admin/clients', icon: Users },
-        { name: 'Structure plateformes', path: '/admin/plateformes', icon: Building2 },
-        { name: 'Structure inventaire', path: '/admin/inventaire', icon: Database },
+        { name: 'Config. articles', path: '/admin/articles', icon: Database },
+        { name: 'Config. clients', path: '/admin/clients', icon: Users },
+        { name: 'Config. plateformes', path: '/admin/plateformes', icon: Building2 },
+        { name: 'Config. inventaire', path: '/admin/inventaire', icon: Database },
         { name: 'Config. Attendus', path: '/admin/attendus', icon: Settings },
         { name: 'Workflow', path: '/admin/workflow', icon: Settings },
         { name: 'Rôles', path: '/admin/roles', icon: Settings },
