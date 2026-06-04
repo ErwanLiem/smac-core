@@ -84,11 +84,11 @@ export default function Reception() {
   const [plateformes, setPlateformes]       = useState<any[]>([])
   const [statuts, setStatuts]               = useState<Statut[]>([])
 
-  const [lotsEnAttente, setLotsEnAttente] = useState<LotPrepare[]>([])
-  const [valide, setValide]               = useState(false)
+  const [lotsEnAttente, setLotsEnAttente]   = useState<LotPrepare[]>([])
   const [erreur, setErreur]               = useState<string | null>(null)
-  const [showModalReset, setShowModalReset] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
 
+  const [infosValidees, setInfosValidees] = useState(false)
   const [articleId, setArticleId]         = useState<number>(0)
   const [champsCommuns, setChampsCommuns] = useState<Record<number, string>>({})
   const [lignesSN, setLignesSN]           = useState<LigneSN[]>([])
@@ -281,19 +281,27 @@ export default function Reception() {
       }
 
       setLotsEnAttente([])
-      setValide(true)
-      setTimeout(() => setValide(false), 3000)
-      setShowModalReset(true)
     } catch { setErreur("Erreur lors de l'enregistrement") }
   }
 
-  function handleGarderChamps() {
-    setArticleId(0); setLignesSN([]); setSnCurrent(''); setQuantite(1); setShowModalReset(false)
+  async function handleConfirmerReception() {
+    await handleValider()
+    // Reset complet
+    setArticleId(0); setChampsCommuns({}); setLignesSN([]); setSnCurrent('')
+    setQuantite(1); setLotsEnAttente([]); setInfosValidees(false); setShowConfirmation(false)
   }
 
-  function handleResetComplet() {
-    setArticleId(0); setChampsCommuns({}); setLignesSN([]); setSnCurrent('')
-    setQuantite(1); setLotsEnAttente([]); setShowModalReset(false)
+  function handleAnnulerConfirmation() {
+    setShowConfirmation(false)
+  }
+
+  function handleValiderInfos(e: React.FormEvent) {
+    e.preventDefault()
+    setInfosValidees(true)
+  }
+
+  function handleModifierInfos() {
+    setInfosValidees(false)
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -312,10 +320,10 @@ export default function Reception() {
         {/* ── Formulaire gauche ── */}
         <div className="card">
           <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>Saisie du lot</h2>
-          <form onSubmit={handlePreparer}>
+          <form onSubmit={infosValidees ? handlePreparer : handleValiderInfos}>
 
-            {/* Article */}
-            <div className="form-group">
+            {/* Article — seulement si infos validées */}
+            {infosValidees && <div className="form-group">
               <label className="form-label">Article *</label>
               <select required className="form-input" value={articleId}
                 onChange={e => { setArticleId(Number(e.target.value)); setLignesSN([]); setQuantite(1) }}>
@@ -324,8 +332,10 @@ export default function Reception() {
               </select>
             </div>
 
+            </div>}
+
             {/* Infos article */}
-            {articleSelectionne && (
+            {infosValidees && articleSelectionne && (
               <div style={{ background: '#f8faff', border: '1px solid #e0e7ff', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '12px' }}>
                 {champsArticles.map(c => {
                   const val = articleSelectionne.valeurs.find(v => v.champId === c.id)?.valeur
@@ -354,7 +364,25 @@ export default function Reception() {
               <p style={{ color: '#f59e0b', fontSize: '12px', marginBottom: '12px' }}>
                 ⚠️ Aucun champ de réception configuré. Allez dans Configuration → Structure inventaire.
               </p>
+            ) : infosValidees ? (
+              /* Mode lecture seule */
+              <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', padding: '12px', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a' }}>✓ Informations validées</span>
+                  <button type="button" onClick={handleModifierInfos}
+                    style={{ fontSize: '12px', background: 'none', border: '1px solid #86efac', borderRadius: '4px', color: '#16a34a', cursor: 'pointer', padding: '2px 8px' }}>
+                    Modifier
+                  </button>
+                </div>
+                {champsVisibles.map(c => champsCommuns[c.id] ? (
+                  <div key={c.id} style={{ display: 'flex', gap: '8px', fontSize: '12px', marginBottom: '2px' }}>
+                    <span style={{ color: '#6b7280', minWidth: '100px' }}>{c.label} :</span>
+                    <span style={{ fontWeight: 500 }}>{champsCommuns[c.id]}</span>
+                  </div>
+                ) : null)}
+              </div>
             ) : (
+              /* Mode saisie */
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {champsVisibles.map(c => {
                   const opts = parseOptions(c.options)
@@ -393,8 +421,15 @@ export default function Reception() {
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />
 
-            {/* Mode QTE */}
-            {articleId > 0 && modeSuivi === 'QTE' && (
+            {/* Bouton valider infos — avant validation */}
+            {!infosValidees && (
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', marginBottom: '4px' }}>
+                ✓ Valider les informations
+              </button>
+            )}
+
+            {/* Mode QTE — seulement si infos validées */}
+            {infosValidees && articleId > 0 && modeSuivi === 'QTE' && (
               <div className="form-group">
                 <label className="form-label">Quantité *</label>
                 <input type="number" min={1} required className="form-input" style={{ maxWidth: '120px' }}
@@ -402,8 +437,8 @@ export default function Reception() {
               </div>
             )}
 
-            {/* Mode SN */}
-            {articleId > 0 && (modeSuivi === 'SN' || modeSuivi === 'AUTRE') && (
+            {/* Mode SN — seulement si infos validées */}
+            {infosValidees && articleId > 0 && (modeSuivi === 'SN' || modeSuivi === 'AUTRE') && (
               <>
                 <div className="form-group" style={{ marginBottom: '8px' }}>
                   <label className="form-label">Saisie S/N <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Entrée pour ajouter)</span></label>
@@ -458,9 +493,10 @@ export default function Reception() {
               </div>
             )}
 
-            {articleId > 0 && (
+            {/* Sélection article + bouton préparer — seulement si infos validées */}
+            {infosValidees && (
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }}
-                disabled={(modeSuivi === 'SN' && lignesSN.length === 0) || (modeSuivi === 'QTE' && quantite < 1)}>
+                disabled={!articleId || (modeSuivi === 'SN' && lignesSN.length === 0) || (modeSuivi === 'QTE' && quantite < 1)}>
                 Préparer {modeSuivi === 'QTE' ? `(${quantite} unité${quantite > 1 ? 's' : ''})` : lignesSN.length > 0 ? `(${lignesSN.length} S/N)` : ''}
               </button>
             )}
@@ -532,7 +568,7 @@ export default function Reception() {
                   {erreur}
                 </div>
               )}
-              <button className="btn btn-primary" style={{ width: '100%', fontSize: '15px', padding: '12px' }} onClick={handleValider}>
+              <button className="btn btn-primary" style={{ width: '100%', fontSize: '15px', padding: '12px' }} onClick={() => setShowConfirmation(true)}>
                 <CheckCircle size={17} style={{ marginRight: '8px' }} />
                 Valider la réception
               </button>
@@ -563,17 +599,23 @@ export default function Reception() {
       </div>
     )}
 
-    {/* Modal continuer / reset */}
-    {showModalReset && (
+    {/* Modal confirmation réception */}
+    {showConfirmation && (
       <div className="modal-overlay">
         <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Continuer la réception ?</h3>
-          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
-            Voulez-vous garder les informations communes pour continuer à saisir ?
+          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la réception en stock ?</h3>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>
+            <strong>{lotsEnAttente.reduce((acc, l) => acc + (l.modesuivi === 'QTE' ? l.quantite : l.lignes.length), 0)} produit{lotsEnAttente.reduce((acc, l) => acc + l.lignes.length, 0) !== 1 ? 's' : ''}</strong> vont être enregistrés dans l'inventaire.
           </p>
+          <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '20px' }}>
+            Si vous confirmez, tous les formulaires seront vidés.
+          </p>
+          {erreur && <div style={{ padding: '8px', background: '#fee2e2', borderRadius: '6px', color: '#dc2626', fontSize: '13px', marginBottom: '12px' }}>{erreur}</div>}
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-            <button className="btn btn-secondary" onClick={handleResetComplet}>Non, tout vider</button>
-            <button className="btn btn-primary" onClick={handleGarderChamps}>Oui, continuer</button>
+            <button className="btn btn-secondary" onClick={handleAnnulerConfirmation}>Non, continuer la saisie</button>
+            <button className="btn btn-primary" onClick={handleConfirmerReception}>
+              <CheckCircle size={15} style={{ marginRight: '6px' }} /> Oui, confirmer
+            </button>
           </div>
         </div>
       </div>
