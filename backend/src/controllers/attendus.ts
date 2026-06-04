@@ -17,7 +17,7 @@ function normalize(s: string): string {
   return String(s ?? '').toLowerCase().trim()
 }
 
-const CODES_SN = ['SN', 'S_N', 'SERIAL', 'NUMERO_SERIE', 'NUMERO DE SERIE', 'NUMERODE SERIE', 'SERIAL_NUMBER']
+const CODES_SN = ['SN', 'S_N', 'SERIAL', 'NUMERO_SERIE', 'NUMERO DE SERIE', 'NUMERODE SERIE', 'SERIAL_NUMBER', 'NUMERO DE SERIE', 'NUMERO_DE_SERIE', 'NUMÉRO DE SÉRIE', 'NUMÉRO_DE_SÉRIE']
 
 function normalizeCode(code: string): string {
   return code.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
@@ -222,25 +222,35 @@ export async function scannerSN(req: Request, res: Response, next: any) {
     let dejaEnInventaire = false
     let rmaExistant: string | null = null
 
-    if (champSN) {
-      const existing = await prisma.valeurChampInventaire.findFirst({
-        where: { champId: champSN.id, valeur: snNorm },
-        include: { inventaire: true }
+    // Recherche robuste : chercher le SN dans tous les champs qui ressemblent à un S/N
+    const tousLesChampsSN = champsInv.filter(c => {
+      const norm = normalizeCode(c.code).replace(/\s+/g, '_')
+      const normSpace = normalizeCode(c.code).replace(/\s+/g, ' ')
+      return CODES_SN.includes(norm) || CODES_SN.includes(normSpace) || CODES_SN.includes(normalizeCode(c.code))
+    })
+
+    // Si pas de champ SN trouvé, chercher dans toutes les valeurs (fallback)
+    const champsIdsRecherche = tousLesChampsSN.length > 0
+      ? tousLesChampsSN.map(c => c.id)
+      : champsInv.map(c => c.id)
+
+    const existingVal = await prisma.valeurChampInventaire.findFirst({
+      where: { champId: { in: champsIdsRecherche }, valeur: snNorm },
+      include: { inventaire: true }
+    })
+
+    if (existingVal) {
+      dejaEnInventaire = true
+      // Chercher le RMA de cet inventaire
+      const champsRMA = champsInv.filter(c => {
+        const norm = normalizeCode(c.code)
+        return ['BL', 'RMA', 'BON_LIVRAISON'].includes(norm)
       })
-      if (existing) {
-        dejaEnInventaire = true
-        // Chercher le RMA de cet inventaire
-        const champBL = findChampSN(champsInv) // réutilise la recherche normalisée
-        const champsRMA = champsInv.filter(c => {
-          const norm = normalizeCode(c.code)
-          return ['BL', 'RMA', 'BON_LIVRAISON'].includes(norm)
+      if (champsRMA.length > 0) {
+        const valRMA = await prisma.valeurChampInventaire.findFirst({
+          where: { inventaireId: existingVal.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
         })
-        if (champsRMA.length > 0) {
-          const valRMA = await prisma.valeurChampInventaire.findFirst({
-            where: { inventaireId: existing.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
-          })
-          rmaExistant = valRMA?.valeur ?? null
-        }
+        rmaExistant = valRMA?.valeur ?? null
       }
     }
 
@@ -374,14 +384,17 @@ export async function valider(req: Request, res: Response, next: any) {
       where: { siteId: attendu.siteId, actif: true }
     })
 
-    // Vérifier les S/N déjà en inventaire
-    const idSNInv = champsInv.find(c => ['SN', 'S_N', 'NUMERO_SERIE', 'NUMÉRO DE SÉRIE'].some(code =>
-      c.code.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '') === code.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-    ))?.id
+    // Vérifier les S/N déjà en inventaire — recherche robuste
+    const champsSNInv = champsInv.filter(c => {
+      const n = normalizeCode(c.code).replace(/\s+/g, '_')
+      const ns = normalizeCode(c.code).replace(/\s+/g, ' ')
+      return CODES_SN.includes(n) || CODES_SN.includes(ns) || CODES_SN.includes(normalizeCode(c.code))
+    })
+    const idsSNInv = champsSNInv.length > 0 ? champsSNInv.map(c => c.id) : champsInv.map(c => c.id)
 
-    const snsExistants = idSNInv ? await prisma.valeurChampInventaire.findMany({
-      where: { champId: idSNInv }
-    }) : []
+    const snsExistants = await prisma.valeurChampInventaire.findMany({
+      where: { champId: { in: idsSNInv } }
+    })
     const snsDejaPresents = new Set(snsExistants.map(v => v.valeur))
 
     // Injecter les lignes RECU dans l'inventaire
@@ -469,12 +482,17 @@ export async function cloturer(req: Request, res: Response, next: any) {
 
     // ---- Vérifier qu'aucun S/N reçu n'est déjà en inventaire ----
     const champsInvCheck = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
-    const champSNCheck = champsInvCheck.find(c => ['SN', 'S_N', 'NUMERO_SERIE'].includes(c.code.toUpperCase()))
-    if (champSNCheck) {
+    const champsSNCheck = champsInvCheck.filter(c => {
+      const n = normalizeCode(c.code).replace(/\s+/g, '_')
+      const ns = normalizeCode(c.code).replace(/\s+/g, ' ')
+      return CODES_SN.includes(n) || CODES_SN.includes(ns) || CODES_SN.includes(normalizeCode(c.code))
+    })
+    const idsSNCheck = champsSNCheck.length > 0 ? champsSNCheck.map(c => c.id) : champsInvCheck.map(c => c.id)
+    {
       const lignesRecues = attendu.lignes.filter(l => l.statut === 'RECU')
       const snsRecus = lignesRecues.map(l => l.sn)
       const existants = await prisma.valeurChampInventaire.findMany({
-        where: { champId: champSNCheck.id, valeur: { in: snsRecus } }
+        where: { champId: { in: idsSNCheck }, valeur: { in: snsRecus } }
       })
       if (existants.length > 0) {
         return res.status(400).json({
