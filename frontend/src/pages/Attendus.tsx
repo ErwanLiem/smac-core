@@ -161,7 +161,7 @@ export default function Attendus() {
                   <td>
                     {a.statut === 'CLOS'
                       ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#cbd5e1', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>
-                      : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', padding: '2px 8px', borderRadius: '4px' }}><Clock size={11} /> En cours</span>
+                      : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#1e3a1e', color: '#4ade80', padding: '2px 8px', borderRadius: '4px' }}><Clock size={11} /> En cours</span>
                     }
                   </td>
                   <td style={{ fontWeight: 500 }}>{a.rma || <span style={{ color: '#d1d5db' }}>—</span>}</td>
