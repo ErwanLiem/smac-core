@@ -299,6 +299,7 @@ export default function AttendusDetail() {
   const isClos = attendu.statut === 'CLOS'
   const lignesNormales = attendu.lignes.filter(l => l.statut !== 'INATTENDU' && l.statut !== 'DOUBLON_INVENTAIRE')
   const inattendus = attendu.lignes.filter(l => l.statut === 'INATTENDU')
+  const doublonsInv = attendu.lignes.filter(l => l.statut === 'DOUBLON_INVENTAIRE')
   const groupes = groupParPN(lignesNormales)
   const totalAttendu = lignesNormales.length
   const totalRecu = lignesNormales.filter(l => l.statut === 'RECU').length
@@ -383,6 +384,21 @@ export default function AttendusDetail() {
               </div>
               {inattendus.map(l => (
                 <div key={l.id} style={{ fontSize: '11px', fontFamily: 'monospace', color: '#92400e' }}>{l.sn}</div>
+              ))}
+            </div>
+          )}
+
+          {/* Déjà en inventaire */}
+          {doublonsInv.length > 0 && (
+            <div style={{ border: '2px solid #f9a8d4', borderRadius: '8px', padding: '12px', background: '#fdf2f8' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#be185d', marginBottom: '6px' }}>
+                🔴 Déjà en inventaire ({doublonsInv.length})
+              </div>
+              {doublonsInv.map(l => (
+                <div key={l.id} style={{ fontSize: '11px', fontFamily: 'monospace', color: '#be185d', marginBottom: '2px' }}>
+                  {l.sn}
+                  {l.notes && <div style={{ fontSize: '10px', fontFamily: 'sans-serif', color: '#9d174d', marginTop: '1px' }}>{l.notes}</div>}
+                </div>
               ))}
             </div>
           )}
