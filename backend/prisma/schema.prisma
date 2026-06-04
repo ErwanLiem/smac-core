@@ -191,6 +191,7 @@ model attendu {
   rma               String?
   bt                String?
   client            String?
+  plateforme        String?
   dateCreationRMA   String?
   statut      String         @default("EN_COURS") // EN_COURS, CLOS
   createdAt   DateTime       @default(now())

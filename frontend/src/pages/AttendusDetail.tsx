@@ -69,20 +69,28 @@ export default function AttendusDetail() {
   const [editInfos, setEditInfos] = useState(false)
   const [rma, setRma] = useState('')
   const [bt, setBt] = useState('')
+  const [plateforme, setPlateforme] = useState('')
   const [dateCreationRMA, setDateCreationRMA] = useState('')
+  const [plateformes, setPlateformes] = useState<any[]>([])
+  const [champsPlateformes, setChampsPlateformes] = useState<any[]>([])
 
   useEffect(() => { reload() }, [id])
 
   async function reload() {
-    const [data, arts, champsArts] = await Promise.all([
+    const [data, arts, champsArts, plats, champsPlats] = await Promise.all([
       attendusApi.getDetail(Number(id)),
       get<any[]>(`/articles/${siteId}`),
-      get<any[]>(`/articles/${siteId}/champs`)
+      get<any[]>(`/articles/${siteId}/champs`),
+      get<any[]>(`/plateformes/${siteId}`),
+      get<any[]>(`/plateformes/${siteId}/champs`)
     ])
     setAttendu(data)
     setRma(data.rma || '')
     setBt(data.bt || '')
+    setPlateforme(data.plateforme || '')
     setDateCreationRMA(data.dateCreationRMA || '')
+    setPlateformes(plats)
+    setChampsPlateformes(champsPlats.filter((c: any) => c.actif))
     // Initialiser les accessoires cochés depuis les données existantes
     const accMap: Record<number, number[]> = {}
     data.lignes.forEach((l: Ligne) => {
@@ -217,8 +225,19 @@ export default function AttendusDetail() {
     reload()
   }
 
+  const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
+
+  function getPlateformeLabel(pl: any): string {
+    const champNom = champsPlateformes.find((c: any) => CODES_NOM.includes(c.code.toUpperCase()))
+    if (champNom) {
+      const val = pl.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur
+      if (val) return val
+    }
+    return pl.valeurs?.map((v: any) => v.valeur).filter(Boolean)[0] || `Plateforme #${pl.id}`
+  }
+
   async function handleSaveInfos() {
-    await attendusApi.update(Number(id), { rma, bt, dateCreationRMA })
+    await attendusApi.update(Number(id), { rma, bt, plateforme, dateCreationRMA })
     setEditInfos(false)
     reload()
   }
@@ -750,6 +769,15 @@ export default function AttendusDetail() {
             <div className="form-group">
               <label className="form-label">N° BT</label>
               <input className="form-input" value={bt} onChange={e => setBt(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Plateforme</label>
+              <select className="form-input" value={plateforme} onChange={e => setPlateforme(e.target.value)}>
+                <option value="">— Choisir une plateforme —</option>
+                {plateformes.map(pl => (
+                  <option key={pl.id} value={getPlateformeLabel(pl)}>{getPlateformeLabel(pl)}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">Date création RMA</label>

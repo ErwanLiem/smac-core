@@ -164,10 +164,10 @@ export async function importExcel(req: Request, res: Response, next: any) {
 export async function update(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
-    const { rma, bt, client, dateCreationRMA } = req.body
+    const { rma, bt, client, plateforme, dateCreationRMA } = req.body
     const attendu = await prisma.attendu.update({
       where: { id: Number(id) },
-      data: { rma, bt, client, dateCreationRMA }
+      data: { rma, bt, client, plateforme, dateCreationRMA }
     })
     res.json(attendu)
   } catch (e) {
@@ -555,6 +555,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
     const idBT          = findChampId(['BT', 'BT_RECEP'])
     const idRMACreation = findChampId(['RMA_CREATION', 'DATE_CREATION_BL', 'DATE_BL'])
     const idDateRIC     = findChampId(['DATE_RIC', 'DATE_RECEPTION', 'DATE_REC'])
+    const idPlateforme  = findChampId(['PLATEFORME', 'PLATEFORMES', 'PLATFORM'])
     const dateAujourdhui = new Date().toISOString().split('T')[0]
 
     const statutStock = await prisma.statut.findFirst({
@@ -600,10 +601,11 @@ export async function cloturer(req: Request, res: Response, next: any) {
       if (idPN && ligne.pn)                        valeurs.push({ champId: idPN, valeur: ligne.pn })
       if (idGarantie && ligne.garantie)            valeurs.push({ champId: idGarantie, valeur: ligne.garantie })
       if (idPanneClient && ligne.panneClient)      valeurs.push({ champId: idPanneClient, valeur: ligne.panneClient })
-      if (idBL && attendu.rma)                     valeurs.push({ champId: idBL, valeur: attendu.rma })
-      if (idBT && attendu.bt)                      valeurs.push({ champId: idBT, valeur: attendu.bt })
+      if (idBL && attendu.rma)                      valeurs.push({ champId: idBL, valeur: attendu.rma })
+      if (idBT && attendu.bt)                       valeurs.push({ champId: idBT, valeur: attendu.bt })
       if (idRMACreation && attendu.dateCreationRMA) valeurs.push({ champId: idRMACreation, valeur: attendu.dateCreationRMA })
-      if (idDateRIC)                               valeurs.push({ champId: idDateRIC, valeur: dateAujourdhui })
+      if (idDateRIC)                                valeurs.push({ champId: idDateRIC, valeur: dateAujourdhui })
+      if (idPlateforme && attendu.plateforme)       valeurs.push({ champId: idPlateforme, valeur: attendu.plateforme })
 
       const valeursMap = new Map<number, string>()
       for (const v of valeurs) valeursMap.set(v.champId, v.valeur)
