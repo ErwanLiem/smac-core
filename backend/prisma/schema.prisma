@@ -208,9 +208,10 @@ model ligneAttendue {
   sn           String
   panneClient  String?
   garantie     String?
-  statut       String   @default("ATTENDU") // ATTENDU, RECU, NON_RECU, INATTENDU
+  statut       String   @default("ATTENDU") // ATTENDU, RECU, NON_RECU, INATTENDU, DOUBLON_INVENTAIRE
   snRecu       String?  // SN réellement scanné si différent
   accessoires  String?  @db.LongText // JSON array des accessoires reçus
+  notes        String?  // Info complémentaire (ex: RMA existant pour DOUBLON_INVENTAIRE)
   createdAt    DateTime @default(now())
   attendu      attendu  @relation(fields: [attenduId], references: [id], onDelete: Cascade, map: "LigneAttendue_attenduId_fkey")
 

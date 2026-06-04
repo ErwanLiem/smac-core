@@ -29,6 +29,7 @@ interface Attendu {
 interface Rapport {
   nonRecus: Ligne[]
   inattendus: Ligne[]
+  doublonsInventaire: Ligne[]
   recus: Ligne[]
   total: number
 }
@@ -277,6 +278,11 @@ export default function AttendusDetail() {
       rapport.inattendus.forEach(l => lines.push(`  - ${l.sn} (P/N : ${l.pn})`))
       lines.push('')
     }
+    if (rapport.doublonsInventaire && rapport.doublonsInventaire.length > 0) {
+      lines.push(`🔴 S/N DÉJÀ EN INVENTAIRE (${rapport.doublonsInventaire.length})`)
+      rapport.doublonsInventaire.forEach(l => lines.push(`  - ${l.sn} — ${l.notes || 'Déjà en inventaire'}`))
+      lines.push('')
+    }
     lines.push(`✅ S/N REÇUS : ${rapport.recus.length} / ${rapport.total}`)
     return lines.join('\n')
   }
@@ -516,7 +522,7 @@ export default function AttendusDetail() {
               </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                 <div style={{ textAlign: 'center', background: '#dcfce7', borderRadius: '8px', padding: '12px' }}>
                   <div style={{ fontSize: '24px', fontWeight: 700, color: '#16a34a' }}>{rapport.recus.length}</div>
                   <div style={{ fontSize: '12px', color: '#16a34a' }}>Reçus</div>
@@ -528,6 +534,10 @@ export default function AttendusDetail() {
                 <div style={{ textAlign: 'center', background: '#fef3c7', borderRadius: '8px', padding: '12px' }}>
                   <div style={{ fontSize: '24px', fontWeight: 700, color: '#92400e' }}>{rapport.inattendus.length}</div>
                   <div style={{ fontSize: '12px', color: '#92400e' }}>Inattendus</div>
+                </div>
+                <div style={{ textAlign: 'center', background: '#fce7f3', borderRadius: '8px', padding: '12px' }}>
+                  <div style={{ fontSize: '24px', fontWeight: 700, color: '#be185d' }}>{rapport.doublonsInventaire?.length ?? 0}</div>
+                  <div style={{ fontSize: '12px', color: '#be185d' }}>Doublons</div>
                 </div>
               </div>
               {rapport.nonRecus.length > 0 && (
@@ -549,12 +559,25 @@ export default function AttendusDetail() {
                   ))}
                 </div>
               )}
-              {rapport.nonRecus.length === 0 && rapport.inattendus.length === 0 && (
+              {rapport.doublonsInventaire && rapport.doublonsInventaire.length > 0 && (
+                <div style={{ marginBottom: '16px' }}>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#be185d', marginBottom: '8px' }}>🔴 S/N déjà en inventaire</h4>
+                  {rapport.doublonsInventaire.map(l => (
+                    <div key={l.id} style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>· {l.sn}</span>
+                      <span style={{ marginLeft: '8px', color: '#be185d' }}>{l.notes || 'Déjà en inventaire'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {rapport.nonRecus.length === 0 && rapport.inattendus.length === 0 && !rapport.doublonsInventaire?.length && (
                 <div style={{ textAlign: 'center', color: '#16a34a', padding: '20px' }}>
                   <CheckCircle size={32} style={{ margin: '0 auto 8px' }} />
                   <p style={{ fontWeight: 600 }}>Aucun écart — tous les S/N ont été reçus !</p>
                 </div>
               )}
+
               <div style={{ marginTop: '16px', background: '#f8faff', border: '1px solid #e0e7ff', borderRadius: '8px', padding: '12px' }}>
                 <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', fontWeight: 600 }}>APERÇU EMAIL</div>
                 <pre style={{ fontSize: '12px', color: '#374151', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{texteRapportEmail()}</pre>

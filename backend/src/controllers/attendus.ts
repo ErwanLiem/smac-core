@@ -220,11 +220,28 @@ export async function scannerSN(req: Request, res: Response, next: any) {
     const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
     const champSN = findChampSN(champsInv)
     let dejaEnInventaire = false
+    let rmaExistant: string | null = null
+
     if (champSN) {
       const existing = await prisma.valeurChampInventaire.findFirst({
-        where: { champId: champSN.id, valeur: snNorm }
+        where: { champId: champSN.id, valeur: snNorm },
+        include: { inventaire: true }
       })
-      dejaEnInventaire = !!existing
+      if (existing) {
+        dejaEnInventaire = true
+        // Chercher le RMA de cet inventaire
+        const champBL = findChampSN(champsInv) // réutilise la recherche normalisée
+        const champsRMA = champsInv.filter(c => {
+          const norm = normalizeCode(c.code)
+          return ['BL', 'RMA', 'BON_LIVRAISON'].includes(norm)
+        })
+        if (champsRMA.length > 0) {
+          const valRMA = await prisma.valeurChampInventaire.findFirst({
+            where: { inventaireId: existing.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
+          })
+          rmaExistant = valRMA?.valeur ?? null
+        }
+      }
     }
 
     if (ligne) {
@@ -233,7 +250,21 @@ export async function scannerSN(req: Request, res: Response, next: any) {
         where: { id: ligne.id },
         data: { statut: 'RECU', snRecu: snNorm, accessoires: accessoiresJson }
       })
-      res.json({ resultat: 'RECU', pn: ligne.pn, garantie: ligne.garantie, panneClient: ligne.panneClient, dejaEnInventaire })
+
+      // Si déjà en inventaire → créer aussi une ligne DOUBLON_INVENTAIRE pour le rapport
+      if (dejaEnInventaire) {
+        await prisma.ligneAttendue.create({
+          data: {
+            attenduId: Number(id),
+            sn: snNorm,
+            pn: ligne.pn,
+            statut: 'DOUBLON_INVENTAIRE',
+            notes: rmaExistant ? `Déjà en inventaire — RMA : ${rmaExistant}` : 'Déjà en inventaire'
+          }
+        })
+      }
+
+      res.json({ resultat: 'RECU', pn: ligne.pn, garantie: ligne.garantie, panneClient: ligne.panneClient, dejaEnInventaire, rmaExistant })
     } else {
       // Vérifier si déjà scanné dans cet attendu (statut RECU)
       const dejaScanne = attendu.lignes.find(l => l.sn === snNorm && l.statut === 'RECU')
@@ -563,9 +594,10 @@ export async function rapport(req: Request, res: Response) {
   })
   if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
 
-  const nonRecus    = attendu.lignes.filter(l => l.statut === 'NON_RECU' || l.statut === 'ATTENDU')
-  const inattendus  = attendu.lignes.filter(l => l.statut === 'INATTENDU')
-  const recus       = attendu.lignes.filter(l => l.statut === 'RECU')
+  const nonRecus          = attendu.lignes.filter(l => l.statut === 'NON_RECU' || l.statut === 'ATTENDU')
+  const inattendus        = attendu.lignes.filter(l => l.statut === 'INATTENDU')
+  const doublonsInventaire = attendu.lignes.filter(l => l.statut === 'DOUBLON_INVENTAIRE')
+  const recus             = attendu.lignes.filter(l => l.statut === 'RECU')
 
-  res.json({ nonRecus, inattendus, recus, total: attendu.lignes.length })
+  res.json({ nonRecus, inattendus, doublonsInventaire, recus, total: attendu.lignes.length })
 }
