@@ -11,14 +11,22 @@ function getSiteId(): number {
 }
 
 interface Attendu {
-  id: number
-  rma: string | null
-  bt: string | null
-  client: string | null
-  statut: string
-  createdAt: string
-  closedAt: string | null
-  _count: { lignes: number }
+  id: number; rma: string | null; bt: string | null; statut: string
+  createdAt: string; closedAt: string | null; _count: { lignes: number }
+  donneesCommunes: string | null
+}
+
+interface ChampInv {
+  id: number; code: string; label: string; type: string; options: string | null
+}
+
+const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
+const CODES_CLIENT = ['CLIENT', 'CLIENTS']
+const CODES_PLATEFORME = ['PLATEFORME', 'PLATEFORMES']
+
+function parseOptions(raw: string | null): string[] {
+  if (!raw) return []
+  try { return JSON.parse(raw) } catch { return [] }
 }
 
 export default function Attendus() {
@@ -27,13 +35,15 @@ export default function Attendus() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [attendus, setAttendus] = useState<Attendu[]>([])
+  const [champsInv, setChampsInv] = useState<ChampInv[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [champsClients, setChampsClients] = useState<any[]>([])
+  const [plateformes, setPlateformes] = useState<any[]>([])
+  const [champsPlateformes, setChampsPlateformes] = useState<any[]>([])
   const [showImport, setShowImport] = useState(false)
   const [rma, setRma] = useState('')
   const [bt, setBt] = useState('')
-  const [client, setClient] = useState('')
-  const [dateCreationRMA, setDateCreationRMA] = useState('')
+  const [donneesCommunes, setDonneesCommunes] = useState<Record<string, string>>({})
   const [fichier, setFichier] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -43,16 +53,19 @@ export default function Attendus() {
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
-    const [data, cl, cc, cfg] = await Promise.all([
+    const [data, ci, cl, cc, pl, cp, cfg] = await Promise.all([
       attendusApi.getAll(siteId),
+      get<ChampInv[]>(`/inventaire/${siteId}/champs`),
       get<any[]>(`/clients/${siteId}`),
       get<any[]>(`/clients/${siteId}/champs`),
+      get<any[]>(`/plateformes/${siteId}`),
+      get<any[]>(`/plateformes/${siteId}/champs`),
       get<any>(`/config-attendus/${siteId}`)
     ])
     setAttendus(data)
-    setClients(cl)
-    setChampsClients(cc.filter((c: any) => c.actif))
-    // Config champs attendu
+    setChampsInv(ci.filter((c: any) => c.actif))
+    setClients(cl); setChampsClients(cc.filter((c: any) => c.actif))
+    setPlateformes(pl); setChampsPlateformes(cp.filter((c: any) => c.actif))
     if (cfg?.config?.champsAttendu) {
       try {
         const parsed = typeof cfg.config.champsAttendu === 'string' ? JSON.parse(cfg.config.champsAttendu) : cfg.config.champsAttendu
@@ -61,15 +74,21 @@ export default function Attendus() {
     }
   }
 
-  const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
+  function getEntiteLabel(entite: any, champs: any[]): string {
+    const champNom = champs.find((c: any) => CODES_NOM.includes(c.code.toUpperCase()))
+    const val = champNom ? entite.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur : null
+    return val || entite.valeurs?.map((v: any) => v.valeur).filter(Boolean)[0] || `#${entite.id}`
+  }
 
-  function getClientLabel(cl: any): string {
-    const champNom = champsClients.find((c: any) => CODES_NOM.includes(c.code.toUpperCase()))
-    if (champNom) {
-      const val = cl.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur
-      if (val) return val
-    }
-    return cl.valeurs?.map((v: any) => v.valeur).filter(Boolean)[0] || `Client #${cl.id}`
+  function getClientLabel(cl: any): string { return getEntiteLabel(cl, champsClients) }
+
+  function getDonneeLabel(attendu: Attendu): string {
+    // Afficher les premières valeurs des donneesCommunes pour la liste
+    if (!attendu.donneesCommunes) return ''
+    try {
+      const d = JSON.parse(attendu.donneesCommunes)
+      return Object.values(d).filter(Boolean).slice(0, 2).join(' · ')
+    } catch { return '' }
   }
 
   async function handleDelete(a: Attendu) {
@@ -88,9 +107,9 @@ export default function Attendus() {
     setLoading(true)
     setErreur(null)
     try {
-      const result = await attendusApi.importExcel(siteId, fichier, rma, bt, client, dateCreationRMA)
+      const result = await attendusApi.importExcel(siteId, fichier, rma, bt, donneesCommunes)
       setShowImport(false)
-      setRma(''); setBt(''); setClient(''); setDateCreationRMA(''); setFichier(null)
+      setRma(''); setBt(''); setDonneesCommunes({}); setFichier(null)
       reload()
       navigate(`/attendus/${result.id}`)
     } catch (e: any) {
@@ -187,45 +206,55 @@ export default function Attendus() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Nouvel attendu — Import Excel</h3>
             <form onSubmit={handleImport}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* Champs dynamiques depuis la config */}
-                {(configChamps.length === 0
-                  ? [{ code: 'rma', visible: true, obligatoire: false }, { code: 'client', visible: true, obligatoire: false }, { code: 'dateCreationRMA', visible: true, obligatoire: false }]
-                  : configChamps
-                ).filter(c => c.visible).map(cc => {
-                  if (cc.code === 'rma') return (
-                    <div key="rma" className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">N° RMA{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
-                      <input required={cc.obligatoire} className="form-input" placeholder="RMA-XXXX" value={rma} onChange={e => setRma(e.target.value)} />
+                {/* Champs système (RMA et BT) */}
+                {(configChamps.find(c => c.code === '__rma__')?.visible ?? true) && (
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">N° RMA{(configChamps.find(c => c.code === '__rma__')?.obligatoire) && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                    <input required={configChamps.find(c => c.code === '__rma__')?.obligatoire} className="form-input" placeholder="RMA-XXXX" value={rma} onChange={e => setRma(e.target.value)} />
+                  </div>
+                )}
+                {(configChamps.find(c => c.code === '__bt__')?.visible) && (
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">N° BT{(configChamps.find(c => c.code === '__bt__')?.obligatoire) && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                    <input required={configChamps.find(c => c.code === '__bt__')?.obligatoire} className="form-input" placeholder="BT-XXXX" value={bt} onChange={e => setBt(e.target.value)} />
+                  </div>
+                )}
+                {/* Champs inventaire configurés */}
+                {configChamps.filter(cc => cc.visible && !cc.code.startsWith('__')).map(cc => {
+                  const champ = champsInv.find(c => c.code === cc.code)
+                  if (!champ) return null
+                  const opts = parseOptions(champ.options)
+                  const isClient = CODES_CLIENT.includes(champ.code.toUpperCase())
+                  const isPlateforme = CODES_PLATEFORME.includes(champ.code.toUpperCase())
+                  return (
+                    <div key={cc.code} className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">{champ.label}{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                      {isClient ? (
+                        <select required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))}>
+                          <option value="">— Choisir un client —</option>
+                          {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
+                        </select>
+                      ) : isPlateforme ? (
+                        <select required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))}>
+                          <option value="">— Choisir une plateforme —</option>
+                          {plateformes.map(pl => <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>{getEntiteLabel(pl, champsPlateformes)}</option>)}
+                        </select>
+                      ) : champ.type === 'SELECT' ? (
+                        <select required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))}>
+                          <option value="">— Choisir —</option>
+                          {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      ) : (champ.type === 'DATE' || champ.type === 'DATE_TODAY') ? (
+                        <input type="date" required={cc.obligatoire} className="form-input"
+                          value={donneesCommunes[cc.code] ?? (champ.type === 'DATE_TODAY' ? new Date().toISOString().split('T')[0] : '')}
+                          onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))} />
+                      ) : champ.type === 'NUMBER' ? (
+                        <input type="number" required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))} />
+                      ) : (
+                        <input type="text" required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))} />
+                      )}
                     </div>
                   )
-                  if (cc.code === 'bt') return (
-                    <div key="bt" className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">N° BT{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
-                      <input required={cc.obligatoire} className="form-input" placeholder="BT-XXXX" value={bt} onChange={e => setBt(e.target.value)} />
-                    </div>
-                  )
-                  if (cc.code === 'dateCreationRMA') return (
-                    <div key="dateCreationRMA" className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">Date création RMA{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
-                      <input type="date" required={cc.obligatoire} className="form-input" value={dateCreationRMA} onChange={e => setDateCreationRMA(e.target.value)} />
-                    </div>
-                  )
-                  if (cc.code === 'client') return (
-                    <div key="client" className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">Client{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
-                      <select required={cc.obligatoire} className="form-input" value={client} onChange={e => setClient(e.target.value)}>
-                        <option value="">— Choisir un client —</option>
-                        {clients.map(cl => <option key={cl.id} value={getClientLabel(cl)}>{getClientLabel(cl)}</option>)}
-                      </select>
-                    </div>
-                  )
-                  if (cc.code === 'plateforme') return (
-                    <div key="plateforme" className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">Plateforme{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
-                      <input required={cc.obligatoire} className="form-input" placeholder="Plateforme" value={bt} onChange={e => setBt(e.target.value)} />
-                    </div>
-                  )
-                  return null
                 })}
               </div>
 

@@ -15,14 +15,14 @@ export const attendusApi = {
   delete:      (id: number) => del(`${BASE}/${id}`),
   descanner:   (id: number) => post(`${BASE}/ligne/${id}/descanner`, {}),
 
-  importExcel: async (siteId: number, file: File, rma: string, bt: string, client: string, dateCreationRMA?: string) => {
+  importExcel: async (siteId: number, file: File, rma: string, bt: string, donneesCommunes?: Record<string, string>) => {
     const token = localStorage.getItem('token')
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('rma', rma)
-    formData.append('bt', bt)
-    formData.append('client', client)
-    if (dateCreationRMA) formData.append('dateCreationRMA', dateCreationRMA)
+    if (rma) formData.append('rma', rma)
+    if (bt) formData.append('bt', bt)
+    if (donneesCommunes && Object.keys(donneesCommunes).length > 0)
+      formData.append('donneesCommunes', JSON.stringify(donneesCommunes))
     const res = await fetch(`/api/attendus/${siteId}/import`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },

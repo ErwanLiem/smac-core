@@ -188,11 +188,9 @@ model valeurChampInventaire {
 model attendu {
   id          Int            @id @default(autoincrement())
   siteId      Int
-  rma               String?
-  bt                String?
-  client            String?
-  plateforme        String?
-  dateCreationRMA   String?
+  rma               String?        // identifiant principal (affiché dans la liste)
+  bt                String?        // identifiant secondaire
+  donneesCommunes   String?        @db.LongText // JSON {champCode: valeur} pour les champs inventaire saisis à la création
   statut      String         @default("EN_COURS") // EN_COURS, CLOS
   createdAt   DateTime       @default(now())
   closedAt    DateTime?

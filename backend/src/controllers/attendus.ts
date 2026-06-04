@@ -99,17 +99,26 @@ async function creerEntreeInventaire(params: {
     }
   }
 
-  // Champs réception (écrasent l'auto-remplissage si même champId)
-  if (idSN && ligne.sn)                        valeurs.push({ champId: idSN,          valeur: ligne.sn })
-  if (idPN && ligne.pn)                         valeurs.push({ champId: idPN,          valeur: ligne.pn })
-  if (idGarantie && ligne.garantie)             valeurs.push({ champId: idGarantie,    valeur: ligne.garantie })
-  if (idPanneClient && ligne.panneClient)       valeurs.push({ champId: idPanneClient, valeur: ligne.panneClient })
-  if (idBL && attendu.rma)                      valeurs.push({ champId: idBL,          valeur: attendu.rma })
-  if (idBT && attendu.bt)                       valeurs.push({ champId: idBT,          valeur: attendu.bt })
-  if (idRMACreation && attendu.dateCreationRMA) valeurs.push({ champId: idRMACreation, valeur: attendu.dateCreationRMA })
-  if (idDateRIC)                                valeurs.push({ champId: idDateRIC,     valeur: dateAujourdhui })
-  if (idPlateforme && attendu.plateforme)       valeurs.push({ champId: idPlateforme,  valeur: attendu.plateforme })
-  if (idClient && attendu.client)               valeurs.push({ champId: idClient,      valeur: attendu.client })
+  // Champs réception fixes
+  if (idSN && ligne.sn)          valeurs.push({ champId: idSN,       valeur: ligne.sn })
+  if (idPN && ligne.pn)           valeurs.push({ champId: idPN,       valeur: ligne.pn })
+  if (idGarantie && ligne.garantie) valeurs.push({ champId: idGarantie, valeur: ligne.garantie })
+  if (idPanneClient && ligne.panneClient) valeurs.push({ champId: idPanneClient, valeur: ligne.panneClient })
+  if (idBL && attendu.rma)       valeurs.push({ champId: idBL,       valeur: attendu.rma })
+  if (idBT && attendu.bt)        valeurs.push({ champId: idBT,       valeur: attendu.bt })
+  if (idDateRIC)                 valeurs.push({ champId: idDateRIC,  valeur: dateAujourdhui })
+
+  // Champs communs saisis à la création (donneesCommunes JSON {code: valeur})
+  if (attendu.donneesCommunes) {
+    try {
+      const donnees: Record<string, string> = JSON.parse(attendu.donneesCommunes)
+      for (const [code, valeur] of Object.entries(donnees)) {
+        if (!valeur) continue
+        const champInv = champsInv.find(c => c.code === code)
+        if (champInv) valeurs.push({ champId: champInv.id, valeur })
+      }
+    } catch {}
+  }
   if (idAccessoires && ligne.accessoires) {
     try {
       const accs: string[] = JSON.parse(ligne.accessoires)
@@ -270,8 +279,9 @@ export async function importExcel(req: Request, res: Response, next: any) {
       }
     }
 
+    const { rma, bt, donneesCommunes } = req.body
     const attendu = await prisma.attendu.create({
-      data: { siteId: Number(siteId), rma: rma || null, bt: bt || null, client: client || null, dateCreationRMA: dateCreationRMA || null, statut: 'EN_COURS' }
+      data: { siteId: Number(siteId), rma: rma || null, bt: bt || null, donneesCommunes: donneesCommunes ? JSON.stringify(donneesCommunes) : null, statut: 'EN_COURS' }
     })
     const lignes = lignesRaw.map(({ champsSupp, ...l }) => ({ ...l, attenduId: attendu.id, statut: 'ATTENDU' }))
     await prisma.ligneAttendue.createMany({ data: lignes })
@@ -283,10 +293,10 @@ export async function importExcel(req: Request, res: Response, next: any) {
 export async function update(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
-    const { rma, bt, client, plateforme, dateCreationRMA } = req.body
+    const { rma, bt, donneesCommunes } = req.body
     const attendu = await prisma.attendu.update({
       where: { id: Number(id) },
-      data: { rma, bt, client, plateforme, dateCreationRMA }
+      data: { rma, bt, donneesCommunes: donneesCommunes ? JSON.stringify(donneesCommunes) : null }
     })
     res.json(attendu)
   } catch (e) { next(e) }
