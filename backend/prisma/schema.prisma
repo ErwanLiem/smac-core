@@ -226,6 +226,7 @@ model configAttendus {
   nomOnglet                String  @default("Terminal Details") // nom de l'onglet Excel à lire
   obligatoirePNcatalogue   Boolean @default(true)  // bloquer l'import si PN absent du catalogue
   statutCloture            String? // code du statut à assigner à la clôture (ex: EN_STOCK)
+  champsAttendu            String? @db.LongText    // JSON: config des champs du formulaire de création
   site                     site    @relation(fields: [siteId], references: [id], map: "ConfigAttendus_siteId_fkey")
 }
 

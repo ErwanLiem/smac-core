@@ -38,18 +38,27 @@ export default function Attendus() {
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [modalDelete, setModalDelete] = useState<Attendu | null>(null)
+  const [configChamps, setConfigChamps] = useState<{ code: string; visible: boolean; obligatoire: boolean }[]>([])
 
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
-    const [data, cl, cc] = await Promise.all([
+    const [data, cl, cc, cfg] = await Promise.all([
       attendusApi.getAll(siteId),
       get<any[]>(`/clients/${siteId}`),
-      get<any[]>(`/clients/${siteId}/champs`)
+      get<any[]>(`/clients/${siteId}/champs`),
+      get<any>(`/config-attendus/${siteId}`)
     ])
     setAttendus(data)
     setClients(cl)
     setChampsClients(cc.filter((c: any) => c.actif))
+    // Config champs attendu
+    if (cfg?.config?.champsAttendu) {
+      try {
+        const parsed = typeof cfg.config.champsAttendu === 'string' ? JSON.parse(cfg.config.champsAttendu) : cfg.config.champsAttendu
+        setConfigChamps(parsed)
+      } catch {}
+    }
   }
 
   const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
@@ -178,25 +187,46 @@ export default function Attendus() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Nouvel attendu — Import Excel</h3>
             <form onSubmit={handleImport}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">N° RMA</label>
-                    <input className="form-input" placeholder="RMA-XXXX" value={rma} onChange={e => setRma(e.target.value)} />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Date création RMA</label>
-                    <input type="date" className="form-input" value={dateCreationRMA} onChange={e => setDateCreationRMA(e.target.value)} />
-                  </div>
-                </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Client</label>
-                  <select className="form-input" value={client} onChange={e => setClient(e.target.value)}>
-                    <option value="">— Choisir un client —</option>
-                    {clients.map(cl => (
-                      <option key={cl.id} value={getClientLabel(cl)}>{getClientLabel(cl)}</option>
-                    ))}
-                  </select>
-                </div>
+                {/* Champs dynamiques depuis la config */}
+                {(configChamps.length === 0
+                  ? [{ code: 'rma', visible: true, obligatoire: false }, { code: 'client', visible: true, obligatoire: false }, { code: 'dateCreationRMA', visible: true, obligatoire: false }]
+                  : configChamps
+                ).filter(c => c.visible).map(cc => {
+                  if (cc.code === 'rma') return (
+                    <div key="rma" className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">N° RMA{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                      <input required={cc.obligatoire} className="form-input" placeholder="RMA-XXXX" value={rma} onChange={e => setRma(e.target.value)} />
+                    </div>
+                  )
+                  if (cc.code === 'bt') return (
+                    <div key="bt" className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">N° BT{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                      <input required={cc.obligatoire} className="form-input" placeholder="BT-XXXX" value={bt} onChange={e => setBt(e.target.value)} />
+                    </div>
+                  )
+                  if (cc.code === 'dateCreationRMA') return (
+                    <div key="dateCreationRMA" className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Date création RMA{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                      <input type="date" required={cc.obligatoire} className="form-input" value={dateCreationRMA} onChange={e => setDateCreationRMA(e.target.value)} />
+                    </div>
+                  )
+                  if (cc.code === 'client') return (
+                    <div key="client" className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Client{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                      <select required={cc.obligatoire} className="form-input" value={client} onChange={e => setClient(e.target.value)}>
+                        <option value="">— Choisir un client —</option>
+                        {clients.map(cl => <option key={cl.id} value={getClientLabel(cl)}>{getClientLabel(cl)}</option>)}
+                      </select>
+                    </div>
+                  )
+                  if (cc.code === 'plateforme') return (
+                    <div key="plateforme" className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Plateforme{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                      <input required={cc.obligatoire} className="form-input" placeholder="Plateforme" value={bt} onChange={e => setBt(e.target.value)} />
+                    </div>
+                  )
+                  return null
+                })}
               </div>
 
               <div className="form-group" style={{ marginTop: '16px' }}>

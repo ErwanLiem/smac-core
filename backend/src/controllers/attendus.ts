@@ -273,7 +273,7 @@ export async function importExcel(req: Request, res: Response, next: any) {
     const attendu = await prisma.attendu.create({
       data: { siteId: Number(siteId), rma: rma || null, bt: bt || null, client: client || null, dateCreationRMA: dateCreationRMA || null, statut: 'EN_COURS' }
     })
-    const lignes = lignesRaw.map(l => ({ ...l, attenduId: attendu.id, statut: 'ATTENDU' }))
+    const lignes = lignesRaw.map(({ champsSupp, ...l }) => ({ ...l, attenduId: attendu.id, statut: 'ATTENDU' }))
     await prisma.ligneAttendue.createMany({ data: lignes })
     fs.unlinkSync(file.path)
     res.json({ ...attendu, lignesCount: lignes.length })

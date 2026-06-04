@@ -9,10 +9,26 @@ function getSiteId(): number {
   return JSON.parse(raw)?.site?.id ?? 1
 }
 
+// Champs disponibles pour le formulaire de création d'un attendu
+const CHAMPS_ATTENDU_DISPONIBLES = [
+  { code: 'rma',            label: 'N° RMA',            type: 'text' },
+  { code: 'bt',             label: 'N° BT',             type: 'text' },
+  { code: 'client',         label: 'Client',            type: 'client' },
+  { code: 'plateforme',     label: 'Plateforme',        type: 'plateforme' },
+  { code: 'dateCreationRMA',label: 'Date création RMA', type: 'date' },
+]
+
+interface ChampAttenduConfig {
+  code: string
+  visible: boolean
+  obligatoire: boolean
+}
+
 interface ConfigAttendus {
   nomOnglet: string
   obligatoirePNcatalogue: boolean
   statutCloture: string | null
+  champsAttendu: ChampAttenduConfig[] | null
 }
 
 interface Mapping {
@@ -39,7 +55,8 @@ export default function AdminAttendus() {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
 
-  const [config, setConfig] = useState<ConfigAttendus>({ nomOnglet: 'Terminal Details', obligatoirePNcatalogue: true, statutCloture: null })
+  const defaultChampsAttendu: ChampAttenduConfig[] = CHAMPS_ATTENDU_DISPONIBLES.map(c => ({ code: c.code, visible: true, obligatoire: false }))
+  const [config, setConfig] = useState<ConfigAttendus>({ nomOnglet: 'Terminal Details', obligatoirePNcatalogue: true, statutCloture: null, champsAttendu: defaultChampsAttendu })
   const [mappings, setMappings] = useState<Mapping[]>([])
   const [champsInv, setChampsInv] = useState<ChampInv[]>([])
   const [statuts, setStatuts] = useState<Statut[]>([])
@@ -56,7 +73,14 @@ export default function AdminAttendus() {
       get<any>(`/config-attendus/${siteId}`),
       get<Statut[]>(`/workflow/${siteId}/statuts`)
     ])
-    if (data.config) setConfig(data.config)
+    if (data.config) {
+      const cfg = data.config
+      if (cfg.champsAttendu && typeof cfg.champsAttendu === 'string') {
+        try { cfg.champsAttendu = JSON.parse(cfg.champsAttendu) } catch {}
+      }
+      if (!cfg.champsAttendu) cfg.champsAttendu = defaultChampsAttendu
+      setConfig(cfg)
+    }
     setMappings(data.mappings)
     setChampsInv(data.champsInv)
     setStatuts(s)
@@ -140,6 +164,54 @@ export default function AdminAttendus() {
             {succes && <span style={{ color: '#16a34a', fontSize: '13px' }}>✓ Enregistré</span>}
           </div>
         )}
+      </div>
+
+      {/* Champs du formulaire de création */}
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#111827' }}>Champs du formulaire de création</h2>
+        <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+          Choisissez quels champs afficher lors de la création d'un attendu.
+        </p>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Champ</th>
+              <th style={{ textAlign: 'center' }}>Visible</th>
+              <th style={{ textAlign: 'center' }}>Obligatoire</th>
+            </tr>
+          </thead>
+          <tbody>
+            {CHAMPS_ATTENDU_DISPONIBLES.map(champ => {
+              const cfg = config.champsAttendu?.find(c => c.code === champ.code) ?? { code: champ.code, visible: true, obligatoire: false }
+              return (
+                <tr key={champ.code}>
+                  <td style={{ fontWeight: 500 }}>{champ.label}</td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input type="checkbox" checked={cfg.visible}
+                      disabled={!isAdmin}
+                      onChange={e => {
+                        const updated = (config.champsAttendu ?? defaultChampsAttendu).map(c =>
+                          c.code === champ.code ? { ...c, visible: e.target.checked, obligatoire: e.target.checked ? c.obligatoire : false } : c
+                        )
+                        setConfig(f => ({ ...f, champsAttendu: updated }))
+                        setConfigModifiee(true)
+                      }} />
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input type="checkbox" checked={cfg.obligatoire} disabled={!cfg.visible || !isAdmin}
+                      onChange={e => {
+                        const updated = (config.champsAttendu ?? defaultChampsAttendu).map(c =>
+                          c.code === champ.code ? { ...c, obligatoire: e.target.checked } : c
+                        )
+                        setConfig(f => ({ ...f, champsAttendu: updated }))
+                        setConfigModifiee(true)
+                      }} />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
 
       {/* Mapping colonnes Excel */}
