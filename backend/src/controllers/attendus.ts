@@ -594,10 +594,11 @@ export async function rapport(req: Request, res: Response) {
   })
   if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
 
-  const nonRecus          = attendu.lignes.filter(l => l.statut === 'NON_RECU' || l.statut === 'ATTENDU')
-  const inattendus        = attendu.lignes.filter(l => l.statut === 'INATTENDU')
+  const lignesNormales     = attendu.lignes.filter(l => l.statut !== 'DOUBLON_INVENTAIRE')
+  const nonRecus           = lignesNormales.filter(l => l.statut === 'NON_RECU' || l.statut === 'ATTENDU')
+  const inattendus         = lignesNormales.filter(l => l.statut === 'INATTENDU')
   const doublonsInventaire = attendu.lignes.filter(l => l.statut === 'DOUBLON_INVENTAIRE')
-  const recus             = attendu.lignes.filter(l => l.statut === 'RECU')
+  const recus              = lignesNormales.filter(l => l.statut === 'RECU')
 
-  res.json({ nonRecus, inattendus, doublonsInventaire, recus, total: attendu.lignes.length })
+  res.json({ nonRecus, inattendus, doublonsInventaire, recus, total: lignesNormales.length })
 }

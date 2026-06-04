@@ -13,6 +13,7 @@ interface Ligne {
   statut: string
   snRecu: string | null
   accessoires: string | null
+  notes: string | null
 }
 
 interface Attendu {
@@ -296,11 +297,11 @@ export default function AttendusDetail() {
   if (!attendu) return <div style={{ padding: '40px', color: '#9ca3af' }}>Chargement...</div>
 
   const isClos = attendu.statut === 'CLOS'
-  const lignesNormales = attendu.lignes.filter(l => l.statut !== 'INATTENDU')
+  const lignesNormales = attendu.lignes.filter(l => l.statut !== 'INATTENDU' && l.statut !== 'DOUBLON_INVENTAIRE')
   const inattendus = attendu.lignes.filter(l => l.statut === 'INATTENDU')
   const groupes = groupParPN(lignesNormales)
   const totalAttendu = lignesNormales.length
-  const totalRecu = attendu.lignes.filter(l => l.statut === 'RECU').length
+  const totalRecu = lignesNormales.filter(l => l.statut === 'RECU').length
   const lignesPNActif = pnActif ? (groupes[pnActif] || []) : []
 
   return (
@@ -418,7 +419,7 @@ export default function AttendusDetail() {
                     </button>
                   </form>
 
-                  {dernierScan && dernierScan.resultat !== 'DEJA_SCANNE' && (
+                  {dernierScan && dernierScan.resultat !== 'DEJA_SCANNE' && !(dernierScan.resultat === 'RECU' && dernierScan.dejaEnInventaire) && (
                     <div style={{
                       marginTop: '10px', padding: '10px 14px', borderRadius: '8px', fontSize: '13px',
                       background: dernierScan.resultat === 'RECU' && !dernierScan.dejaEnInventaire ? '#dcfce7'
