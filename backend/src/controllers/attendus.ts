@@ -279,13 +279,16 @@ export async function importExcel(req: Request, res: Response, next: any) {
     }
 
     const { donneesCommunes } = req.body
-    // Extraire rma et bt depuis donneesCommunes si présents
-    const donnees: Record<string, string> = donneesCommunes || {}
+    // donneesCommunes arrive comme string JSON via FormData — il faut le parser
+    let donnees: Record<string, string> = {}
+    if (donneesCommunes) {
+      try { donnees = typeof donneesCommunes === 'string' ? JSON.parse(donneesCommunes) : donneesCommunes } catch {}
+    }
     const rmaAuto = Object.entries(donnees).find(([k]) => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(k)))?.[1] || null
     const btAuto  = Object.entries(donnees).find(([k]) => ['BT', 'BT_RECEP', 'BON_TRANSPORT'].includes(normalizeCode(k)))?.[1] || null
 
     const attendu = await prisma.attendu.create({
-      data: { siteId: Number(siteId), rma: rmaAuto, bt: btAuto, donneesCommunes: donneesCommunes ? JSON.stringify(donneesCommunes) : null, statut: 'EN_COURS' }
+      data: { siteId: Number(siteId), rma: rmaAuto, bt: btAuto, donneesCommunes: Object.keys(donnees).length > 0 ? JSON.stringify(donnees) : null, statut: 'EN_COURS' }
     })
     const lignes = lignesRaw.map(({ champsSupp, ...l }) => ({ ...l, attenduId: attendu.id, statut: 'ATTENDU' }))
     await prisma.ligneAttendue.createMany({ data: lignes })
