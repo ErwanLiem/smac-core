@@ -612,11 +612,53 @@ export async function rapport(req: Request, res: Response) {
   })
   if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
 
-  const lignesNormales     = attendu.lignes.filter(l => l.statut !== 'DOUBLON_INVENTAIRE')
-  const nonRecus           = lignesNormales.filter(l => l.statut === 'NON_RECU' || l.statut === 'ATTENDU')
-  const inattendus         = lignesNormales.filter(l => l.statut === 'INATTENDU')
-  const doublonsInventaire = attendu.lignes.filter(l => l.statut === 'DOUBLON_INVENTAIRE')
-  const recus              = lignesNormales.filter(l => l.statut === 'RECU')
+  // Lignes normales (sans les doublons inventaire déjà stockés)
+  const lignesNormales = attendu.lignes.filter(l => l.statut !== 'DOUBLON_INVENTAIRE')
+  const nonRecus   = lignesNormales.filter(l => l.statut === 'NON_RECU' || l.statut === 'ATTENDU')
+  const inattendus = lignesNormales.filter(l => l.statut === 'INATTENDU')
+  const recus      = lignesNormales.filter(l => l.statut === 'RECU')
 
-  res.json({ nonRecus, inattendus, doublonsInventaire, recus, total: lignesNormales.length })
+  // Calculer les doublons inventaire en temps réel sur les S/N reçus
+  const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
+  const champsSN = champsInv.filter(c => {
+    const n = normalizeCode(c.code).replace(/\s+/g, '_')
+    const ns = normalizeCode(c.code).replace(/\s+/g, ' ')
+    return CODES_SN.includes(n) || CODES_SN.includes(ns) || CODES_SN.includes(normalizeCode(c.code))
+  })
+  const idsSN = champsSN.length > 0 ? champsSN.map(c => c.id) : champsInv.map(c => c.id)
+
+  // Champs BL/RMA pour trouver le RMA existant
+  const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(c.code)))
+  const idsRMA = champsRMA.map(c => c.id)
+
+  const snsRecus = recus.map(l => l.sn)
+  const valeursExistantes = snsRecus.length > 0 ? await prisma.valeurChampInventaire.findMany({
+    where: { champId: { in: idsSN }, valeur: { in: snsRecus } }
+  }) : []
+
+  const doublonsInventaire: any[] = []
+  for (const val of valeursExistantes) {
+    const ligne = recus.find(l => l.sn === val.valeur)
+    if (!ligne) continue
+    // Chercher le RMA de cette entrée inventaire
+    let rmaExistant = null
+    if (idsRMA.length > 0) {
+      const valRMA = await prisma.valeurChampInventaire.findFirst({
+        where: { inventaireId: val.inventaireId, champId: { in: idsRMA } }
+      })
+      rmaExistant = valRMA?.valeur ?? null
+    }
+    doublonsInventaire.push({
+      ...ligne,
+      notes: rmaExistant ? `Déjà en inventaire — RMA : ${rmaExistant}` : 'Déjà en inventaire'
+    })
+  }
+
+  // Aussi inclure les lignes DOUBLON_INVENTAIRE déjà stockées
+  const doublonsStockes = attendu.lignes.filter(l => l.statut === 'DOUBLON_INVENTAIRE')
+  const tousDoublons = [...doublonsInventaire, ...doublonsStockes.filter(d =>
+    !doublonsInventaire.some(di => di.sn === d.sn)
+  )]
+
+  res.json({ nonRecus, inattendus, doublonsInventaire: tousDoublons, recus, total: lignesNormales.length })
 }
