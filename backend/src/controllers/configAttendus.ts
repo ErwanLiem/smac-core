@@ -21,8 +21,7 @@ export async function getConfig(req: Request, res: Response) {
 export async function saveConfig(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { nomOnglet, obligatoirePNcatalogue, statutCloture } = req.body
-      const { nomOnglet, obligatoirePNcatalogue, statutCloture, champsAttendu } = req.body
+    const { nomOnglet, obligatoirePNcatalogue, statutCloture, champsAttendu } = req.body
     const config = await prisma.configAttendus.upsert({
       where: { siteId: Number(siteId) },
       create: { siteId: Number(siteId), nomOnglet, obligatoirePNcatalogue, statutCloture, champsAttendu: champsAttendu ? JSON.stringify(champsAttendu) : null },

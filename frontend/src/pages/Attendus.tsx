@@ -206,21 +206,8 @@ export default function Attendus() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Nouvel attendu — Import Excel</h3>
             <form onSubmit={handleImport}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* Champs système (RMA et BT) */}
-                {(configChamps.find(c => c.code === '__rma__')?.visible ?? true) && (
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">N° RMA{(configChamps.find(c => c.code === '__rma__')?.obligatoire) && <span style={{ color: '#dc2626' }}> *</span>}</label>
-                    <input required={configChamps.find(c => c.code === '__rma__')?.obligatoire} className="form-input" placeholder="RMA-XXXX" value={rma} onChange={e => setRma(e.target.value)} />
-                  </div>
-                )}
-                {(configChamps.find(c => c.code === '__bt__')?.visible) && (
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">N° BT{(configChamps.find(c => c.code === '__bt__')?.obligatoire) && <span style={{ color: '#dc2626' }}> *</span>}</label>
-                    <input required={configChamps.find(c => c.code === '__bt__')?.obligatoire} className="form-input" placeholder="BT-XXXX" value={bt} onChange={e => setBt(e.target.value)} />
-                  </div>
-                )}
                 {/* Champs inventaire configurés */}
-                {configChamps.filter(cc => cc.visible && !cc.code.startsWith('__')).map(cc => {
+                {configChamps.filter(cc => cc.visible).map(cc => {
                   const champ = champsInv.find(c => c.code === cc.code)
                   if (!champ) return null
                   const opts = parseOptions(champ.options)

@@ -184,7 +184,6 @@ export async function getDetail(req: Request, res: Response) {
 export async function importExcel(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { rma, bt, client, dateCreationRMA } = req.body
     const file = (req as any).file
     if (!file) return res.status(400).json({ error: 'Fichier manquant' })
 
@@ -279,9 +278,14 @@ export async function importExcel(req: Request, res: Response, next: any) {
       }
     }
 
-    const { rma, bt, donneesCommunes } = req.body
+    const { donneesCommunes } = req.body
+    // Extraire rma et bt depuis donneesCommunes si présents
+    const donnees: Record<string, string> = donneesCommunes || {}
+    const rmaAuto = Object.entries(donnees).find(([k]) => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(k)))?.[1] || null
+    const btAuto  = Object.entries(donnees).find(([k]) => ['BT', 'BT_RECEP', 'BON_TRANSPORT'].includes(normalizeCode(k)))?.[1] || null
+
     const attendu = await prisma.attendu.create({
-      data: { siteId: Number(siteId), rma: rma || null, bt: bt || null, donneesCommunes: donneesCommunes ? JSON.stringify(donneesCommunes) : null, statut: 'EN_COURS' }
+      data: { siteId: Number(siteId), rma: rmaAuto, bt: btAuto, donneesCommunes: donneesCommunes ? JSON.stringify(donneesCommunes) : null, statut: 'EN_COURS' }
     })
     const lignes = lignesRaw.map(({ champsSupp, ...l }) => ({ ...l, attenduId: attendu.id, statut: 'ATTENDU' }))
     await prisma.ligneAttendue.createMany({ data: lignes })
