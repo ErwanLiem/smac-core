@@ -391,15 +391,40 @@ export default function AttendusDetail() {
           {/* Déjà en inventaire */}
           {doublonsInv.length > 0 && (
             <div style={{ border: '2px solid #f9a8d4', borderRadius: '8px', padding: '12px', background: '#fdf2f8' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#be185d', marginBottom: '6px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#be185d', marginBottom: '8px' }}>
                 🔴 Déjà en inventaire ({doublonsInv.length})
               </div>
               {doublonsInv.map(l => (
-                <div key={l.id} style={{ fontSize: '11px', fontFamily: 'monospace', color: '#be185d', marginBottom: '2px' }}>
-                  {l.sn}
-                  {l.notes && <div style={{ fontSize: '10px', fontFamily: 'sans-serif', color: '#9d174d', marginTop: '1px' }}>{l.notes}</div>}
+                <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#be185d', fontWeight: 600 }}>{l.sn}</div>
+                    {l.notes && <div style={{ fontSize: '10px', color: '#9d174d', marginTop: '1px' }}>{l.notes}</div>}
+                  </div>
+                  {!isClos && (
+                    <button
+                      onClick={async () => {
+                        await attendusApi.descanner(l.id)
+                        reload()
+                      }}
+                      title="Déscannerle S/N — remet en attente"
+                      style={{ background: 'none', border: '1px solid #f9a8d4', borderRadius: '4px', cursor: 'pointer', color: '#be185d', padding: '2px 6px', fontSize: '11px', marginLeft: '6px', flexShrink: 0 }}
+                    >
+                      ↩ Déscannerle
+                    </button>
+                  )}
                 </div>
               ))}
+              {!isClos && doublonsInv.length > 0 && (
+                <button
+                  onClick={async () => {
+                    for (const l of doublonsInv) await attendusApi.descanner(l.id)
+                    reload()
+                  }}
+                  style={{ marginTop: '6px', width: '100%', fontSize: '11px', padding: '4px', background: '#be185d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  ↩ Tout déscannerle
+                </button>
+              )}
             </div>
           )}
         </div>

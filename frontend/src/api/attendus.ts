@@ -13,6 +13,7 @@ export const attendusApi = {
   cloturer:    (id: number) => post(`${BASE}/${id}/cloturer`, {}),
   rapport:     (id: number) => get(`${BASE}/${id}/rapport`),
   delete:      (id: number) => del(`${BASE}/${id}`),
+  descanner:   (id: number) => post(`${BASE}/ligne/${id}/descanner`, {}),
 
   importExcel: async (siteId: number, file: File, rma: string, bt: string, client: string, dateCreationRMA?: string) => {
     const token = localStorage.getItem('token')

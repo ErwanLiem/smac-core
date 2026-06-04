@@ -236,21 +236,25 @@ export async function scannerSN(req: Request, res: Response, next: any) {
 
     const existingVal = await prisma.valeurChampInventaire.findFirst({
       where: { champId: { in: champsIdsRecherche }, valeur: snNorm },
-      include: { inventaire: true }
+      include: { inventaire: { include: { statut: true } } }
     })
 
     if (existingVal) {
-      dejaEnInventaire = true
-      // Chercher le RMA de cet inventaire
-      const champsRMA = champsInv.filter(c => {
-        const norm = normalizeCode(c.code)
-        return ['BL', 'RMA', 'BON_LIVRAISON'].includes(norm)
-      })
-      if (champsRMA.length > 0) {
-        const valRMA = await prisma.valeurChampInventaire.findFirst({
-          where: { inventaireId: existingVal.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
+      // Statut final → machine sortie du circuit → réception normale, pas de blocage
+      const statutFinal = existingVal.inventaire?.statut?.estFinal ?? false
+      if (!statutFinal) {
+        dejaEnInventaire = true
+        // Chercher le RMA de cet inventaire
+        const champsRMA = champsInv.filter(c => {
+          const norm = normalizeCode(c.code)
+          return ['BL', 'RMA', 'BON_LIVRAISON'].includes(norm)
         })
-        rmaExistant = valRMA?.valeur ?? null
+        if (champsRMA.length > 0) {
+          const valRMA = await prisma.valeurChampInventaire.findFirst({
+            where: { inventaireId: existingVal.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
+          })
+          rmaExistant = valRMA?.valeur ?? null
+        }
       }
     }
 
@@ -296,6 +300,28 @@ export async function scannerSN(req: Request, res: Response, next: any) {
         res.json({ resultat: 'INATTENDU', dejaEnInventaire })
       }
     }
+  } catch (e) {
+    next(e)
+  }
+}
+
+// POST /api/attendus/ligne/:id/descannier — remettre une ligne en ATTENDU + supprimer le doublon inventaire
+export async function descanner(req: Request, res: Response, next: any) {
+  try {
+    const { id } = req.params
+    const ligne = await prisma.ligneAttendue.findUnique({ where: { id: Number(id) } })
+    if (!ligne) return res.status(404).json({ error: 'Ligne introuvable' })
+
+    // Remettre la ligne DOUBLON_INVENTAIRE en suppression
+    await prisma.ligneAttendue.delete({ where: { id: Number(id) } })
+
+    // Remettre la ligne RECU correspondante en ATTENDU
+    await prisma.ligneAttendue.updateMany({
+      where: { attenduId: ligne.attenduId, sn: ligne.sn, statut: 'RECU' },
+      data: { statut: 'ATTENDU', snRecu: null, accessoires: null }
+    })
+
+    res.json({ success: true })
   } catch (e) {
     next(e)
   }
@@ -492,12 +518,15 @@ export async function cloturer(req: Request, res: Response, next: any) {
       const lignesRecues = attendu.lignes.filter(l => l.statut === 'RECU')
       const snsRecus = lignesRecues.map(l => l.sn)
       const existants = await prisma.valeurChampInventaire.findMany({
-        where: { champId: { in: idsSNCheck }, valeur: { in: snsRecus } }
+        where: { champId: { in: idsSNCheck }, valeur: { in: snsRecus } },
+        include: { inventaire: { include: { statut: true } } }
       })
-      if (existants.length > 0) {
+      // Ne bloquer que si le statut de la ligne inventaire n'est PAS final
+      const doublonsActifs = existants.filter(e => !(e.inventaire?.statut?.estFinal ?? false))
+      if (doublonsActifs.length > 0) {
         return res.status(400).json({
-          error: `Clôture impossible : ${existants.length} S/N déjà présent${existants.length > 1 ? 's' : ''} en inventaire.`,
-          snsEnDoublon: existants.map(e => e.valeur)
+          error: `Clôture impossible : ${doublonsActifs.length} S/N déjà présent${doublonsActifs.length > 1 ? 's' : ''} en inventaire avec un statut non final.`,
+          snsEnDoublon: doublonsActifs.map(e => e.valeur)
         })
       }
     }
@@ -633,12 +662,17 @@ export async function rapport(req: Request, res: Response) {
 
   const snsRecus = recus.map(l => l.sn)
   const valeursExistantes = snsRecus.length > 0 ? await prisma.valeurChampInventaire.findMany({
-    where: { champId: { in: idsSN }, valeur: { in: snsRecus } }
+    where: { champId: { in: idsSN }, valeur: { in: snsRecus } },
+    include: { inventaire: { include: { statut: true } } }
   }) : []
 
+  // Garder uniquement les doublons avec statut NON final
+  const valeursDoublons = valeursExistantes.filter(e => !(e.inventaire?.statut?.estFinal ?? false))
+
   const doublonsInventaire: any[] = []
-  for (const val of valeursExistantes) {
+  for (const val of valeursDoublons) {
     const ligne = recus.find(l => l.sn === val.valeur)
+
     if (!ligne) continue
     // Chercher le RMA de cette entrée inventaire
     let rmaExistant = null
