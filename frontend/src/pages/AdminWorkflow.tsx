@@ -136,7 +136,7 @@ export default function AdminWorkflow() {
 
       {/* STATUTS */}
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Statuts</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Statuts</h2>
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -197,7 +197,7 @@ export default function AdminWorkflow() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '2px' }}>
               <input type="checkbox" id="estFinal" checked={newStatut.estFinal} onChange={e => setNewStatut(f => ({ ...f, estFinal: e.target.checked }))} />
-              <label htmlFor="estFinal" style={{ fontSize: '13px', color: '#374151' }}>Final</label>
+              <label htmlFor="estFinal" style={{ fontSize: '13px', color: '#e2e8f0' }}>Final</label>
             </div>
             {isAdmin && <button type="submit" className="btn btn-primary">+ Ajouter</button>}
           </form>
@@ -206,7 +206,7 @@ export default function AdminWorkflow() {
 
       {/* TRANSITIONS */}
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Transitions</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Transitions</h2>
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -314,7 +314,7 @@ export default function AdminWorkflow() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '26px' }}>
                   <input type="checkbox" id="editFinal" checked={editStatut.estFinal} onChange={e => setEditStatut(s => s ? { ...s, estFinal: e.target.checked } : s)} />
-                  <label htmlFor="editFinal" style={{ fontSize: '13px', color: '#374151' }}>Final</label>
+                  <label htmlFor="editFinal" style={{ fontSize: '13px', color: '#e2e8f0' }}>Final</label>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>

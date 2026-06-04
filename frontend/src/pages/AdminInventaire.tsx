@@ -158,7 +158,7 @@ export default function AdminInventaire() {
       </div>
 
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Champs configurés</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Champs configurés</h2>
         <div style={{ overflowX: 'auto' }}>
           <table className="table" style={{ marginBottom: '20px', minWidth: 'max-content' }}>
             <thead>
@@ -224,7 +224,7 @@ export default function AdminInventaire() {
 
         {isAdmin && (
           <>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginTop: '28px', marginBottom: '16px' }}>Ajouter un champ</h2>
+            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginTop: '28px', marginBottom: '16px' }}>Ajouter un champ</h2>
             <form onSubmit={handleCreate} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Code *</label>
@@ -251,13 +251,13 @@ export default function AdminInventaire() {
                 <input type="number" value={form.ordre} onChange={e => setForm({ ...form, ordre: Number(e.target.value) })} className="form-input" style={{ width: '70px' }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '2px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
                   <input type="checkbox" checked={form.obligatoire} onChange={e => setForm({ ...form, obligatoire: e.target.checked })} /> Obligatoire
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
                   <input type="checkbox" checked={form.visibleReceptionSN} onChange={e => setForm({ ...form, visibleReceptionSN: e.target.checked })} /> Visible S/N
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
                   <input type="checkbox" checked={form.visibleReceptionQTE} onChange={e => setForm({ ...form, visibleReceptionQTE: e.target.checked })} /> Visible QTE
                 </label>
               </div>

@@ -622,7 +622,7 @@ export default function AttendusDetail() {
                   <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>❌ S/N manquants</h4>
                   {Object.entries(groupParPN(rapport.nonRecus)).map(([pn, ligs]) => (
                     <div key={pn} style={{ marginBottom: '8px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>P/N {pn} ({ligs.length})</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0', marginBottom: '4px' }}>P/N {pn} ({ligs.length})</div>
                       {ligs.map(l => <div key={l.id} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#6b7280', paddingLeft: '12px' }}>· {l.sn}</div>)}
                     </div>
                   ))}
@@ -657,7 +657,7 @@ export default function AttendusDetail() {
 
               <div style={{ marginTop: '16px', background: '#141720', border: '1px solid #2d3148', borderRadius: '8px', padding: '12px' }}>
                 <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', fontWeight: 600 }}>APERÇU EMAIL</div>
-                <pre style={{ fontSize: '12px', color: '#374151', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{texteRapportEmail()}</pre>
+                <pre style={{ fontSize: '12px', color: '#e2e8f0', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{texteRapportEmail()}</pre>
               </div>
             </div>
           </div>

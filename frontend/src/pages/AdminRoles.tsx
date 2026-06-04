@@ -54,7 +54,7 @@ function PermissionsEditor({ pages, value, onChange }: { pages: Page[]; value: P
         return (
           <div key={p.path} style={{ border: `1px solid ${pageActive ? '#bfdbfe' : '#e5e7eb'}`, borderRadius: '8px', padding: '10px 14px', background: pageActive ? '#f0f7ff' : 'white' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '13px', fontWeight: 500, color: '#374151' }}>{p.label}</span>
+              <span style={{ fontSize: '13px', fontWeight: 500, color: '#e2e8f0' }}>{p.label}</span>
               <div style={{ display: 'flex', gap: '12px' }}>
                 {p.actions.map(action => {
                   const checked = value[p.path]?.includes(action) ?? false

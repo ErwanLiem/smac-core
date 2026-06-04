@@ -515,7 +515,7 @@ export default function Reception() {
         {/* ── Panneau de droite ── */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9' }}>
               À valider — {lotsEnAttente.length} lot{lotsEnAttente.length !== 1 ? 's' : ''}
             </h2>
             {lotsEnAttente.length > 0 && (

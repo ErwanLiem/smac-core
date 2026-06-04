@@ -139,7 +139,7 @@ export default function AdminArticles() {
       </div>
 
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Champs configurés</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Champs configurés</h2>
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -237,7 +237,7 @@ export default function AdminArticles() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '2px' }}>
               <input type="checkbox" id="obligatoire" checked={form.obligatoire} onChange={e => setForm(f => ({ ...f, obligatoire: e.target.checked }))} />
-              <label htmlFor="obligatoire" style={{ fontSize: '13px', color: '#374151' }}>Obligatoire</label>
+              <label htmlFor="obligatoire" style={{ fontSize: '13px', color: '#e2e8f0' }}>Obligatoire</label>
             </div>
             {isAdmin && <button type="submit" className="btn btn-primary">+ Ajouter</button>}
           </form>

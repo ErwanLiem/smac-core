@@ -47,7 +47,7 @@ export default function Login() {
           }}>
             <Warehouse size={32} color="white" />
           </div>
-          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#111827', marginBottom: '4px' }}>SMAC</h1>
+          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#f1f5f9', marginBottom: '4px' }}>SMAC</h1>
           <p style={{ color: '#6b7280' }}>Gestion industrielle — Vallery</p>
         </div>
 

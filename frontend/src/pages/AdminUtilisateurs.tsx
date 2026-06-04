@@ -167,7 +167,7 @@ export default function AdminUtilisateurs() {
               Communiquez ce mot de passe à l'utilisateur. Il lui sera demandé de le modifier à sa première connexion.
             </p>
             <div style={{ background: '#141720', border: '1px solid #2d3148', borderRadius: '8px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <code style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '2px', color: '#111827' }}>{modal.mdp}</code>
+              <code style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '2px', color: '#f1f5f9' }}>{modal.mdp}</code>
               <button className="btn btn-secondary btn-icon" title="Copier" onClick={() => navigator.clipboard.writeText(modal.mdp ?? '')}>
                 <Copy size={16} />
               </button>

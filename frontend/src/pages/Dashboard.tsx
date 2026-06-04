@@ -28,7 +28,7 @@ export default function Dashboard() {
                   <Icon size={20} color={color} />
                 </div>
                 <div>
-                  <div style={{ fontWeight: 600, color: '#111827', fontSize: '14px' }}>{label}</div>
+                  <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: '14px' }}>{label}</div>
                   <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '2px' }}>{sub}</div>
                 </div>
               </div>
