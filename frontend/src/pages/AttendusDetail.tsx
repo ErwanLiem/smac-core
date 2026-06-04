@@ -347,7 +347,7 @@ export default function AttendusDetail() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
             <button onClick={() => navigate('/attendus')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '13px' }}>← Attendus</button>
-            {isClos && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#cbd5e1', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>}
+            {isClos && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#1e2130', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>}
           </div>
           <h1 className="page-title">{attendu.rma ? `RMA ${attendu.rma}` : 'Attendu sans RMA'}</h1>
           <p className="page-subtitle">
@@ -371,7 +371,7 @@ export default function AttendusDetail() {
 
       {/* Barre de progression globale */}
       <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '8px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ flex: 1, background: '#f1f5f9', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
+        <div style={{ flex: 1, background: '#1e2130', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
           <div style={{ background: '#2563eb', height: '100%', width: `${totalAttendu > 0 ? (totalRecu / totalAttendu) * 100 : 0}%`, transition: 'width 0.3s' }} />
         </div>
         <span style={{ fontSize: '13px', fontWeight: 600, color: '#2563eb', whiteSpace: 'nowrap' }}>{totalRecu} / {totalAttendu} reçus</span>
@@ -403,7 +403,7 @@ export default function AttendusDetail() {
                   <code style={{ fontSize: '11px', fontWeight: 600, color: actif ? '#60a5fa' : '#cbd5e1' }}>{pn}</code>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: complet ? '#16a34a' : '#2563eb' }}>{recus}/{total}</span>
                 </div>
-                <div style={{ background: '#f1f5f9', borderRadius: '3px', height: '4px', overflow: 'hidden' }}>
+                <div style={{ background: '#1e2130', borderRadius: '3px', height: '4px', overflow: 'hidden' }}>
                   <div style={{ background: complet ? '#16a34a' : '#2563eb', height: '100%', width: `${(recus / total) * 100}%` }} />
                 </div>
                 {complet && <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle size={11} /> Complet</div>}

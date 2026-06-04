@@ -160,7 +160,7 @@ export default function Attendus() {
                   onClick={() => navigate(`/attendus/${a.id}`)}>
                   <td>
                     {a.statut === 'CLOS'
-                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#cbd5e1', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>
+                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#1e2130', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>
                       : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#1e3a1e', color: '#4ade80', padding: '2px 8px', borderRadius: '4px' }}><Clock size={11} /> En cours</span>
                     }
                   </td>
