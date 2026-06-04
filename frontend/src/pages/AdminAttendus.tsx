@@ -130,7 +130,7 @@ export default function AdminAttendus() {
 
       {/* Config globale */}
       <div className="card" style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>Paramètres généraux</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#f1f5f9' }}>Paramètres généraux</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div className="form-group">
             <label className="form-label">Nom de l'onglet Excel</label>
@@ -170,8 +170,8 @@ export default function AdminAttendus() {
 
       {/* Champs du formulaire de création */}
       <div className="card" style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#111827' }}>Champs du formulaire de création</h2>
-        <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#f1f5f9' }}>Champs du formulaire de création</h2>
+        <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
           Sélectionnez les champs inventaire à remplir lors de la création d'un attendu. Ces valeurs seront automatiquement injectées dans l'inventaire à la clôture.
         </p>
         <table className="table">
@@ -206,8 +206,8 @@ export default function AdminAttendus() {
 
       {/* Mapping colonnes Excel */}
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#111827' }}>Mapping colonnes Excel → inventaire</h2>
-        <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#f1f5f9' }}>Mapping colonnes Excel → inventaire</h2>
+        <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
           Définissez quelle colonne Excel correspond à quel champ inventaire. Les rôles <strong>SN</strong> et <strong>PN</strong> sont obligatoires pour identifier les numéros de série et les références produit.
         </p>
 
@@ -283,7 +283,7 @@ export default function AdminAttendus() {
 
         {isAdmin && (
           <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginTop: '16px' }}>
-            <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajouter un mapping</p>
+            <p style={{ fontSize: '13px', fontWeight: 600, color: '#64748b', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajouter un mapping</p>
             <form onSubmit={handleAddMapping} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '200px' }}>
                 <label className="form-label">Colonne Excel *</label>
