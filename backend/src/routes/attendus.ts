@@ -6,6 +6,7 @@ const router = Router()
 const upload = multer({ dest: 'uploads/' })
 
 router.get('/:siteId', ctrl.getAll)
+router.delete('/:id', ctrl.deleteAttendu)
 router.get('/detail/:id', ctrl.getDetail)
 router.post('/:siteId/import', upload.single('file'), ctrl.importExcel)
 router.put('/:id', ctrl.update)

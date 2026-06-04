@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Upload, FileText, Lock, Clock } from 'lucide-react'
+import { Plus, Upload, FileText, Lock, Clock, Trash2 } from 'lucide-react'
 import { attendusApi } from '../api/attendus'
 import { get } from '../api/client'
 
@@ -33,9 +33,11 @@ export default function Attendus() {
   const [rma, setRma] = useState('')
   const [bt, setBt] = useState('')
   const [client, setClient] = useState('')
+  const [dateCreationRMA, setDateCreationRMA] = useState('')
   const [fichier, setFichier] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
+  const [modalDelete, setModalDelete] = useState<Attendu | null>(null)
 
   useEffect(() => { reload() }, [siteId])
 
@@ -61,15 +63,25 @@ export default function Attendus() {
     return cl.valeurs?.map((v: any) => v.valeur).filter(Boolean)[0] || `Client #${cl.id}`
   }
 
+  async function handleDelete(a: Attendu) {
+    try {
+      await attendusApi.delete(a.id)
+      setModalDelete(null)
+      reload()
+    } catch (e: any) {
+      try { alert(JSON.parse(e.message)?.error ?? 'Erreur') } catch { alert('Erreur') }
+    }
+  }
+
   async function handleImport(e: React.FormEvent) {
     e.preventDefault()
     if (!fichier) return
     setLoading(true)
     setErreur(null)
     try {
-      const result = await attendusApi.importExcel(siteId, fichier, rma, bt, client)
+      const result = await attendusApi.importExcel(siteId, fichier, rma, bt, client, dateCreationRMA)
       setShowImport(false)
-      setRma(''); setBt(''); setClient(''); setFichier(null)
+      setRma(''); setBt(''); setClient(''); setDateCreationRMA(''); setFichier(null)
       reload()
       navigate(`/attendus/${result.id}`)
     } catch (e: any) {
@@ -129,11 +141,33 @@ export default function Attendus() {
                   <td>{a.client || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   <td><span style={{ background: '#eff6ff', color: '#2563eb', borderRadius: '4px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{a._count.lignes}</span></td>
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>{new Date(a.createdAt).toLocaleDateString('fr-FR')}</td>
-                  <td style={{ color: '#9ca3af', fontSize: '12px' }}>→</td>
+                  <td onClick={e => e.stopPropagation()}>
+                    {a.statut === 'EN_COURS' && (
+                      <button className="btn btn-danger btn-icon" onClick={e => { e.stopPropagation(); setModalDelete(a) }}>
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Modal suppression */}
+      {modalDelete && (
+        <div className="modal-overlay">
+          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Supprimer l'attendu ?</h3>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
+              L'attendu <strong>{modalDelete.rma || `#${modalDelete.id}`}</strong> et toutes ses lignes seront définitivement supprimés.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setModalDelete(null)}>Annuler</button>
+              <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => handleDelete(modalDelete)}>Supprimer</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -144,9 +178,15 @@ export default function Attendus() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Nouvel attendu — Import Excel</h3>
             <form onSubmit={handleImport}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">N° RMA</label>
-                  <input className="form-input" placeholder="RMA-XXXX" value={rma} onChange={e => setRma(e.target.value)} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">N° RMA</label>
+                    <input className="form-input" placeholder="RMA-XXXX" value={rma} onChange={e => setRma(e.target.value)} />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Date création RMA</label>
+                    <input type="date" className="form-input" value={dateCreationRMA} onChange={e => setDateCreationRMA(e.target.value)} />
+                  </div>
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Client</label>

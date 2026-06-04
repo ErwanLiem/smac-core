@@ -65,6 +65,7 @@ export default function AttendusDetail() {
   const [editInfos, setEditInfos] = useState(false)
   const [rma, setRma] = useState('')
   const [bt, setBt] = useState('')
+  const [dateCreationRMA, setDateCreationRMA] = useState('')
 
   useEffect(() => { reload() }, [id])
 
@@ -77,6 +78,7 @@ export default function AttendusDetail() {
     setAttendu(data)
     setRma(data.rma || '')
     setBt(data.bt || '')
+    setDateCreationRMA(data.dateCreationRMA || '')
     // Initialiser les accessoires cochés depuis les données existantes
     const accMap: Record<number, number[]> = {}
     data.lignes.forEach((l: Ligne) => {
@@ -184,7 +186,7 @@ export default function AttendusDetail() {
   }
 
   async function handleSaveInfos() {
-    await attendusApi.update(Number(id), { rma, bt })
+    await attendusApi.update(Number(id), { rma, bt, dateCreationRMA })
     setEditInfos(false)
     reload()
   }
@@ -563,6 +565,10 @@ export default function AttendusDetail() {
             <div className="form-group">
               <label className="form-label">N° BT</label>
               <input className="form-input" value={bt} onChange={e => setBt(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Date création RMA</label>
+              <input type="date" className="form-input" value={dateCreationRMA} onChange={e => setDateCreationRMA(e.target.value)} />
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
               <button className="btn btn-secondary" onClick={() => setEditInfos(false)}>Annuler</button>

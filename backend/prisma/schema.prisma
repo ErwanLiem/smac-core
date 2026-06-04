@@ -188,9 +188,10 @@ model valeurChampInventaire {
 model attendu {
   id          Int            @id @default(autoincrement())
   siteId      Int
-  rma         String?
-  bt          String?
-  client      String?
+  rma               String?
+  bt                String?
+  client            String?
+  dateCreationRMA   String?
   statut      String         @default("EN_COURS") // EN_COURS, CLOS
   createdAt   DateTime       @default(now())
   closedAt    DateTime?

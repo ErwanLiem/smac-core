@@ -55,7 +55,7 @@ export async function getDetail(req: Request, res: Response) {
 export async function importExcel(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { rma, bt, client } = req.body
+    const { rma, bt, client, dateCreationRMA } = req.body
     const file = (req as any).file
 
     if (!file) return res.status(400).json({ error: 'Fichier manquant' })
@@ -129,6 +129,7 @@ export async function importExcel(req: Request, res: Response, next: any) {
         rma: rma || null,
         bt: bt || null,
         client: client || null,
+        dateCreationRMA: dateCreationRMA || null,
         statut: 'EN_COURS'
       }
     })
@@ -149,12 +150,32 @@ export async function importExcel(req: Request, res: Response, next: any) {
 export async function update(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
-    const { rma, bt, client } = req.body
+    const { rma, bt, client, dateCreationRMA } = req.body
     const attendu = await prisma.attendu.update({
       where: { id: Number(id) },
-      data: { rma, bt, client }
+      data: { rma, bt, client, dateCreationRMA }
     })
     res.json(attendu)
+  } catch (e) {
+    next(e)
+  }
+}
+
+// DELETE /api/attendus/:id — supprimer un attendu non commencé
+export async function deleteAttendu(req: Request, res: Response, next: any) {
+  try {
+    const { id } = req.params
+    const attendu = await prisma.attendu.findUnique({
+      where: { id: Number(id) },
+      include: { lignes: true }
+    })
+    if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
+
+    const aCommence = attendu.lignes.some(l => l.statut === 'RECU' || l.statut === 'INATTENDU')
+    if (aCommence) return res.status(400).json({ error: 'Impossible de supprimer un attendu en cours de traitement.' })
+
+    await prisma.attendu.delete({ where: { id: Number(id) } })
+    res.json({ success: true })
   } catch (e) {
     next(e)
   }
@@ -248,8 +269,11 @@ export async function valider(req: Request, res: Response, next: any) {
     const idPN         = findChampId(['PN', 'P_N', 'PART_NUMBER', 'PART_NO'])
     const idGarantie   = findChampId(['GARANTIE'])
     const idPanneClient = findChampId(['PANNE_CLIENT', 'PANNE'])
-    const idBL         = findChampId(['BL', 'RMA'])
-    const idBT         = findChampId(['BT', 'BT_RECEP'])
+    const idBL          = findChampId(['BL', 'RMA'])
+    const idBT          = findChampId(['BT', 'BT_RECEP'])
+    const idRMACreation = findChampId(['RMA_CREATION', 'DATE_CREATION_BL', 'DATE_BL'])
+    const idDateRIC     = findChampId(['DATE_RIC', 'DATE_RECEPTION', 'DATE_REC'])
+    const dateAujourdhui = new Date().toISOString().split('T')[0]
 
     // Récupérer le statut "En stock"
     const statutStock = await prisma.statut.findFirst({
@@ -329,15 +353,22 @@ export async function valider(req: Request, res: Response, next: any) {
       if (idPN && ligne.pn)                  valeurs.push({ champId: idPN, valeur: ligne.pn })
       if (idGarantie && ligne.garantie)      valeurs.push({ champId: idGarantie, valeur: ligne.garantie })
       if (idPanneClient && ligne.panneClient) valeurs.push({ champId: idPanneClient, valeur: ligne.panneClient })
-      if (idBL && attendu.rma)               valeurs.push({ champId: idBL, valeur: attendu.rma })
-      if (idBT && attendu.bt)                valeurs.push({ champId: idBT, valeur: attendu.bt })
+      if (idBL && attendu.rma)                      valeurs.push({ champId: idBL, valeur: attendu.rma })
+      if (idBT && attendu.bt)                       valeurs.push({ champId: idBT, valeur: attendu.bt })
+      if (idRMACreation && attendu.dateCreationRMA) valeurs.push({ champId: idRMACreation, valeur: attendu.dateCreationRMA })
+      if (idDateRIC)                                valeurs.push({ champId: idDateRIC, valeur: dateAujourdhui })
+
+      // Dédupliquer : les champs explicites écrasent l'auto-remplissage
+      const valeursMap = new Map<number, string>()
+      for (const v of valeurs) valeursMap.set(v.champId, v.valeur)
+      const valeursDedupliquees = Array.from(valeursMap.entries()).map(([champId, valeur]) => ({ champId, valeur }))
 
       await prisma.inventaire.create({
         data: {
           siteId: attendu.siteId,
           articleId: articleId,
           statutId: statutStock?.id ?? null,
-          valeurs: { create: valeurs }
+          valeurs: { create: valeursDedupliquees }
         }
       })
     }

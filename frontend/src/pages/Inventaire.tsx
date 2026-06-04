@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Trash2, Plus, Pencil, X } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
-import { get } from '../api/client'
+import { get, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
 
 function getSiteId(): number {
@@ -67,6 +67,8 @@ export default function Inventaire() {
   const [formStatutId, setFormStatutId] = useState<number>(0)
   const [formValeurs, setFormValeurs] = useState<Record<number, string>>({})
   const [modal, setModal] = useState<{ id: number } | null>(null)
+  const [modalMasse, setModalMasse] = useState(false)
+  const [selection, setSelection] = useState<Set<number>>(new Set())
   const [editItem, setEditItem] = useState<{ id: number; articleId: number; statutId: number | null; valeurs: Record<number, string> } | null>(null)
 
   useEffect(() => {
@@ -121,6 +123,31 @@ export default function Inventaire() {
     const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
     localStorage.setItem(`inventaire_colonnes_${login}`, JSON.stringify(newOrdre))
     dragColonne.current = null
+  }
+
+  function toggleSelection(id: number) {
+    setSelection(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (selection.size === filteredInventaires.length) {
+      setSelection(new Set())
+    } else {
+      setSelection(new Set(filteredInventaires.map(i => i.id)))
+    }
+  }
+
+  async function supprimerSelection() {
+    for (const id of Array.from(selection)) {
+      await del(`/inventaire/${id}`)
+    }
+    setSelection(new Set())
+    setModalMasse(false)
+    reload()
   }
 
   const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
@@ -212,6 +239,11 @@ export default function Inventaire() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          {selection.size > 0 && peutSupprimer && (
+            <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => setModalMasse(true)}>
+              <Trash2 size={14} /> Supprimer ({selection.size})
+            </button>
+          )}
           {hasActiveFiltres && (
             <button className="btn btn-secondary" onClick={resetFiltres}>
               <X size={14} /> Effacer filtres
@@ -236,6 +268,13 @@ export default function Inventaire() {
           <table className="table" style={{ minWidth: 'max-content', fontSize: '12px' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr>
+                <th style={{ width: '36px', textAlign: 'center' }}>
+                  <input type="checkbox"
+                    checked={filteredInventaires.length > 0 && selection.size === filteredInventaires.length}
+                    onChange={toggleAll}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </th>
                 <th>Statut</th>
                 {champsOrdonnes.map(c => (
                   <th key={c.id}
@@ -252,6 +291,7 @@ export default function Inventaire() {
                 <th></th>
               </tr>
               <tr style={{ background: '#f8faff' }}>
+                <td style={{ padding: '4px 8px' }}></td>
                 <td style={{ padding: '4px 8px' }}>
                   <input className="form-input" placeholder="Filtrer..."
                     value={filtres['statut'] ?? ''}
@@ -276,7 +316,14 @@ export default function Inventaire() {
                 </td></tr>
               )}
               {filteredInventaires.map((item, idx) => (
-                <tr key={item.id} style={{ background: idx % 2 === 0 ? 'white' : '#e8f0fe' }}>
+                <tr key={item.id} style={{ background: selection.has(item.id) ? '#dbeafe' : idx % 2 === 0 ? 'white' : '#e8f0fe' }}>
+                  <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                    <input type="checkbox"
+                      checked={selection.has(item.id)}
+                      onChange={() => toggleSelection(item.id)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </td>
                   <td style={{ padding: '4px 10px' }}><StatutBadge statut={item.statut} /></td>
                   {champsOrdonnes.map(c => (
                     <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
@@ -400,6 +447,24 @@ export default function Inventaire() {
                 <button type="submit" className="btn btn-primary">Enregistrer</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal suppression en masse */}
+      {modalMasse && (
+        <div className="modal-overlay">
+          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
+              <strong>{selection.size} enregistrement{selection.size > 1 ? 's' : ''}</strong> seront définitivement supprimés.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setModalMasse(false)}>Annuler</button>
+              <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={supprimerSelection}>
+                Supprimer {selection.size} ligne{selection.size > 1 ? 's' : ''}
+              </button>
+            </div>
           </div>
         </div>
       )}

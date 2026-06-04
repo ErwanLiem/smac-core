@@ -1,5 +1,6 @@
 import { get, post, put, del } from './client'
 
+
 const BASE = '/attendus'
 
 export const attendusApi = {
@@ -11,14 +12,16 @@ export const attendusApi = {
   valider:     (id: number) => post(`${BASE}/${id}/valider`, {}),
   cloturer:    (id: number) => post(`${BASE}/${id}/cloturer`, {}),
   rapport:     (id: number) => get(`${BASE}/${id}/rapport`),
+  delete:      (id: number) => del(`${BASE}/${id}`),
 
-  importExcel: async (siteId: number, file: File, rma: string, bt: string, client: string) => {
+  importExcel: async (siteId: number, file: File, rma: string, bt: string, client: string, dateCreationRMA?: string) => {
     const token = localStorage.getItem('token')
     const formData = new FormData()
     formData.append('file', file)
     formData.append('rma', rma)
     formData.append('bt', bt)
     formData.append('client', client)
+    if (dateCreationRMA) formData.append('dateCreationRMA', dateCreationRMA)
     const res = await fetch(`/api/attendus/${siteId}/import`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
