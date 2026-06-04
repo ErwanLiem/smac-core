@@ -202,6 +202,14 @@ export default function AdminAttendus() {
             })}
           </tbody>
         </table>
+        {isAdmin && (
+          <div style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button className="btn btn-primary" onClick={handleSaveConfig} disabled={!configModifiee}>
+              Enregistrer les champs
+            </button>
+            {succes && <span style={{ color: '#4ade80', fontSize: '13px' }}>✓ Enregistré</span>}
+          </div>
+        )}
       </div>
 
       {/* Mapping colonnes Excel */}
