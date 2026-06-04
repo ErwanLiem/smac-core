@@ -1,0 +1,18 @@
+import { Router } from 'express'
+import multer from 'multer'
+import * as ctrl from '../controllers/attendus'
+
+const router = Router()
+const upload = multer({ dest: 'uploads/' })
+
+router.get('/:siteId', ctrl.getAll)
+router.get('/detail/:id', ctrl.getDetail)
+router.post('/:siteId/import', upload.single('file'), ctrl.importExcel)
+router.put('/:id', ctrl.update)
+router.post('/:id/scanner', ctrl.scannerSN)
+router.put('/ligne/:id', ctrl.updateLigne)
+router.post('/:id/valider', ctrl.valider)
+router.post('/:id/cloturer', ctrl.cloturer)
+router.get('/:id/rapport', ctrl.rapport)
+
+export default router

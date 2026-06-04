@@ -184,6 +184,51 @@ model valeurChampInventaire {
   @@index([champId], map: "ValeurChampInventaire_champId_fkey")
 }
 
+// Module Attendus (réception sur fichier client)
+model attendu {
+  id          Int            @id @default(autoincrement())
+  siteId      Int
+  rma         String?
+  bt          String?
+  client      String?
+  statut      String         @default("EN_COURS") // EN_COURS, CLOS
+  createdAt   DateTime       @default(now())
+  closedAt    DateTime?
+  site        site           @relation(fields: [siteId], references: [id], map: "Attendu_siteId_fkey")
+  lignes      ligneAttendue[]
+
+  @@index([siteId], map: "Attendu_siteId_fkey")
+}
+
+model ligneAttendue {
+  id           Int      @id @default(autoincrement())
+  attenduId    Int
+  pn           String
+  sn           String
+  panneClient  String?
+  garantie     String?
+  statut       String   @default("ATTENDU") // ATTENDU, RECU, NON_RECU, INATTENDU
+  snRecu       String?  // SN réellement scanné si différent
+  accessoires  String?  @db.LongText // JSON array des accessoires reçus
+  createdAt    DateTime @default(now())
+  attendu      attendu  @relation(fields: [attenduId], references: [id], onDelete: Cascade, map: "LigneAttendue_attenduId_fkey")
+
+  @@index([attenduId], map: "LigneAttendue_attenduId_fkey")
+}
+
+// Configuration du mapping colonnes Excel → champs inventaire
+model configImportExcel {
+  id                  Int    @id @default(autoincrement())
+  siteId              Int
+  colonneExcel        String // nom exact de la colonne dans le fichier Excel
+  champInventaireCode String // code du champ inventaire cible
+  actif               Boolean @default(true)
+  site                site   @relation(fields: [siteId], references: [id], map: "ConfigImportExcel_siteId_fkey")
+
+  @@unique([siteId, colonneExcel], map: "ConfigImportExcel_siteId_colonneExcel_key")
+  @@index([siteId], map: "ConfigImportExcel_siteId_fkey")
+}
+
 model historiqueActivite {
   id         Int      @id @default(autoincrement())
   siteId     Int
@@ -245,6 +290,8 @@ model site {
   inventaire           inventaire[]
   champInventaire      champInventaire[]
   historiqueActivite   historiqueActivite[]
+  attendu              attendu[]
+  configImportExcel    configImportExcel[]
 }
 
 model statut {

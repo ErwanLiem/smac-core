@@ -14,6 +14,8 @@ import Clients from './pages/Clients'
 import Plateformes from './pages/Plateformes'
 import Inventaire from './pages/Inventaire'
 import Reception from './pages/Reception'
+import Attendus from './pages/Attendus'
+import AttendusDetail from './pages/AttendusDetail'
 import Layout from './components/Layout'
 
 function isConnecte() {
@@ -44,6 +46,8 @@ function App() {
             <Route path="/plateformes" element={<Plateformes />} />
             <Route path="/inventaire" element={<Inventaire />} />
             <Route path="/reception" element={<Reception />} />
+            <Route path="/attendus" element={<Attendus />} />
+            <Route path="/attendus/:id" element={<AttendusDetail />} />
             <Route path="/admin/roles" element={<AdminRoles />} />
             <Route path="/admin/utilisateurs" element={<AdminUtilisateurs />} />
           </Route>

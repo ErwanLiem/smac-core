@@ -6,6 +6,7 @@ import articlesRouter from './routes/articles'
 import clientsRouter from './routes/clients'
 import plateformesRouter from './routes/plateformes'
 import inventaireRouter from './routes/inventaire'
+import attendusRouter from './routes/attendus'
 import utilisateursRouter from './routes/utilisateurs'
 import authRouter from './routes/auth'
 import { requireAuth } from './middleware/auth'
@@ -35,6 +36,7 @@ app.use('/api/articles', requireAuth, articlesRouter)
 app.use('/api/clients', requireAuth, clientsRouter)
 app.use('/api/plateformes', requireAuth, plateformesRouter)
 app.use('/api/inventaire', requireAuth, inventaireRouter)
+app.use('/api/attendus', requireAuth, attendusRouter)
 app.use('/api/gestion', requireAuth, utilisateursRouter)
 
 // Middleware global de gestion des erreurs

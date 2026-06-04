@@ -206,8 +206,8 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                   {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
-              {filteredItems.map(item => (
-                <tr key={item.id}>
+              {filteredItems.map((item, idx) => (
+                <tr key={item.id} style={{ background: idx % 2 === 0 ? 'white' : '#e8f0fe' }}>
                   {champsOrdonnes.map(c => (
                     <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
