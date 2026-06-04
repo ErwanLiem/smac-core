@@ -264,6 +264,7 @@ body {
 }
 .form-input::placeholder { color: #475569; }
 select.form-input option { background: #1a1d27; color: #e2e8f0; }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); cursor: pointer; }
 
 /* ─── Modal ─────────────────────────────────────────────── */
 .modal-overlay {
