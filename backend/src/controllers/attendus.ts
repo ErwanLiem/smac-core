@@ -202,26 +202,30 @@ export async function scannerSN(req: Request, res: Response, next: any) {
       l.sn === snNorm && l.statut === 'ATTENDU' && (!pn || l.pn === pn)
     )
 
-    if (ligne) {
-      // Vérifier si le S/N est déjà en inventaire
-      const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
-      const champSN = champsInv.find(c => ['SN', 'S_N', 'NUMERO_SERIE'].includes(c.code.toUpperCase()))
-      let dejaEnInventaire = false
-      if (champSN) {
-        const existing = await prisma.valeurChampInventaire.findFirst({
-          where: { champId: champSN.id, valeur: snNorm }
-        })
-        dejaEnInventaire = !!existing
-      }
+    // Vérifier si le S/N est déjà en inventaire BDD
+    const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
+    const champSN = champsInv.find(c => ['SN', 'S_N', 'NUMERO_SERIE'].includes(c.code.toUpperCase()))
+    let dejaEnInventaire = false
+    if (champSN) {
+      const existing = await prisma.valeurChampInventaire.findFirst({
+        where: { champId: champSN.id, valeur: snNorm }
+      })
+      dejaEnInventaire = !!existing
+    }
 
+    if (ligne) {
+      // S/N attendu et pas encore scanné → RECU
       await prisma.ligneAttendue.update({
         where: { id: ligne.id },
         data: { statut: 'RECU', snRecu: snNorm, accessoires: accessoiresJson }
       })
       res.json({ resultat: 'RECU', pn: ligne.pn, garantie: ligne.garantie, panneClient: ligne.panneClient, dejaEnInventaire })
     } else {
-      // SN non attendu pour ce PN
-      const ligneInattendu = await prisma.ligneAttendue.create({
+      // Vérifier si déjà scanné dans cet attendu (statut RECU)
+      const dejaScanne = attendu.lignes.find(l => l.sn === snNorm && l.statut === 'RECU')
+
+      // Créer une ligne INATTENDU dans tous les cas (rapport d'écart)
+      await prisma.ligneAttendue.create({
         data: {
           attenduId: Number(id),
           sn: snNorm,
@@ -230,7 +234,12 @@ export async function scannerSN(req: Request, res: Response, next: any) {
           accessoires: accessoiresJson
         }
       })
-      res.json({ resultat: 'INATTENDU', id: ligneInattendu.id })
+
+      if (dejaScanne) {
+        res.json({ resultat: 'DEJA_SCANNE', pn: dejaScanne.pn, dejaEnInventaire })
+      } else {
+        res.json({ resultat: 'INATTENDU', dejaEnInventaire })
+      }
     }
   } catch (e) {
     next(e)

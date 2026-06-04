@@ -54,7 +54,7 @@ export default function AttendusDetail() {
   const [articlesAccessoires, setArticlesAccessoires] = useState<ArticleAccessoire[]>([])
   const [pnActif, setPnActif] = useState<string | null>(null)
   const [snSaisie, setSnSaisie] = useState('')
-  const [dernierScan, setDernierScan] = useState<{ resultat: string; pn?: string; dejaEnInventaire?: boolean } | null>(null)
+  const [dernierScan, setDernierScan] = useState<{ resultat: string; pn?: string; dejaEnInventaire?: boolean; sn?: string } | null>(null)
   const [accessoiresParLigne, setAccessoiresParLigne] = useState<Record<number, number[]>>({})
   const [showRapport, setShowRapport] = useState(false)
   const [rapport, setRapport] = useState<Rapport | null>(null)
@@ -162,7 +162,7 @@ export default function AttendusDetail() {
         body: JSON.stringify({ sn: snSaisie.trim(), pn: pnActif, accessoires: [] })
       })
       const result = await res.json()
-      setDernierScan(result)
+      setDernierScan({ ...result, sn: snSaisie.trim() })
       setSnSaisie('')
       reload()
     } catch {
@@ -378,20 +378,38 @@ export default function AttendusDetail() {
                   {dernierScan && (
                     <div style={{
                       marginTop: '10px', padding: '10px 14px', borderRadius: '8px', fontSize: '13px',
-                      background: dernierScan.resultat === 'RECU' ? '#dcfce7' : dernierScan.resultat === 'INATTENDU' ? '#fef3c7' : '#fee2e2',
-                      color: dernierScan.resultat === 'RECU' ? '#16a34a' : dernierScan.resultat === 'INATTENDU' ? '#92400e' : '#dc2626',
+                      background: dernierScan.resultat === 'RECU' && !dernierScan.dejaEnInventaire ? '#dcfce7'
+                        : dernierScan.resultat === 'RECU' && dernierScan.dejaEnInventaire ? '#fef3c7'
+                        : dernierScan.resultat === 'DEJA_SCANNE' ? '#fee2e2'
+                        : dernierScan.resultat === 'INATTENDU' ? '#fef3c7'
+                        : '#fee2e2',
+                      color: dernierScan.resultat === 'RECU' && !dernierScan.dejaEnInventaire ? '#16a34a'
+                        : dernierScan.resultat === 'RECU' && dernierScan.dejaEnInventaire ? '#92400e'
+                        : dernierScan.resultat === 'DEJA_SCANNE' ? '#dc2626'
+                        : dernierScan.resultat === 'INATTENDU' ? '#92400e'
+                        : '#dc2626',
                     }}>
-                      {dernierScan.resultat === 'RECU' && (
+                      {dernierScan.resultat === 'RECU' && !dernierScan.dejaEnInventaire && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} /> S/N validé ✓ — P/N : <strong>{dernierScan.pn}</strong></div>
+                      )}
+                      {dernierScan.resultat === 'RECU' && dernierScan.dejaEnInventaire && (
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} />S/N validé ✓</div>
-                          {dernierScan.dejaEnInventaire && (
-                            <div style={{ marginTop: '4px', fontSize: '12px', color: '#92400e' }}>
-                              ⚠️ Ce S/N est déjà présent en inventaire — il sera ignoré à la clôture
-                            </div>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} /> S/N validé — P/N : <strong>{dernierScan.pn}</strong></div>
+                          <div style={{ marginTop: '4px', fontSize: '12px' }}>⚠️ Ce S/N est déjà présent en inventaire — il sera ignoré à la clôture</div>
                         </div>
                       )}
-                      {dernierScan.resultat === 'INATTENDU' && <><AlertTriangle size={14} style={{ display: 'inline', marginRight: '6px' }} />S/N non attendu pour ce P/N — ajouté comme inattendu</>}
+                      {dernierScan.resultat === 'DEJA_SCANNE' && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><XCircle size={14} /> S/N déjà scanné dans cet attendu — ajouté en doublon au rapport</div>
+                          {dernierScan.dejaEnInventaire && <div style={{ marginTop: '4px', fontSize: '12px' }}>⚠️ Ce S/N est également déjà présent en inventaire</div>}
+                        </div>
+                      )}
+                      {dernierScan.resultat === 'INATTENDU' && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} /> S/N non attendu pour ce P/N — ajouté au rapport</div>
+                          {dernierScan.dejaEnInventaire && <div style={{ marginTop: '4px', fontSize: '12px' }}>⚠️ Ce S/N est déjà présent en inventaire — il sera ignoré à la clôture</div>}
+                        </div>
+                      )}
                       {dernierScan.resultat === 'ERREUR' && <><XCircle size={14} style={{ display: 'inline', marginRight: '6px' }} />Erreur lors du scan</>}
                     </div>
                   )}
