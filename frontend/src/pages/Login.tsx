@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Warehouse } from 'lucide-react'
 import { post } from '../api/client'
@@ -35,7 +35,7 @@ export default function Login() {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', background: '#f9fafb', padding: '16px'
+      justifyContent: 'center', background: '#141720', padding: '16px'
     }}>
       <div style={{ maxWidth: '420px', width: '100%' }}>
 
@@ -48,7 +48,7 @@ export default function Login() {
             <Warehouse size={32} color="white" />
           </div>
           <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#111827', marginBottom: '4px' }}>SMAC</h1>
-          <p style={{ color: '#6b7280' }}>Gestion industrielle — Vallery</p>
+          <p style={{ color: '#6b7280' }}>Gestion industrielle â€” Vallery</p>
         </div>
 
         {/* Formulaire */}
@@ -75,7 +75,7 @@ export default function Login() {
                 value={motDePasse}
                 onChange={e => setMotDePasse(e.target.value)}
                 className="form-input"
-                placeholder="••••••••"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                 required
               />
             </div>
@@ -99,3 +99,4 @@ export default function Login() {
     </div>
   )
 }
+

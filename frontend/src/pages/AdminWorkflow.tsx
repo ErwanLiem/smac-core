@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X } from 'lucide-react'
 import { workflowApi } from '../api/workflow'
 import type { Statut, Transition } from '../types'
@@ -18,7 +18,7 @@ function getSiteId(): number {
   return JSON.parse(raw)?.site?.id ?? 1
 }
 
-// Badge sobre : fond coloré à 12% d'opacité + texte coloré
+// Badge sobre : fond colorÃ© Ã  12% d'opacitÃ© + texte colorÃ©
 function StatutBadge({ statut }: { statut: Statut }) {
   return (
     <span style={{
@@ -129,7 +129,7 @@ export default function AdminWorkflow() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Admin — Workflow</h1>
+          <h1 className="page-title">Admin â€” Workflow</h1>
           <p className="page-subtitle">Configurez les statuts et transitions de votre site</p>
         </div>
       </div>
@@ -155,7 +155,7 @@ export default function AdminWorkflow() {
                 <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{s.code}</code></td>
                 <td><StatutBadge statut={s} /></td>
                 <td style={{ textAlign: 'center' }}><ColorSquare color={s.couleur} /></td>
-                <td>{s.estFinal ? <span className="badge badge-info">Final</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                <td>{s.estFinal ? <span className="badge badge-info">Final</span> : <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
                 <td style={{ width: '80px', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                   {isAdmin && (<>
                     <button className="btn btn-secondary btn-icon" title="Modifier" onClick={() => setEditStatut(s)}>
@@ -181,7 +181,7 @@ export default function AdminWorkflow() {
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Label</label>
-              <input required value={newStatut.label} onChange={e => setNewStatut(f => ({ ...f, label: e.target.value }))} className="form-input" placeholder="Ex: En réparation" />
+              <input required value={newStatut.label} onChange={e => setNewStatut(f => ({ ...f, label: e.target.value }))} className="form-input" placeholder="Ex: En rÃ©paration" />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Couleur</label>
@@ -257,20 +257,20 @@ export default function AdminWorkflow() {
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">De</label>
               <select required value={newTransition.statutFromId} onChange={e => setNewTransition(f => ({ ...f, statutFromId: Number(e.target.value) }))} className="form-input">
-                <option value={0}>— choisir —</option>
+                <option value={0}>â€” choisir â€”</option>
                 {statuts.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Vers</label>
               <select required value={newTransition.statutToId} onChange={e => setNewTransition(f => ({ ...f, statutToId: Number(e.target.value) }))} className="form-input">
-                <option value={0}>— choisir —</option>
+                <option value={0}>â€” choisir â€”</option>
                 {statuts.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Label bouton</label>
-              <input required value={newTransition.labelBouton} onChange={e => setNewTransition(f => ({ ...f, labelBouton: e.target.value }))} className="form-input" placeholder="Ex: Envoyer en réparation" />
+              <input required value={newTransition.labelBouton} onChange={e => setNewTransition(f => ({ ...f, labelBouton: e.target.value }))} className="form-input" placeholder="Ex: Envoyer en rÃ©paration" />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Couleur</label>
@@ -285,10 +285,10 @@ export default function AdminWorkflow() {
         </div>
       </div>
 
-      {/* Modal édition statut */}
+      {/* Modal Ã©dition statut */}
       {editStatut && (
         <div className="modal-overlay">
-          <div className="modal" style={{ background: 'white', borderRadius: '10px', padding: '24px', maxWidth: '460px', width: '100%' }}>
+          <div className="modal" style={{ background: '#1a1d27', borderRadius: '10px', padding: '24px', maxWidth: '460px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Modifier le statut</h3>
             <form onSubmit={sauvegarderStatut}>
               <div className="form-group">
@@ -326,10 +326,10 @@ export default function AdminWorkflow() {
         </div>
       )}
 
-      {/* Modal édition transition */}
+      {/* Modal Ã©dition transition */}
       {editTransition && (
         <div className="modal-overlay">
-          <div className="modal" style={{ background: 'white', borderRadius: '10px', padding: '24px', maxWidth: '460px', width: '100%' }}>
+          <div className="modal" style={{ background: '#1a1d27', borderRadius: '10px', padding: '24px', maxWidth: '460px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Modifier la transition</h3>
             <form onSubmit={sauvegarderTransition}>
               <div className="form-group">
@@ -368,12 +368,12 @@ export default function AdminWorkflow() {
       {/* Modal confirmation */}
       {modal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
+          <div className="modal" style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
               {modal.type === 'deleteStatut'
-                ? 'Ce statut sera définitivement supprimé. Les articles associés seront impactés.'
-                : 'Cette transition sera définitivement supprimée.'}
+                ? 'Ce statut sera dÃ©finitivement supprimÃ©. Les articles associÃ©s seront impactÃ©s.'
+                : 'Cette transition sera dÃ©finitivement supprimÃ©e.'}
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
@@ -391,3 +391,4 @@ export default function AdminWorkflow() {
     </div>
   )
 }
+

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { Trash2, Plus, Pencil, X } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get, del } from '../api/client'
@@ -87,7 +87,7 @@ export default function Inventaire() {
     ])
     const champsActifs = c.filter(ch => ch.actif)
     setChamps(champsActifs)
-    // Restaurer l'ordre sauvegardé, en ignorant les champs supprimés et ajoutant les nouveaux
+    // Restaurer l'ordre sauvegardÃ©, en ignorant les champs supprimÃ©s et ajoutant les nouveaux
     const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
     const savedOrdre = JSON.parse(localStorage.getItem(`inventaire_colonnes_${login}`) || '[]') as number[]
     const ids = champsActifs.map(ch => ch.id)
@@ -102,10 +102,10 @@ export default function Inventaire() {
   }
 
   function getValeur(item: Inventaire, champId: number) {
-    return item.valeurs.find(v => v.champId === champId)?.valeur ?? '—'
+    return item.valeurs.find(v => v.champId === champId)?.valeur ?? 'â€”'
   }
 
-  // Colonnes triées selon l'ordre drag & drop
+  // Colonnes triÃ©es selon l'ordre drag & drop
   const champsOrdonnes = colonnesOrdre.map(id => champs.find(c => c.id === id)).filter(Boolean) as Champ[]
 
   function onDragStart(champId: number) {
@@ -224,7 +224,7 @@ export default function Inventaire() {
   }
 
   function StatutBadge({ statut }: { statut: Statut | null }) {
-    if (!statut) return <span style={{ color: '#d1d5db' }}>—</span>
+    if (!statut) return <span style={{ color: '#d1d5db' }}>â€”</span>
     return <span style={{ background: statut.couleur, color: 'white', fontSize: '11px', fontWeight: 500, padding: '1px 7px', borderRadius: '4px', whiteSpace: 'nowrap', display: 'inline-block' }}>{statut.label}</span>
   }
 
@@ -259,8 +259,8 @@ export default function Inventaire() {
 
       {champs.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
-          <p style={{ marginBottom: '8px', fontWeight: 500 }}>Aucun champ configuré</p>
-          <p style={{ fontSize: '13px' }}>Configurez d'abord les champs dans Configuration → Structure inventaire.</p>
+          <p style={{ marginBottom: '8px', fontWeight: 500 }}>Aucun champ configurÃ©</p>
+          <p style={{ fontSize: '13px' }}>Configurez d'abord les champs dans Configuration â†’ Structure inventaire.</p>
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
@@ -283,14 +283,14 @@ export default function Inventaire() {
                     onDragOver={e => e.preventDefault()}
                     onDrop={() => onDrop(c.id)}
                     style={{ cursor: 'grab', userSelect: 'none', whiteSpace: 'nowrap' }}
-                    title="Glisser pour déplacer"
+                    title="Glisser pour dÃ©placer"
                   >
-                    {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>⠿</span>
+                    {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>â ¿</span>
                   </th>
                 ))}
                 <th></th>
               </tr>
-              <tr style={{ background: '#f8faff' }}>
+              <tr style={{ background: '#141720' }}>
                 <td style={{ padding: '4px 8px' }}></td>
                 <td style={{ padding: '4px 8px' }}>
                   <input className="form-input" placeholder="Filtrer..."
@@ -312,11 +312,11 @@ export default function Inventaire() {
             <tbody>
               {filteredInventaires.length === 0 && (
                 <tr><td colSpan={champs.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
-                  {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
+                  {hasActiveFiltres ? 'Aucun rÃ©sultat' : 'Aucune donnÃ©e'}
                 </td></tr>
               )}
               {filteredInventaires.map((item, idx) => (
-                <tr key={item.id} style={{ background: selection.has(item.id) ? '#dbeafe' : idx % 2 === 0 ? 'white' : '#e8f0fe' }}>
+                <tr key={item.id} style={{ background: selection.has(item.id) ? '#1e3a5f' : idx % 2 === 0 ? '#1a1d27' : '#141720' }}>
                   <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                     <input type="checkbox"
                       checked={selection.has(item.id)}
@@ -326,7 +326,7 @@ export default function Inventaire() {
                   </td>
                   <td style={{ padding: '4px 10px' }}><StatutBadge statut={item.statut} /></td>
                   {champsOrdonnes.map(c => (
-                    <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                    <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
                   ))}
                   <td style={{ padding: '4px 8px', display: 'flex', gap: '6px' }}>
                     {peutEditer && (
@@ -351,13 +351,13 @@ export default function Inventaire() {
       {/* Modal ajout */}
       {showForm && (
         <div className="modal-overlay">
-          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Ajouter — Inventaire</h3>
+          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Ajouter â€” Inventaire</h3>
             <form onSubmit={handleCreate}>
               <div className="form-group">
                 <label className="form-label">Article *</label>
                 <select required value={formArticleId} onChange={e => setFormArticleId(Number(e.target.value))} className="form-input">
-                  <option value={0}>— Choisir un article —</option>
+                  <option value={0}>â€” Choisir un article â€”</option>
                   {articles.map(a => (
                     <option key={a.id} value={a.id}>{getArticleLabel(a.id)}</option>
                   ))}
@@ -366,7 +366,7 @@ export default function Inventaire() {
               <div className="form-group">
                 <label className="form-label">Statut initial</label>
                 <select value={formStatutId} onChange={e => setFormStatutId(Number(e.target.value))} className="form-input">
-                  <option value={0}>— Aucun statut —</option>
+                  <option value={0}>â€” Aucun statut â€”</option>
                   {statuts.map(s => (
                     <option key={s.id} value={s.id}>{s.label}</option>
                   ))}
@@ -402,11 +402,11 @@ export default function Inventaire() {
         </div>
       )}
 
-      {/* Modal édition */}
+      {/* Modal Ã©dition */}
       {editItem && (
         <div className="modal-overlay">
-          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Modifier — Inventaire</h3>
+          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Modifier â€” Inventaire</h3>
             <form onSubmit={handleEdit}>
               <div className="form-group">
                 <label className="form-label">Article</label>
@@ -415,7 +415,7 @@ export default function Inventaire() {
               <div className="form-group">
                 <label className="form-label">Statut</label>
                 <select value={editItem.statutId || 0} onChange={e => setEditItem(ei => ei ? { ...ei, statutId: Number(e.target.value) || null } : ei)} className="form-input">
-                  <option value={0}>— Aucun statut —</option>
+                  <option value={0}>â€” Aucun statut â€”</option>
                   {statuts.map(s => (
                     <option key={s.id} value={s.id}>{s.label}</option>
                   ))}
@@ -454,10 +454,10 @@ export default function Inventaire() {
       {/* Modal suppression en masse */}
       {modalMasse && (
         <div className="modal-overlay">
-          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
+          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
-              <strong>{selection.size} enregistrement{selection.size > 1 ? 's' : ''}</strong> seront définitivement supprimés.
+              <strong>{selection.size} enregistrement{selection.size > 1 ? 's' : ''}</strong> seront dÃ©finitivement supprimÃ©s.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModalMasse(false)}>Annuler</button>
@@ -472,9 +472,9 @@ export default function Inventaire() {
       {/* Modal suppression */}
       {modal && (
         <div className="modal-overlay">
-          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
+          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Cet enregistrement sera définitivement supprimé.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Cet enregistrement sera dÃ©finitivement supprimÃ©.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => handleDelete(modal.id)}>Supprimer</button>
@@ -485,3 +485,4 @@ export default function Inventaire() {
     </div>
   )
 }
+

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
@@ -118,8 +118,8 @@ export default function AdminRoles() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Rôles utilisateurs</h1>
-          <p className="page-subtitle">Définissez les rôles et leurs droits d'accès par page</p>
+          <h1 className="page-title">RÃ´les utilisateurs</h1>
+          <p className="page-subtitle">DÃ©finissez les rÃ´les et leurs droits d'accÃ¨s par page</p>
         </div>
       </div>
 
@@ -152,12 +152,12 @@ export default function AdminRoles() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {role.permissions.length === 0
-                  ? <span style={{ fontSize: '13px', color: '#9ca3af' }}>Aucun accès configuré</span>
+                  ? <span style={{ fontSize: '13px', color: '#9ca3af' }}>Aucun accÃ¨s configurÃ©</span>
                   : role.permissions.map(p => {
                     const page = pages.find(pg => pg.path === p.page)
                     return (
                       <span key={`${p.page}:${p.action}`} className="badge badge-info" style={{ fontSize: '12px' }}>
-                        {page?.label ?? p.page} — {ACTION_LABELS[p.action] ?? p.action}
+                        {page?.label ?? p.page} â€” {ACTION_LABELS[p.action] ?? p.action}
                       </span>
                     )
                   })
@@ -168,9 +168,9 @@ export default function AdminRoles() {
         </div>
       ))}
 
-      {/* Formulaire création — ADMIN uniquement */}
+      {/* Formulaire crÃ©ation â€” ADMIN uniquement */}
       {isAdmin && <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px' }}>Créer un rôle</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px' }}>CrÃ©er un rÃ´le</h2>
         <form onSubmit={handleCreate}>
           <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div className="form-group" style={{ margin: 0 }}>
@@ -186,15 +186,15 @@ export default function AdminRoles() {
           <div style={{ marginBottom: '20px' }}>
             <PermissionsEditor pages={pages} value={form.permSet} onChange={permSet => setForm(f => ({ ...f, permSet }))} />
           </div>
-          <button type="submit" className="btn btn-primary">+ Créer le rôle</button>
+          <button type="submit" className="btn btn-primary">+ CrÃ©er le rÃ´le</button>
         </form>
       </div>}
 
       {modal && (
         <div className="modal-overlay">
-          <div style={{ background: 'white', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
+          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Ce rôle sera supprimé. Les utilisateurs associés devront être réassignés.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Ce rÃ´le sera supprimÃ©. Les utilisateurs associÃ©s devront Ãªtre rÃ©assignÃ©s.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => handleDelete(modal.id)}>Supprimer</button>
@@ -205,3 +205,4 @@ export default function AdminRoles() {
     </div>
   )
 }
+
