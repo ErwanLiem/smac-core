@@ -54,7 +54,7 @@ export default function AttendusDetail() {
   const [articlesAccessoires, setArticlesAccessoires] = useState<ArticleAccessoire[]>([])
   const [pnActif, setPnActif] = useState<string | null>(null)
   const [snSaisie, setSnSaisie] = useState('')
-  const [dernierScan, setDernierScan] = useState<{ resultat: string; pn?: string } | null>(null)
+  const [dernierScan, setDernierScan] = useState<{ resultat: string; pn?: string; dejaEnInventaire?: boolean } | null>(null)
   const [accessoiresParLigne, setAccessoiresParLigne] = useState<Record<number, number[]>>({})
   const [showRapport, setShowRapport] = useState(false)
   const [rapport, setRapport] = useState<Rapport | null>(null)
@@ -203,9 +203,14 @@ export default function AttendusDetail() {
   }
 
   async function handleCloturer() {
-    await attendusApi.cloturer(Number(id))
-    setShowCloturer(false)
-    reload()
+    try {
+      const result = await attendusApi.cloturer(Number(id))
+      setShowCloturer(false)
+      setValiderOk(result)
+      reload()
+    } catch (e: any) {
+      alert('Erreur : ' + e.message)
+    }
   }
 
   async function handleRapport() {
@@ -276,9 +281,8 @@ export default function AttendusDetail() {
           <button className="btn btn-secondary" onClick={handleRapport}>Rapport d'écart</button>
           {!isClos && (
             <>
-              <button className="btn btn-primary" onClick={() => setShowValider(true)}>✓ Valider → Inventaire</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => setShowCloturer(true)}>
-                <Lock size={14} /> Clôturer
+                <Lock size={14} /> Clôturer et enregistrer
               </button>
             </>
           )}
@@ -377,7 +381,16 @@ export default function AttendusDetail() {
                       background: dernierScan.resultat === 'RECU' ? '#dcfce7' : dernierScan.resultat === 'INATTENDU' ? '#fef3c7' : '#fee2e2',
                       color: dernierScan.resultat === 'RECU' ? '#16a34a' : dernierScan.resultat === 'INATTENDU' ? '#92400e' : '#dc2626',
                     }}>
-                      {dernierScan.resultat === 'RECU' && <><CheckCircle size={14} style={{ display: 'inline', marginRight: '6px' }} />S/N validé ✓</>}
+                      {dernierScan.resultat === 'RECU' && (
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} />S/N validé ✓</div>
+                          {dernierScan.dejaEnInventaire && (
+                            <div style={{ marginTop: '4px', fontSize: '12px', color: '#92400e' }}>
+                              ⚠️ Ce S/N est déjà présent en inventaire — il sera ignoré à la clôture
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {dernierScan.resultat === 'INATTENDU' && <><AlertTriangle size={14} style={{ display: 'inline', marginRight: '6px' }} />S/N non attendu pour ce P/N — ajouté comme inattendu</>}
                       {dernierScan.resultat === 'ERREUR' && <><XCircle size={14} style={{ display: 'inline', marginRight: '6px' }} />Erreur lors du scan</>}
                     </div>
@@ -540,13 +553,16 @@ export default function AttendusDetail() {
       {showCloturer && (
         <div className="modal-overlay">
           <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Clôturer l'attendu ?</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Clôturer et enregistrer ?</h3>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>
+              Les <strong>{attendu.lignes.filter(l => l.statut === 'RECU').length} S/N reçus</strong> seront injectés dans l'inventaire avec le statut "En stock".
+            </p>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Les S/N non scannés seront marqués comme <strong>non reçus</strong>.</p>
             <p style={{ color: '#dc2626', fontSize: '13px', marginBottom: '20px' }}>⚠️ Cette action est irréversible.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setShowCloturer(false)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={handleCloturer}>
-                <Lock size={14} /> Clôturer définitivement
+                <Lock size={14} /> Clôturer et enregistrer dans l'inventaire
               </button>
             </div>
           </div>

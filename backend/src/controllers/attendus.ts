@@ -203,11 +203,22 @@ export async function scannerSN(req: Request, res: Response, next: any) {
     )
 
     if (ligne) {
+      // Vérifier si le S/N est déjà en inventaire
+      const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
+      const champSN = champsInv.find(c => ['SN', 'S_N', 'NUMERO_SERIE'].includes(c.code.toUpperCase()))
+      let dejaEnInventaire = false
+      if (champSN) {
+        const existing = await prisma.valeurChampInventaire.findFirst({
+          where: { champId: champSN.id, valeur: snNorm }
+        })
+        dejaEnInventaire = !!existing
+      }
+
       await prisma.ligneAttendue.update({
         where: { id: ligne.id },
         data: { statut: 'RECU', snRecu: snNorm, accessoires: accessoiresJson }
       })
-      res.json({ resultat: 'RECU', pn: ligne.pn, garantie: ligne.garantie, panneClient: ligne.panneClient })
+      res.json({ resultat: 'RECU', pn: ligne.pn, garantie: ligne.garantie, panneClient: ligne.panneClient, dejaEnInventaire })
     } else {
       // SN non attendu pour ce PN
       const ligneInattendu = await prisma.ligneAttendue.create({
@@ -391,14 +402,16 @@ export async function valider(req: Request, res: Response, next: any) {
   }
 }
 
-// POST /api/attendus/:id/cloturer — clôturer l'attendu
+// POST /api/attendus/:id/cloturer — clôturer ET injecter dans inventaire
 export async function cloturer(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
-    const attendu = await prisma.attendu.update({
+
+    const attendu = await prisma.attendu.findUnique({
       where: { id: Number(id) },
-      data: { statut: 'CLOS', closedAt: new Date() }
+      include: { lignes: true }
     })
+    if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
 
     // Marquer les lignes encore ATTENDU comme NON_RECU
     await prisma.ligneAttendue.updateMany({
@@ -406,7 +419,96 @@ export async function cloturer(req: Request, res: Response, next: any) {
       data: { statut: 'NON_RECU' }
     })
 
-    res.json(attendu)
+    // ---- Injection inventaire (même logique que valider) ----
+    const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId, actif: true } })
+
+    function findChampId(codes: string[]): number | null {
+      const c = champsInv.find(ch => codes.some(code =>
+        ch.code.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '') === code.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      ))
+      return c ? c.id : null
+    }
+
+    const idSN          = findChampId(['SN', 'NUMERO_SERIE', 'NUMERO DE SERIE'])
+    const idPN          = findChampId(['PN', 'P_N', 'PART_NUMBER', 'PART_NO'])
+    const idGarantie    = findChampId(['GARANTIE'])
+    const idPanneClient = findChampId(['PANNE_CLIENT', 'PANNE'])
+    const idBL          = findChampId(['BL', 'RMA'])
+    const idBT          = findChampId(['BT', 'BT_RECEP'])
+    const idRMACreation = findChampId(['RMA_CREATION', 'DATE_CREATION_BL', 'DATE_BL'])
+    const idDateRIC     = findChampId(['DATE_RIC', 'DATE_RECEPTION', 'DATE_REC'])
+    const dateAujourdhui = new Date().toISOString().split('T')[0]
+
+    const statutStock = await prisma.statut.findFirst({
+      where: { siteId: attendu.siteId, OR: [{ code: { contains: 'STOCK' } }, { label: { contains: 'stock' } }] }
+    })
+
+    const champsPNArt = await prisma.champArticle.findMany({ where: { siteId: attendu.siteId } })
+    const champsPNIds = champsPNArt.filter(c => ['PN', 'P_N', 'PART_NUMBER', 'PART_NO'].includes(c.code.toUpperCase())).map(c => c.id)
+    const articlesAvecValeurs = await prisma.article.findMany({
+      where: { siteId: attendu.siteId },
+      include: { valeurs: true }
+    })
+    const champsArticle = await prisma.champArticle.findMany({ where: { siteId: attendu.siteId, actif: true } })
+
+    function trouverArticleParPN(pn: string) {
+      return articlesAvecValeurs.find(a => a.valeurs.some(v => champsPNIds.includes(v.champId) && v.valeur === pn)) ?? null
+    }
+
+    // Récupérer S/N déjà en inventaire pour éviter doublons
+    const snsExistants = idSN ? await prisma.valeurChampInventaire.findMany({ where: { champId: idSN } }) : []
+    const snsDejaPresents = new Set(snsExistants.map(v => v.valeur))
+
+    const lignesRecues = attendu.lignes.filter(l => l.statut === 'RECU')
+    let lignesInjectees = 0
+    const snDoublons: string[] = []
+
+    for (const ligne of lignesRecues) {
+      if (idSN && snsDejaPresents.has(ligne.sn)) { snDoublons.push(ligne.sn); continue }
+
+      const article = trouverArticleParPN(ligne.pn)
+      const valeurs: { champId: number; valeur: string }[] = []
+
+      if (article) {
+        for (const valArt of article.valeurs) {
+          const champArt = champsArticle.find(c => c.id === valArt.champId)
+          if (!champArt || !valArt.valeur) continue
+          const champInvCorr = champsInv.find(c => c.code.toUpperCase() === champArt.code.toUpperCase())
+          if (champInvCorr) valeurs.push({ champId: champInvCorr.id, valeur: valArt.valeur })
+        }
+      }
+
+      if (idSN && ligne.sn)                       valeurs.push({ champId: idSN, valeur: ligne.sn })
+      if (idPN && ligne.pn)                        valeurs.push({ champId: idPN, valeur: ligne.pn })
+      if (idGarantie && ligne.garantie)            valeurs.push({ champId: idGarantie, valeur: ligne.garantie })
+      if (idPanneClient && ligne.panneClient)      valeurs.push({ champId: idPanneClient, valeur: ligne.panneClient })
+      if (idBL && attendu.rma)                     valeurs.push({ champId: idBL, valeur: attendu.rma })
+      if (idBT && attendu.bt)                      valeurs.push({ champId: idBT, valeur: attendu.bt })
+      if (idRMACreation && attendu.dateCreationRMA) valeurs.push({ champId: idRMACreation, valeur: attendu.dateCreationRMA })
+      if (idDateRIC)                               valeurs.push({ champId: idDateRIC, valeur: dateAujourdhui })
+
+      const valeursMap = new Map<number, string>()
+      for (const v of valeurs) valeursMap.set(v.champId, v.valeur)
+      const valeursDedupliquees = Array.from(valeursMap.entries()).map(([champId, valeur]) => ({ champId, valeur }))
+
+      await prisma.inventaire.create({
+        data: {
+          siteId: attendu.siteId,
+          articleId: article?.id ?? null,
+          statutId: statutStock?.id ?? null,
+          valeurs: { create: valeursDedupliquees }
+        }
+      })
+      lignesInjectees++
+    }
+
+    // Clôturer l'attendu
+    await prisma.attendu.update({
+      where: { id: Number(id) },
+      data: { statut: 'CLOS', closedAt: new Date() }
+    })
+
+    res.json({ success: true, lignesInjectees, snDoublons })
   } catch (e) {
     next(e)
   }
