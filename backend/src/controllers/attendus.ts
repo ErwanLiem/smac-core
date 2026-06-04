@@ -557,6 +557,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
     const idDateRIC     = findChampId(['DATE_RIC', 'DATE_RECEPTION', 'DATE_REC'])
     const idPlateforme  = findChampId(['PLATEFORME', 'PLATEFORMES', 'PLATFORM'])
     const idClient      = findChampId(['CLIENT', 'CLIENTS'])
+    const idAccessoires = findChampId(['ACCESSOIRES', 'ACCESSOIRE', 'ACCESSORIES'])
     const dateAujourdhui = new Date().toISOString().split('T')[0]
 
     const statutStock = await prisma.statut.findFirst({
@@ -615,6 +616,12 @@ export async function cloturer(req: Request, res: Response, next: any) {
       if (idDateRIC)                                valeurs.push({ champId: idDateRIC, valeur: dateAujourdhui })
       if (idPlateforme && attendu.plateforme)       valeurs.push({ champId: idPlateforme, valeur: attendu.plateforme })
       if (idClient && attendu.client)               valeurs.push({ champId: idClient, valeur: attendu.client })
+      if (idAccessoires && ligne.accessoires) {
+        try {
+          const accs: string[] = JSON.parse(ligne.accessoires)
+          if (accs.length > 0) valeurs.push({ champId: idAccessoires, valeur: accs.join(', ') })
+        } catch {}
+      }
 
       const valeursMap = new Map<number, string>()
       for (const v of valeurs) valeursMap.set(v.champId, v.valeur)
