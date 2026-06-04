@@ -393,14 +393,14 @@ export default function AttendusDetail() {
               <div key={pn}
                 onClick={() => { setPnActif(pn); setDernierScan(null); setSnSaisie(''); if (!isClos) setTimeout(() => snInputRef.current?.focus(), 100) }}
                 style={{
-                  border: `2px solid ${actif ? '#2563eb' : complet ? '#86efac' : '#e5e7eb'}`,
+                  border: `2px solid ${actif ? '#2563eb' : complet ? '#4ade80' : '#2d3148'}`,
                   borderRadius: '8px', padding: '12px',
-                  background: actif ? '#eff6ff' : complet ? '#f0fdf4' : 'white',
+                  background: actif ? '#1e3a5f' : complet ? '#1e3a1e' : '#1a1d27',
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <code style={{ fontSize: '11px', fontWeight: 600, color: actif ? '#1d4ed8' : '#374151' }}>{pn}</code>
+                  <code style={{ fontSize: '11px', fontWeight: 600, color: actif ? '#60a5fa' : '#cbd5e1' }}>{pn}</code>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: complet ? '#16a34a' : '#2563eb' }}>{recus}/{total}</span>
                 </div>
                 <div style={{ background: '#f1f5f9', borderRadius: '3px', height: '4px', overflow: 'hidden' }}>
