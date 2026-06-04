@@ -533,7 +533,7 @@ export default function AttendusDetail() {
 
               {/* Liste des S/N pour ce PN */}
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid #2d3148', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: 600 }}>S/N attendus — <code style={{ background: '#1e3a5f', color: '#2563eb', padding: '1px 6px', borderRadius: '4px', fontSize: '12px' }}>{pnActif}</code></h3>
                   <span style={{ fontSize: '12px', color: '#6b7280' }}>
                     {lignesPNActif.filter(l => l.statut === 'RECU').length}/{lignesPNActif.length}
@@ -555,8 +555,8 @@ export default function AttendusDetail() {
                     {lignesPNActif.map((l, i) => {
                       const accs: string[] = l.accessoires ? (() => { try { return JSON.parse(l.accessoires) } catch { return [] } })() : []
                       return (
-                        <tr key={l.id} style={{ borderTop: '1px solid #f3f4f6', background: i % 2 === 0 ? '#1a1d27' : '#141720' }}>
-                          <td style={{ padding: '6px 14px', fontFamily: 'monospace', fontWeight: l.statut === 'RECU' ? 600 : 400, color: l.statut === 'RECU' ? '#1d4ed8' : '#374151' }}>{l.sn}</td>
+                        <tr key={l.id} style={{ borderTop: '1px solid #1e2130', background: i % 2 === 0 ? '#1a1d27' : '#141720' }}>
+                          <td style={{ padding: '6px 14px', fontFamily: 'monospace', fontWeight: l.statut === 'RECU' ? 600 : 400, color: l.statut === 'RECU' ? '#60a5fa' : '#94a3b8' }}>{l.sn}</td>
                           <td style={{ padding: '6px 14px', color: '#6b7280' }}>{l.garantie || '—'}</td>
                           <td style={{ padding: '6px 14px', color: '#6b7280', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.panneClient || '—'}</td>
                           {articlesAccessoires.length > 0 && articlesAccessoires.map(acc => (
