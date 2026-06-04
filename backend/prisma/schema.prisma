@@ -219,14 +219,25 @@ model ligneAttendue {
   @@index([attenduId], map: "LigneAttendue_attenduId_fkey")
 }
 
-// Configuration du mapping colonnes Excel → champs inventaire
+// Configuration globale du module Attendus par site
+model configAttendus {
+  id                       Int     @id @default(autoincrement())
+  siteId                   Int     @unique
+  nomOnglet                String  @default("Terminal Details") // nom de l'onglet Excel à lire
+  obligatoirePNcatalogue   Boolean @default(true)  // bloquer l'import si PN absent du catalogue
+  statutCloture            String? // code du statut à assigner à la clôture (ex: EN_STOCK)
+  site                     site    @relation(fields: [siteId], references: [id], map: "ConfigAttendus_siteId_fkey")
+}
+
+// Mapping colonnes Excel → champs inventaire
 model configImportExcel {
-  id                  Int    @id @default(autoincrement())
+  id                  Int     @id @default(autoincrement())
   siteId              Int
-  colonneExcel        String // nom exact de la colonne dans le fichier Excel
-  champInventaireCode String // code du champ inventaire cible
+  colonneExcel        String  // nom exact de la colonne dans le fichier Excel
+  champInventaireCode String  // code du champ inventaire cible
+  roleSpecial         String? // SN | PN | null (rôle particulier dans le traitement)
   actif               Boolean @default(true)
-  site                site   @relation(fields: [siteId], references: [id], map: "ConfigImportExcel_siteId_fkey")
+  site                site    @relation(fields: [siteId], references: [id], map: "ConfigImportExcel_siteId_fkey")
 
   @@unique([siteId, colonneExcel], map: "ConfigImportExcel_siteId_colonneExcel_key")
   @@index([siteId], map: "ConfigImportExcel_siteId_fkey")
@@ -294,6 +305,7 @@ model site {
   champInventaire      champInventaire[]
   historiqueActivite   historiqueActivite[]
   attendu              attendu[]
+  configAttendus       configAttendus?
   configImportExcel    configImportExcel[]
 }
 

@@ -17,6 +17,7 @@ const PAGES_DISPONIBLES = [
   { path: '/admin/clients',      label: 'Configuration — Structure clients',  actions: ['view'] },
   { path: '/admin/plateformes',  label: 'Configuration — Structure plateformes', actions: ['view'] },
   { path: '/admin/inventaire',   label: 'Configuration — Structure inventaire', actions: ['view'] },
+  { path: '/admin/attendus',     label: 'Configuration — Attendus',            actions: ['view'] },
   { path: '/admin/workflow',     label: 'Configuration — Workflow',           actions: ['view'] },
   { path: '/admin/roles',        label: 'Configuration — Rôles',             actions: ['view'] },
   { path: '/admin/utilisateurs', label: 'Configuration — Utilisateurs',      actions: ['view'] },

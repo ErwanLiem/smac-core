@@ -73,6 +73,7 @@ export default function Sidebar() {
         { name: 'Structure clients', path: '/admin/clients', icon: Users },
         { name: 'Structure plateformes', path: '/admin/plateformes', icon: Building2 },
         { name: 'Structure inventaire', path: '/admin/inventaire', icon: Database },
+        { name: 'Config. Attendus', path: '/admin/attendus', icon: Settings },
         { name: 'Workflow', path: '/admin/workflow', icon: Settings },
         { name: 'Rôles', path: '/admin/roles', icon: Settings },
         { name: 'Utilisateurs', path: '/admin/utilisateurs', icon: Users },

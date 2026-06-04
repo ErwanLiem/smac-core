@@ -179,21 +179,47 @@ export async function importExcel(req: Request, res: Response, next: any) {
     const file = (req as any).file
     if (!file) return res.status(400).json({ error: 'Fichier manquant' })
 
+    // Charger la config du site
+    const config = await prisma.configAttendus.findUnique({ where: { siteId: Number(siteId) } })
+    const mappings = await prisma.configImportExcel.findMany({ where: { siteId: Number(siteId), actif: true } })
+
     const wb = XLSX.readFile(file.path)
-    const sheetName = wb.SheetNames.find(s => normalize(s).includes('terminal')) || wb.SheetNames[0]
+
+    // Onglet : config ou fallback sur "terminal"
+    const nomOnglet = config?.nomOnglet || 'Terminal Details'
+    const sheetName = wb.SheetNames.find(s => normalize(s) === normalize(nomOnglet))
+      || wb.SheetNames.find(s => normalize(s).includes('terminal'))
+      || wb.SheetNames[0]
     const ws = wb.Sheets[sheetName]
     const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
 
     const headerRowIdx = findHeaderRow(data)
     const headers = (data[headerRowIdx] || []).map((h: any) => String(h ?? ''))
-    const iSN       = findCol(headers, COL_SN)
-    const iPN       = findCol(headers, COL_PN)
-    const iPanne    = findCol(headers, COL_PANNE)
-    const iGarantie = findCol(headers, COL_GARANTIE)
+
+    // Identifier les colonnes SN et PN (depuis config ou fallback)
+    const colSNConfig = mappings.find(m => m.roleSpecial === 'SN')
+    const colPNConfig = mappings.find(m => m.roleSpecial === 'PN')
+
+    const iSN = colSNConfig
+      ? headers.findIndex(h => normalize(h) === normalize(colSNConfig.colonneExcel))
+      : findCol(headers, COL_SN)
+    const iPN = colPNConfig
+      ? headers.findIndex(h => normalize(h) === normalize(colPNConfig.colonneExcel))
+      : findCol(headers, COL_PN)
+
+    // Colonnes additionnelles depuis le mapping config
+    const colsMappees = mappings.filter(m => !m.roleSpecial).map(m => ({
+      idx: headers.findIndex(h => normalize(h) === normalize(m.colonneExcel)),
+      code: m.champInventaireCode
+    })).filter(m => m.idx !== -1)
+
+    // Fallback colonnes panne et garantie si pas de config
+    const iPanne    = mappings.length === 0 ? findCol(headers, COL_PANNE) : -1
+    const iGarantie = mappings.length === 0 ? findCol(headers, COL_GARANTIE) : -1
 
     if (iSN === -1 || iPN === -1) {
       fs.unlinkSync(file.path)
-      return res.status(400).json({ error: 'Colonnes Serial Number / Part Number introuvables' })
+      return res.status(400).json({ error: 'Colonnes Serial Number / Part Number introuvables. Vérifiez la configuration du mapping.' })
     }
 
     // Extraire les lignes
@@ -204,33 +230,44 @@ export async function importExcel(req: Request, res: Response, next: any) {
       const sn = String(row[iSN]).trim()
       const pn = String(row[iPN]).trim()
       if (!sn || !pn) continue
+
+      // Champs additionnels depuis le mapping configuré
+      const champsSupp: Record<string, string> = {}
+      for (const col of colsMappees) {
+        if (row[col.idx]) champsSupp[col.code] = String(row[col.idx]).trim()
+      }
+
       lignesRaw.push({
         sn, pn,
-        panneClient: iPanne !== -1 && row[iPanne] ? String(row[iPanne]).trim() : null,
-        garantie:    iGarantie !== -1 && row[iGarantie] ? String(row[iGarantie]).trim() : null,
+        panneClient: champsSupp['PANNE_CLIENT'] || (iPanne !== -1 && row[iPanne] ? String(row[iPanne]).trim() : null),
+        garantie:    champsSupp['GARANTIE'] || (iGarantie !== -1 && row[iGarantie] ? String(row[iGarantie]).trim() : null),
+        champsSupp
       })
     }
 
-    // Vérifier que tous les PN existent dans le catalogue
-    const pnsUniques = [...new Set(lignesRaw.map(l => l.pn))]
-    const champsPNArt = await prisma.champArticle.findMany({ where: { siteId: Number(siteId) } })
-    const champsPNIds = champsPNArt
-      .filter(c => ['PN', 'P_N', 'PART_NUMBER', 'PART_NO'].includes(c.code.toUpperCase()))
-      .map(c => c.id)
-    const articlesExistants = await prisma.article.findMany({
-      where: { siteId: Number(siteId) },
-      include: { valeurs: { where: { champId: { in: champsPNIds } } } }
-    })
-    const pnsCatalogue = new Set(
-      articlesExistants.flatMap(a => a.valeurs.map(v => v.valeur)).filter(Boolean)
-    )
-    const pnsInconnus = pnsUniques.filter(pn => !pnsCatalogue.has(pn))
-    if (pnsInconnus.length > 0) {
-      fs.unlinkSync(file.path)
-      return res.status(400).json({
-        error: `Les P/N suivants n'existent pas dans le catalogue : ${pnsInconnus.join(', ')}`,
-        pnsInconnus
+    // Vérifier les PN contre le catalogue (si obligatoire selon config)
+    const obligatoirePN = config?.obligatoirePNcatalogue ?? true
+    if (obligatoirePN) {
+      const pnsUniques = [...new Set(lignesRaw.map(l => l.pn))]
+      const champsPNArt = await prisma.champArticle.findMany({ where: { siteId: Number(siteId) } })
+      const champsPNIds = champsPNArt
+        .filter(c => ['PN', 'P_N', 'PART_NUMBER', 'PART_NO'].includes(c.code.toUpperCase()))
+        .map(c => c.id)
+      const articlesExistants = await prisma.article.findMany({
+        where: { siteId: Number(siteId) },
+        include: { valeurs: { where: { champId: { in: champsPNIds } } } }
       })
+      const pnsCatalogue = new Set(
+        articlesExistants.flatMap(a => a.valeurs.map(v => v.valeur)).filter(Boolean)
+      )
+      const pnsInconnus = pnsUniques.filter(pn => !pnsCatalogue.has(pn))
+      if (pnsInconnus.length > 0) {
+        fs.unlinkSync(file.path)
+        return res.status(400).json({
+          error: `Les P/N suivants n'existent pas dans le catalogue : ${pnsInconnus.join(', ')}`,
+          pnsInconnus
+        })
+      }
     }
 
     const attendu = await prisma.attendu.create({
@@ -387,9 +424,11 @@ export async function cloturer(req: Request, res: Response, next: any) {
     // Charger données pour injection
     const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId, actif: true } })
     const { champsArticle, trouverParPN } = await chargerArticles(attendu.siteId)
-    const statutStock = await prisma.statut.findFirst({
-      where: { siteId: attendu.siteId, OR: [{ code: { contains: 'STOCK' } }, { label: { contains: 'stock' } }] }
-    })
+    // Statut de clôture : depuis la config ou fallback recherche "STOCK"
+    const configSite = await prisma.configAttendus.findUnique({ where: { siteId: attendu.siteId } })
+    const statutStock = configSite?.statutCloture
+      ? await prisma.statut.findFirst({ where: { siteId: attendu.siteId, code: configSite.statutCloture } })
+      : await prisma.statut.findFirst({ where: { siteId: attendu.siteId, OR: [{ code: { contains: 'STOCK' } }, { label: { contains: 'stock' } }] } })
 
     // S/N à exclure (déjà en inventaire avec statut non final)
     const idsSN = getIdsSN(champsInv)
