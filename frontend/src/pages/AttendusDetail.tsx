@@ -375,12 +375,12 @@ export default function AttendusDetail() {
 
             return (
               <div key={pn}
-                onClick={() => { if (!isClos) { setPnActif(pn); setDernierScan(null); setSnSaisie(''); setAccessoiresCochés([]); setTimeout(() => snInputRef.current?.focus(), 100) } }}
+                onClick={() => { setPnActif(pn); setDernierScan(null); setSnSaisie(''); if (!isClos) setTimeout(() => snInputRef.current?.focus(), 100) }}
                 style={{
                   border: `2px solid ${actif ? '#2563eb' : complet ? '#86efac' : '#e5e7eb'}`,
                   borderRadius: '8px', padding: '12px',
                   background: actif ? '#eff6ff' : complet ? '#f0fdf4' : 'white',
-                  cursor: isClos ? 'default' : 'pointer',
+                  cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>

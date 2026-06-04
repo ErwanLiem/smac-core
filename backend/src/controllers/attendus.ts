@@ -556,6 +556,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
     const idRMACreation = findChampId(['RMA_CREATION', 'DATE_CREATION_BL', 'DATE_BL'])
     const idDateRIC     = findChampId(['DATE_RIC', 'DATE_RECEPTION', 'DATE_REC'])
     const idPlateforme  = findChampId(['PLATEFORME', 'PLATEFORMES', 'PLATFORM'])
+    const idClient      = findChampId(['CLIENT', 'CLIENTS'])
     const dateAujourdhui = new Date().toISOString().split('T')[0]
 
     const statutStock = await prisma.statut.findFirst({
@@ -574,9 +575,16 @@ export async function cloturer(req: Request, res: Response, next: any) {
       return articlesAvecValeurs.find(a => a.valeurs.some(v => champsPNIds.includes(v.champId) && v.valeur === pn)) ?? null
     }
 
-    // Récupérer S/N déjà en inventaire pour éviter doublons
-    const snsExistants = idSN ? await prisma.valeurChampInventaire.findMany({ where: { champId: idSN } }) : []
-    const snsDejaPresents = new Set(snsExistants.map(v => v.valeur))
+    // Récupérer S/N déjà en inventaire avec statut NON final uniquement
+    const snsExistants = idSN ? await prisma.valeurChampInventaire.findMany({
+      where: { champId: idSN },
+      include: { inventaire: { include: { statut: true } } }
+    }) : []
+    const snsDejaPresents = new Set(
+      snsExistants
+        .filter(v => !(v.inventaire?.statut?.estFinal ?? false))
+        .map(v => v.valeur)
+    )
 
     const lignesRecues = attendu.lignes.filter(l => l.statut === 'RECU')
     let lignesInjectees = 0
@@ -606,6 +614,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
       if (idRMACreation && attendu.dateCreationRMA) valeurs.push({ champId: idRMACreation, valeur: attendu.dateCreationRMA })
       if (idDateRIC)                                valeurs.push({ champId: idDateRIC, valeur: dateAujourdhui })
       if (idPlateforme && attendu.plateforme)       valeurs.push({ champId: idPlateforme, valeur: attendu.plateforme })
+      if (idClient && attendu.client)               valeurs.push({ champId: idClient, valeur: attendu.client })
 
       const valeursMap = new Map<number, string>()
       for (const v of valeurs) valeursMap.set(v.champId, v.valeur)
