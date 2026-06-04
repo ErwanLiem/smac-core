@@ -167,8 +167,8 @@ export default function Attendus() {
                   <td style={{ fontWeight: 500 }}>{a.rma || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   <td>{a.bt || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   <td>{a.client || <span style={{ color: '#d1d5db' }}>—</span>}</td>
-                  <td><span style={{ background: '#1e3a5f', color: '#2563eb', borderRadius: '4px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{a._count.lignes}</span></td>
-                  <td style={{ color: '#94a3b8', fontSize: '13px' }}>{new Date(a.createdAt).toLocaleDateString('fr-FR')}</td>
+                  <td><span style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: '4px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{a._count.lignes}</span></td>
+                  <td>{new Date(a.createdAt).toLocaleDateString('fr-FR')}</td>
                   <td onClick={e => e.stopPropagation()}>
                     {a.statut === 'EN_COURS' && (
                       <button className="btn btn-danger btn-icon" onClick={e => { e.stopPropagation(); setModalDelete(a) }}>
