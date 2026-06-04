@@ -3,59 +3,12 @@ import { CheckCircle, Plus, Trash2, X } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get } from '../api/client'
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
   if (!raw) return 1
   return JSON.parse(raw)?.site?.id ?? 1
 }
-
-interface Champ {
-  id: number
-  code: string
-  label: string
-  type: string
-  options: string | null
-  obligatoire: boolean
-  visibleReceptionSN: boolean
-  visibleReceptionQTE: boolean
-  actif: boolean
-}
-
-interface Article {
-  id: number
-  valeurs: { champId: number; valeur: string | null; champ: Champ }[]
-}
-
-interface Statut {
-  id: number
-  label: string
-  couleur: string
-  code?: string
-}
-
-interface LigneSN {
-  sn: string
-  accessoires: number[]
-}
-
-interface LotPrepare {
-  id: number
-  articleId: number
-  articleLabel: string
-  modesuivi: 'SN' | 'QTE' | 'AUTRE'
-  champsCommuns: Record<number, string>
-  lignes: { sn: string; accessoiresIds: number[]; accessoiresLabels: string[] }[]
-  quantite: number
-  statut: string | null
-  statutId: number | null
-}
-
-const CODES_PN          = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO']
-const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
-const CODES_TYPE_ART    = ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE']
-const CODES_SUIVI       = ['SUIVI', 'MODE_SUIVI', 'TRACKING']
-const CODES_TYPE_INV    = ['TYPE', 'TYPE_ARTICLE', 'TYPE_PRODUIT']
-const CODES_ACCESSOIRE  = ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE']
 
 function normalize(str: string): string {
   return str.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
@@ -72,35 +25,76 @@ function findChampId(champs: Champ[], codes: string[]): number | null {
   return c ? c.id : null
 }
 
+function jouerSonAlerte() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain); gain.connect(ctx.destination)
+    osc.type = 'square'
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
+    osc.frequency.setValueAtTime(440, ctx.currentTime + 0.1)
+    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4)
+  } catch {}
+}
+
+// ─── Constantes ───────────────────────────────────────────────────────────────
+const CODES_PN          = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO']
+const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
+const CODES_TYPE        = ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE']  // articles ET inventaire
+const CODES_SUIVI       = ['SUIVI', 'MODE_SUIVI', 'TRACKING']
+const CODES_CLIENT      = ['CLIENT', 'CLIENTS']
+const CODES_PLATEFORME  = ['PLATEFORME', 'PLATEFORMES']
+const CODES_NOM         = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface Champ {
+  id: number; code: string; label: string; type: string
+  options: string | null; obligatoire: boolean
+  visibleReceptionSN: boolean; visibleReceptionQTE: boolean; actif: boolean
+}
+interface Article {
+  id: number
+  valeurs: { champId: number; valeur: string | null; champ: Champ }[]
+}
+interface Statut { id: number; label: string; couleur: string; code?: string }
+interface LigneSN { sn: string; accessoires: number[] }
+interface LotPrepare {
+  id: number; articleId: number; articleLabel: string
+  modesuivi: 'SN' | 'QTE' | 'AUTRE'
+  champsCommuns: Record<number, string>
+  lignes: { sn: string; accessoiresIds: number[]; accessoiresLabels: string[] }[]
+  quantite: number; statut: string | null; statutId: number | null
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 export default function Reception() {
   const siteId = getSiteId()
   const snInputRef = useRef<HTMLInputElement>(null)
 
   const [champsArticles, setChampsArticles] = useState<Champ[]>([])
-  const [champsInv, setChampsInv] = useState<Champ[]>([])
-  const [champsReception, setChampsReception] = useState<Champ[]>([])
-  const [champsClients, setChampsClients] = useState<Champ[]>([])
+  const [champsInv, setChampsInv]           = useState<Champ[]>([])
+  const [champsClients, setChampsClients]   = useState<Champ[]>([])
   const [champsPlateformes, setChampsPlateformes] = useState<Champ[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
+  const [articles, setArticles]             = useState<Article[]>([])
   const [articlesAccessoires, setArticlesAccessoires] = useState<Article[]>([])
-  const [clients, setClients] = useState<any[]>([])
-  const [plateformes, setPlateformes] = useState<any[]>([])
-  const [statuts, setStatuts] = useState<Statut[]>([])
+  const [clients, setClients]               = useState<any[]>([])
+  const [plateformes, setPlateformes]       = useState<any[]>([])
+  const [statuts, setStatuts]               = useState<Statut[]>([])
 
-  const CODES_CLIENT     = ['CLIENT', 'CLIENTS']
-  const CODES_PLATEFORME = ['PLATEFORME', 'PLATEFORMES']
   const [lotsEnAttente, setLotsEnAttente] = useState<LotPrepare[]>([])
-  const [valide, setValide] = useState(false)
-  const [erreur, setErreur] = useState<string | null>(null)
+  const [valide, setValide]               = useState(false)
+  const [erreur, setErreur]               = useState<string | null>(null)
   const [showModalReset, setShowModalReset] = useState(false)
 
-  // Formulaire
-  const [articleId, setArticleId] = useState<number>(0)
+  const [articleId, setArticleId]         = useState<number>(0)
   const [champsCommuns, setChampsCommuns] = useState<Record<number, string>>({})
-  const [lignesSN, setLignesSN] = useState<LigneSN[]>([])
-  const [snCurrent, setSnCurrent] = useState('')
-  const [alerteSN, setAlerteSN] = useState<{ sn: string; statut: string | null; rma: string | null } | null>(null)
-  const [quantite, setQuantite] = useState<number>(1)
+  const [lignesSN, setLignesSN]           = useState<LigneSN[]>([])
+  const [snCurrent, setSnCurrent]         = useState('')
+  const [quantite, setQuantite]           = useState<number>(1)
+  const [alerteSN, setAlerteSN]           = useState<{ sn: string; statut: string | null; rma: string | null } | null>(null)
 
   useEffect(() => { reload() }, [siteId])
 
@@ -115,37 +109,31 @@ export default function Reception() {
       get<any[]>(`/plateformes/${siteId}`),
       get<Statut[]>(`/workflow/${siteId}/statuts`)
     ])
+
     setChampsArticles(ca.filter(c => c.actif))
     setChampsClients(cc.filter(c => c.actif))
     setChampsPlateformes(cp.filter(c => c.actif))
-    setClients(cl)
-    setPlateformes(pl)
-    setStatuts(s)
+    setClients(cl); setPlateformes(pl); setStatuts(s)
 
-    const champsInvActifs = ci.filter(c => c.actif)
-    setChampsInv(champsInvActifs)
-    setChampsReception(champsInvActifs)
+    const champsActifs = ci.filter(c => c.actif)
+    setChampsInv(champsActifs)
 
-    // Pré-remplir les champs DATE_TODAY avec la date du jour
+    // Pré-remplir DATE_TODAY
     const today = new Date().toISOString().split('T')[0]
     const preRemplis: Record<number, string> = {}
-    champsInvActifs.forEach(c => {
-      if (c.type === 'DATE_TODAY') preRemplis[c.id] = today
-    })
-    if (Object.keys(preRemplis).length > 0) {
-      setChampsCommuns(f => ({ ...preRemplis, ...f }))
-    }
+    champsActifs.forEach(c => { if (c.type === 'DATE_TODAY') preRemplis[c.id] = today })
+    if (Object.keys(preRemplis).length > 0) setChampsCommuns(f => ({ ...preRemplis, ...f }))
 
     // Séparer articles normaux et accessoires
-    const champsTypeIds = ca.filter(c => CODES_ACCESSOIRE.some(code => normalize(c.code) === normalize(code))).map(c => c.id)
-    const acc = a.filter(art => art.valeurs.some(v => champsTypeIds.includes(v.champId) && normalize(String(v.valeur ?? '')) === 'ACCESSOIRE'))
-    const normaux = a.filter(art => !art.valeurs.some(v => champsTypeIds.includes(v.champId) && normalize(String(v.valeur ?? '')) === 'ACCESSOIRE'))
-    setArticles(normaux)
-    setArticlesAccessoires(acc)
+    const champsTypeIds = ca.filter(c => CODES_TYPE.some(code => normalize(c.code) === normalize(code))).map(c => c.id)
+    const estAccessoire = (art: Article) => art.valeurs.some(v => champsTypeIds.includes(v.champId) && normalize(String(v.valeur ?? '')) === 'ACCESSOIRE')
+    setArticlesAccessoires(a.filter(estAccessoire))
+    setArticles(a.filter(art => !estAccessoire(art)))
   }
 
+  // ─── Labels ───────────────────────────────────────────────────────────────
   function getArticleLabel(art: Article): string {
-    const pn = art.valeurs.find(v => CODES_PN.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur
+    const pn    = art.valeurs.find(v => CODES_PN.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur
     const desig = art.valeurs.find(v => CODES_DESIGNATION.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur
     return [pn, desig].filter(Boolean).join(' — ') || `Article #${art.id}`
   }
@@ -155,88 +143,52 @@ export default function Reception() {
     return art ? getArticleLabel(art) : `#${id}`
   }
 
-  const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
-
   function getEntiteLabel(entite: any, champs: Champ[]): string {
-    // Chercher d'abord un champ NOM
     const champNom = champs.find(c => CODES_NOM.includes(normalize(c.code)))
-    if (champNom) {
-      const val = entite.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur
-      if (val) return val
-    }
-    // Sinon premier champ non vide
-    return champs.map(c => entite.valeurs?.find((v: any) => v.champId === c.id)?.valeur).filter(Boolean)[0] || `#${entite.id}`
+    const val = champNom ? entite.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur : null
+    return val || champs.map(c => entite.valeurs?.find((v: any) => v.champId === c.id)?.valeur).filter(Boolean)[0] || `#${entite.id}`
   }
 
-  function isChampClient(c: Champ): boolean {
-    return CODES_CLIENT.includes(normalize(c.code))
-  }
-
-  function isChampPlateforme(c: Champ): boolean {
-    return CODES_PLATEFORME.includes(normalize(c.code))
-  }
-
+  // ─── Mode suivi ───────────────────────────────────────────────────────────
   function getModesuivi(artId = articleId): 'SN' | 'QTE' | 'AUTRE' {
     const art = articles.find(a => a.id === artId)
     if (!art) return 'AUTRE'
     const champsSuivi = champsArticles.filter(c => CODES_SUIVI.some(code => normalize(c.code) === normalize(code)))
-    const val = art.valeurs.find(v => champsSuivi.some(c => c.id === v.champId))?.valeur
-    if (!val) return 'AUTRE'
-    const norm = normalize(val)
-    if (norm === 'SN') return 'SN'
-    if (norm === 'QTE') return 'QTE'
+    const val = normalize(art.valeurs.find(v => champsSuivi.some(c => c.id === v.champId))?.valeur ?? '')
+    if (val === 'SN') return 'SN'
+    if (val === 'QTE') return 'QTE'
     return 'AUTRE'
   }
 
   function getStatutStock(): number | null {
-    const s = statuts.find(s => normalize(s.code ?? '') === normalize('EN_STOCK') || normalize(s.label).includes('STOCK'))
-    return s ? s.id : null
+    return statuts.find(s => normalize(s.code ?? '').includes('STOCK') || normalize(s.label).includes('STOCK'))?.id ?? null
   }
 
   const articleSelectionne = articles.find(a => a.id === articleId)
   const modeSuivi = getModesuivi()
 
+  // ─── Champs visibles en réception ─────────────────────────────────────────
+  const champsVisibles = champsInv.filter(c => modeSuivi === 'QTE' ? c.visibleReceptionQTE : c.visibleReceptionSN)
+
+  // ─── S/N ──────────────────────────────────────────────────────────────────
   async function addSN() {
     const sn = snCurrent.trim()
     if (!sn || lignesSN.some(l => l.sn === sn)) return
-
-    // Vérifier si le S/N est déjà en inventaire
     try {
       const check = await get<any>(`/inventaire/${siteId}/check-sn/${encodeURIComponent(sn)}`)
       if (check.existe && !check.estFinal) {
-        // S/N en inventaire avec statut non final → alerte
         jouerSonAlerte()
         setAlerteSN({ sn, statut: check.statut, rma: check.rma })
         setSnCurrent('')
         return
       }
     } catch {}
-
     setLignesSN(prev => [...prev, { sn, accessoires: [] }])
     setSnCurrent('')
     snInputRef.current?.focus()
   }
 
-  function jouerSonAlerte() {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const oscillator = ctx.createOscillator()
-      const gain = ctx.createGain()
-      oscillator.connect(gain)
-      gain.connect(ctx.destination)
-      oscillator.type = 'square'
-      oscillator.frequency.setValueAtTime(880, ctx.currentTime)
-      oscillator.frequency.setValueAtTime(440, ctx.currentTime + 0.1)
-      gain.gain.setValueAtTime(0.3, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-      oscillator.start(ctx.currentTime)
-      oscillator.stop(ctx.currentTime + 0.4)
-    } catch {}
-  }
-
-  function removeSN(sn: string) {
-    setLignesSN(prev => prev.filter(l => l.sn !== sn))
-  }
+  function removeSN(sn: string) { setLignesSN(prev => prev.filter(l => l.sn !== sn)) }
 
   function toggleAccessoire(sn: string, accId: number) {
     setLignesSN(prev => prev.map(l => {
@@ -246,6 +198,7 @@ export default function Reception() {
     }))
   }
 
+  // ─── Préparer ─────────────────────────────────────────────────────────────
   function handlePreparer(e: React.FormEvent) {
     e.preventDefault()
     if (!articleId) return
@@ -253,22 +206,13 @@ export default function Reception() {
     if (modeSuivi === 'QTE' && quantite < 1) { setErreur('La quantité doit être supérieure à 0'); return }
     setErreur(null)
 
-    // S'assurer que les champs DATE_TODAY ont bien la date du jour
+    // Assurer DATE_TODAY
     const today = new Date().toISOString().split('T')[0]
     const champsAvecDateToday = { ...champsCommuns }
-    champsInv.forEach(c => {
-      if (c.type === 'DATE_TODAY' && !champsAvecDateToday[c.id]) {
-        champsAvecDateToday[c.id] = today
-      }
-    })
+    champsInv.forEach(c => { if (c.type === 'DATE_TODAY' && !champsAvecDateToday[c.id]) champsAvecDateToday[c.id] = today })
 
     const art = articles.find(a => a.id === articleId)!
     const statutId = modeSuivi === 'SN' ? getStatutStock() : null
-    const statutLabel = statuts.find(s => s.id === statutId)?.label ?? null
-
-    const lignes = modeSuivi === 'SN'
-      ? lignesSN.map(l => ({ sn: l.sn, accessoiresIds: l.accessoires, accessoiresLabels: l.accessoires.map(id => getArticleLabelById(id)) }))
-      : [{ sn: '', accessoiresIds: [], accessoiresLabels: [] }]
 
     setLotsEnAttente(prev => [...prev, {
       id: Date.now(),
@@ -276,24 +220,26 @@ export default function Reception() {
       articleLabel: getArticleLabel(art),
       modesuivi: modeSuivi,
       champsCommuns: champsAvecDateToday,
-      lignes,
+      lignes: modeSuivi === 'SN'
+        ? lignesSN.map(l => ({ sn: l.sn, accessoiresIds: l.accessoires, accessoiresLabels: l.accessoires.map(id => getArticleLabelById(id)) }))
+        : [{ sn: '', accessoiresIds: [], accessoiresLabels: [] }],
       quantite,
-      statut: statutLabel,
+      statut: statuts.find(s => s.id === statutId)?.label ?? null,
       statutId
     }])
-
   }
 
+  // ─── Valider ──────────────────────────────────────────────────────────────
   async function handleValider() {
     if (lotsEnAttente.length === 0) return
     setErreur(null)
     try {
-      const idPN      = findChampId(champsInv, CODES_PN)
-      const idDesig   = findChampId(champsInv, CODES_DESIGNATION)
-      const idTypeInv = findChampId(champsInv, CODES_TYPE_INV)
-      const idSN      = findChampId(champsInv, ['SN', 'S_N', 'NUMERO_SERIE', 'NUMÉRO DE SÉRIE'])
-      const idAcc     = findChampId(champsInv, ['ACCESSOIRES', 'ACCESSOIRE'])
-      const idQte     = findChampId(champsInv, ['QUANTITE', 'QTE', 'QUANTITY'])
+      const idPN  = findChampId(champsInv, CODES_PN)
+      const idDesig = findChampId(champsInv, CODES_DESIGNATION)
+      const idType  = findChampId(champsInv, CODES_TYPE)
+      const idSN    = findChampId(champsInv, ['SN', 'S_N', 'NUMERO_SERIE', 'NUMÉRO DE SÉRIE'])
+      const idAcc   = findChampId(champsInv, ['ACCESSOIRES', 'ACCESSOIRE'])
+      const idQte   = findChampId(champsInv, ['QUANTITE', 'QTE', 'QUANTITY'])
 
       const inventaireExistant: any[] = await inventaireApi.getAll(siteId)
 
@@ -301,40 +247,34 @@ export default function Reception() {
         const artSource = [...articles, ...articlesAccessoires].find(a => a.id === lot.articleId)
         const pnValeur    = artSource?.valeurs.find(v => CODES_PN.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur ?? ''
         const desigValeur = artSource?.valeurs.find(v => CODES_DESIGNATION.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur ?? ''
-        const typeValeur  = artSource?.valeurs.find(v => CODES_TYPE_ART.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur ?? ''
+        const typeValeur  = artSource?.valeurs.find(v => CODES_TYPE.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur ?? ''
 
-        // Champs communs de réception
         const valeursCommunes: { champId: number; valeur: string }[] = []
-        if (idPN && pnValeur)      valeursCommunes.push({ champId: idPN, valeur: pnValeur })
+        if (idPN && pnValeur)       valeursCommunes.push({ champId: idPN, valeur: pnValeur })
         if (idDesig && desigValeur) valeursCommunes.push({ champId: idDesig, valeur: desigValeur })
-        if (idTypeInv && typeValeur) valeursCommunes.push({ champId: idTypeInv, valeur: typeValeur })
-        // Champs configurés visibles à la réception
+        if (idType && typeValeur)   valeursCommunes.push({ champId: idType, valeur: typeValeur })
         for (const [champId, valeur] of Object.entries(lot.champsCommuns)) {
           if (valeur) valeursCommunes.push({ champId: Number(champId), valeur })
         }
 
         if (lot.modesuivi === 'QTE') {
           const ligneExistante = inventaireExistant.find(inv => inv.articleId === lot.articleId)
-          const nouvelleQte = lot.quantite
-
           if (ligneExistante) {
             const qteActuelle = Number(ligneExistante.valeurs.find((v: any) => v.champId === idQte)?.valeur ?? 0)
-            const valeurs = ligneExistante.valeurs
-              .filter((v: any) => v.champId !== idQte)
-              .map((v: any) => ({ champId: v.champId, valeur: v.valeur ?? '' }))
-            if (idQte) valeurs.push({ champId: idQte, valeur: String(qteActuelle + nouvelleQte) })
+            const valeurs = [
+              ...ligneExistante.valeurs.filter((v: any) => v.champId !== idQte).map((v: any) => ({ champId: v.champId, valeur: v.valeur ?? '' })),
+              ...(idQte ? [{ champId: idQte, valeur: String(qteActuelle + lot.quantite) }] : [])
+            ]
             await inventaireApi.update(ligneExistante.id, { statutId: ligneExistante.statutId, valeurs })
           } else {
-            const valeurs = [...valeursCommunes]
-            if (idQte) valeurs.push({ champId: idQte, valeur: String(nouvelleQte) })
+            const valeurs = [...valeursCommunes, ...(idQte ? [{ champId: idQte, valeur: String(lot.quantite) }] : [])]
             await inventaireApi.create(siteId, { articleId: lot.articleId, statutId: lot.statutId, valeurs })
           }
         } else {
           for (const ligne of lot.lignes) {
             const valeurs = [...valeursCommunes]
             if (idSN && ligne.sn) valeurs.push({ champId: idSN, valeur: ligne.sn })
-            if (idAcc && ligne.accessoiresLabels.length > 0)
-              valeurs.push({ champId: idAcc, valeur: ligne.accessoiresLabels.join(', ') })
+            if (idAcc && ligne.accessoiresLabels.length > 0) valeurs.push({ champId: idAcc, valeur: ligne.accessoiresLabels.join(', ') })
             await inventaireApi.create(siteId, { articleId: lot.articleId, statutId: lot.statutId, valeurs })
           }
         }
@@ -344,29 +284,19 @@ export default function Reception() {
       setValide(true)
       setTimeout(() => setValide(false), 3000)
       setShowModalReset(true)
-    } catch {
-      setErreur("Erreur lors de l'enregistrement")
-    }
+    } catch { setErreur("Erreur lors de l'enregistrement") }
   }
 
   function handleGarderChamps() {
-    setArticleId(0)
-    setLignesSN([])
-    setSnCurrent('')
-    setQuantite(1)
-    setShowModalReset(false)
+    setArticleId(0); setLignesSN([]); setSnCurrent(''); setQuantite(1); setShowModalReset(false)
   }
 
   function handleResetComplet() {
-    setArticleId(0)
-    setChampsCommuns({})
-    setLignesSN([])
-    setSnCurrent('')
-    setQuantite(1)
-    setLotsEnAttente([])
-    setShowModalReset(false)
+    setArticleId(0); setChampsCommuns({}); setLignesSN([]); setSnCurrent('')
+    setQuantite(1); setLotsEnAttente([]); setShowModalReset(false)
   }
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <>
     <div>
@@ -379,7 +309,7 @@ export default function Reception() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '460px 1fr', gap: '20px', alignItems: 'start' }}>
 
-        {/* Formulaire */}
+        {/* ── Formulaire gauche ── */}
         <div className="card">
           <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>Saisie du lot</h2>
           <form onSubmit={handlePreparer}>
@@ -390,9 +320,7 @@ export default function Reception() {
               <select required className="form-input" value={articleId}
                 onChange={e => { setArticleId(Number(e.target.value)); setLignesSN([]); setQuantite(1) }}>
                 <option value={0}>— Choisir un article —</option>
-                {articles.map(a => (
-                  <option key={a.id} value={a.id}>{getArticleLabel(a)}</option>
-                ))}
+                {articles.map(a => <option key={a.id} value={a.id}>{getArticleLabel(a)}</option>)}
               </select>
             </div>
 
@@ -415,60 +343,36 @@ export default function Reception() {
                     <span>Suivi par S/N — statut : <strong>{statuts.find(s => s.id === getStatutStock())?.label ?? '⚠️ statut stock introuvable'}</strong></span>
                   </div>
                 )}
-                {modeSuivi === 'QTE' && (
-                  <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>
-                    📦 Suivi par quantité
-                  </div>
-                )}
+                {modeSuivi === 'QTE' && <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>📦 Suivi par quantité</div>}
               </div>
             )}
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '4px 0 12px' }} />
 
-            {/* Champs configurés visibles à la réception — toujours visibles */}
-            {(() => {
-              const champsVisibles = champsReception.filter(c =>
-                modeSuivi === 'QTE' ? c.visibleReceptionQTE : c.visibleReceptionSN
-              )
-              return champsVisibles.length === 0 ? (
+            {/* Champs de réception configurés */}
+            {champsVisibles.length === 0 ? (
               <p style={{ color: '#f59e0b', fontSize: '12px', marginBottom: '12px' }}>
                 ⚠️ Aucun champ de réception configuré. Allez dans Configuration → Structure inventaire.
               </p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {champsVisibles.map(c => {
-                  const opts = Array.isArray(parseOptions(c.options)) ? parseOptions(c.options) : []
+                  const opts = parseOptions(c.options)
                   return (
                     <div key={c.id} className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">
-                        {c.label} <span style={{ color: '#dc2626' }}>*</span>
-                      </label>
-                      {isChampClient(c) ? (
-                        <select required className="form-input"
-                          value={champsCommuns[c.id] ?? ''}
-                          onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
+                      <label className="form-label">{c.label} <span style={{ color: '#dc2626' }}>*</span></label>
+                      {CODES_CLIENT.includes(normalize(c.code)) ? (
+                        <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
                           <option value="">— Choisir un client —</option>
-                          {clients.map(cl => (
-                            <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>
-                              {getEntiteLabel(cl, champsClients)}
-                            </option>
-                          ))}
+                          {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
                         </select>
-                      ) : isChampPlateforme(c) ? (
-                        <select required className="form-input"
-                          value={champsCommuns[c.id] ?? ''}
-                          onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
+                      ) : CODES_PLATEFORME.includes(normalize(c.code)) ? (
+                        <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
                           <option value="">— Choisir une plateforme —</option>
-                          {plateformes.map(pl => (
-                            <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>
-                              {getEntiteLabel(pl, champsPlateformes)}
-                            </option>
-                          ))}
+                          {plateformes.map(pl => <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>{getEntiteLabel(pl, champsPlateformes)}</option>)}
                         </select>
                       ) : c.type === 'SELECT' ? (
-                        <select required className="form-input"
-                          value={champsCommuns[c.id] ?? ''}
-                          onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
+                        <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
                           <option value="">— Choisir —</option>
                           {opts.map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
@@ -477,19 +381,15 @@ export default function Reception() {
                           value={champsCommuns[c.id] ?? (c.type === 'DATE_TODAY' ? new Date().toISOString().split('T')[0] : '')}
                           onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
                       ) : c.type === 'NUMBER' ? (
-                        <input type="number" required className="form-input"
-                          value={champsCommuns[c.id] ?? ''}
-                          onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
+                        <input type="number" required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
                       ) : (
-                        <input type="text" required className="form-input"
-                          value={champsCommuns[c.id] ?? ''}
-                          onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
+                        <input type="text" required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
                       )}
                     </div>
                   )
                 })}
               </div>
-            )})()}
+            )}
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />
 
@@ -508,23 +408,18 @@ export default function Reception() {
                 <div className="form-group" style={{ marginBottom: '8px' }}>
                   <label className="form-label">Saisie S/N <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Entrée pour ajouter)</span></label>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <input ref={snInputRef} className="form-input"
-                      placeholder="Scanner ou saisir un S/N..."
-                      value={snCurrent}
-                      onChange={e => setSnCurrent(e.target.value)}
+                    <input ref={snInputRef} className="form-input" placeholder="Scanner ou saisir un S/N..."
+                      value={snCurrent} onChange={e => setSnCurrent(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSN() } }} />
                     <button type="button" className="btn btn-secondary btn-icon" onClick={addSN}><Plus size={16} /></button>
                   </div>
                 </div>
-
                 {lignesSN.length > 0 && (
                   <div style={{ border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden', marginBottom: '12px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                       <thead>
                         <tr style={{ background: '#eff6ff' }}>
-                          <th style={{ padding: '6px 10px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>
-                            S/N ({lignesSN.length})
-                          </th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>S/N ({lignesSN.length})</th>
                           {articlesAccessoires.map(acc => (
                             <th key={acc.id} style={{ padding: '6px 8px', textAlign: 'center', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}>
                               {getArticleLabel(acc)}
@@ -563,14 +458,16 @@ export default function Reception() {
               </div>
             )}
 
-            {articleId > 0 && <button type="submit" className="btn btn-primary" style={{ width: '100%' }}
-              disabled={!articleId || (modeSuivi === 'SN' && lignesSN.length === 0) || (modeSuivi === 'QTE' && quantite < 1)}>
-              Préparer {modeSuivi === 'QTE' ? `(${quantite} unité${quantite > 1 ? 's' : ''})` : lignesSN.length > 0 ? `(${lignesSN.length} S/N)` : ''}
-            </button>}
+            {articleId > 0 && (
+              <button type="submit" className="btn btn-primary" style={{ width: '100%' }}
+                disabled={(modeSuivi === 'SN' && lignesSN.length === 0) || (modeSuivi === 'QTE' && quantite < 1)}>
+                Préparer {modeSuivi === 'QTE' ? `(${quantite} unité${quantite > 1 ? 's' : ''})` : lignesSN.length > 0 ? `(${lignesSN.length} S/N)` : ''}
+              </button>
+            )}
           </form>
         </div>
 
-        {/* Panneau de droite */}
+        {/* ── Panneau de droite ── */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>
@@ -601,7 +498,7 @@ export default function Reception() {
                     <div>
                       <span style={{ fontWeight: 600, fontSize: '13px' }}>{lot.articleLabel}</span>
                       <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                        {champsReception.map(c => lot.champsCommuns[c.id] ? `${c.label} : ${lot.champsCommuns[c.id]}` : null).filter(Boolean).join(' · ')}
+                        {champsInv.filter(c => lot.champsCommuns[c.id]).map(c => `${c.label} : ${lot.champsCommuns[c.id]}`).join(' · ')}
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -630,13 +527,11 @@ export default function Reception() {
                   )}
                 </div>
               ))}
-
               {erreur && (
                 <div style={{ padding: '8px 12px', background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '6px', color: '#dc2626', fontSize: '13px', marginBottom: '10px' }}>
                   {erreur}
                 </div>
               )}
-
               <button className="btn btn-primary" style={{ width: '100%', fontSize: '15px', padding: '12px' }} onClick={handleValider}>
                 <CheckCircle size={17} style={{ marginRight: '8px' }} />
                 Valider la réception
@@ -647,7 +542,6 @@ export default function Reception() {
       </div>
     </div>
 
-    {/* Modal reset */}
     {/* Modal alerte S/N déjà en inventaire */}
     {alerteSN && (
       <div className="modal-overlay" onClick={() => { setAlerteSN(null); snInputRef.current?.focus() }}>
@@ -662,14 +556,14 @@ export default function Reception() {
           {alerteSN.statut && <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Statut actuel : <strong>{alerteSN.statut}</strong></p>}
           {alerteSN.rma && <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>RMA : <strong>{alerteSN.rma}</strong></p>}
           <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '20px' }}>Ce S/N n'a pas été ajouté à la réception en cours.</p>
-          <button className="btn btn-primary" style={{ width: '100%' }}
-            onClick={() => { setAlerteSN(null); snInputRef.current?.focus() }}>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setAlerteSN(null); snInputRef.current?.focus() }}>
             OK — Continuer
           </button>
         </div>
       </div>
     )}
 
+    {/* Modal continuer / reset */}
     {showModalReset && (
       <div className="modal-overlay">
         <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>
