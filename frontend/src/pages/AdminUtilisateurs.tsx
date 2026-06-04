@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X, RefreshCw, Copy } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
@@ -72,7 +72,7 @@ export default function AdminUtilisateurs() {
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
-              <th>Nom</th><th>PrÃ©nom</th><th>Login</th><th>RÃ´le</th><th>Statut</th><th>Mdp</th><th></th>
+              <th>Nom</th><th>Prénom</th><th>Login</th><th>Rôle</th><th>Statut</th><th>Mdp</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -110,14 +110,14 @@ export default function AdminUtilisateurs() {
                     <td style={{ fontWeight: 500 }}>{u.nom}</td>
                     <td>{u.prenom}</td>
                     <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{u.login}</code></td>
-                    <td><span className="badge badge-default">{u.role?.label ?? 'â€”'}</span></td>
+                    <td><span className="badge badge-default">{u.role?.label ?? '—'}</span></td>
                     <td><span className={`badge ${u.actif ? 'badge-success' : 'badge-danger'}`}>{u.actif ? 'Actif' : 'Inactif'}</span></td>
-                    <td>{u.doitChangerMdp ? <span className="badge badge-warning">Ã€ changer</span> : <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
+                    <td>{u.doitChangerMdp ? <span className="badge badge-warning">À changer</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
                     <td>
                       {isAdmin && (
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button className="btn btn-secondary btn-icon" title="Modifier" onClick={() => { setEditId(u.id); setEditForm({ nom: u.nom, prenom: u.prenom, login: u.login, roleId: u.role?.id, actif: u.actif }) }}><Pencil size={14} /></button>
-                          <button className="btn btn-secondary btn-icon" title="RÃ©initialiser le mot de passe" onClick={() => handleReinitMdp(u.id)}><RefreshCw size={14} /></button>
+                          <button className="btn btn-secondary btn-icon" title="Réinitialiser le mot de passe" onClick={() => handleReinitMdp(u.id)}><RefreshCw size={14} /></button>
                           <button className="btn btn-danger btn-icon" title="Supprimer" onClick={() => setModal({ type: 'delete', id: u.id })}><Trash2 size={14} /></button>
                         </div>
                       )}
@@ -129,16 +129,16 @@ export default function AdminUtilisateurs() {
           </tbody>
         </table>
 
-        {/* Formulaire crÃ©ation */}
+        {/* Formulaire création */}
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>CrÃ©er un utilisateur</p>
+          <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Créer un utilisateur</p>
           <form onSubmit={handleCreate} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Nom</label>
               <input required value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} className="form-input" style={{ width: '130px' }} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">PrÃ©nom</label>
+              <label className="form-label">Prénom</label>
               <input required value={form.prenom} onChange={e => setForm(f => ({ ...f, prenom: e.target.value }))} className="form-input" style={{ width: '130px' }} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
@@ -146,25 +146,25 @@ export default function AdminUtilisateurs() {
               <input required value={form.login} onChange={e => setForm(f => ({ ...f, login: e.target.value }))} className="form-input" style={{ width: '130px' }} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">RÃ´le</label>
+              <label className="form-label">Rôle</label>
               <select required value={form.roleId} onChange={e => setForm(f => ({ ...f, roleId: Number(e.target.value) }))} className="form-input" style={{ width: '150px' }}>
-                <option value={0}>â€” choisir â€”</option>
+                <option value={0}>— choisir —</option>
                 {roles.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
               </select>
             </div>
-            {isAdmin && <button type="submit" className="btn btn-primary">+ CrÃ©er</button>}
+            {isAdmin && <button type="submit" className="btn btn-primary">+ Créer</button>}
           </form>
-          <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '10px' }}>Un mot de passe sÃ©curisÃ© sera gÃ©nÃ©rÃ© automatiquement et affichÃ© une seule fois.</p>
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '10px' }}>Un mot de passe sécurisé sera généré automatiquement et affiché une seule fois.</p>
         </div>
       </div>
 
-      {/* Modal mot de passe gÃ©nÃ©rÃ© */}
+      {/* Modal mot de passe généré */}
       {modal?.type === 'mdp' && (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '460px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>Mot de passe gÃ©nÃ©rÃ©</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>Mot de passe généré</h3>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
-              Communiquez ce mot de passe Ã  l'utilisateur. Il lui sera demandÃ© de le modifier Ã  sa premiÃ¨re connexion.
+              Communiquez ce mot de passe à l'utilisateur. Il lui sera demandé de le modifier à sa première connexion.
             </p>
             <div style={{ background: '#141720', border: '1px solid #2d3148', borderRadius: '8px', padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <code style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '2px', color: '#111827' }}>{modal.mdp}</code>
@@ -173,10 +173,10 @@ export default function AdminUtilisateurs() {
               </button>
             </div>
             <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', padding: '10px 14px', marginBottom: '20px' }}>
-              <p style={{ fontSize: '13px', color: '#92400e' }}>âš ï¸ Ce mot de passe ne sera plus affichÃ©. Notez-le avant de fermer.</p>
+              <p style={{ fontSize: '13px', color: '#92400e' }}>⚠️ Ce mot de passe ne sera plus affiché. Notez-le avant de fermer.</p>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="btn btn-primary" onClick={() => setModal(null)}>J'ai notÃ© le mot de passe</button>
+              <button className="btn btn-primary" onClick={() => setModal(null)}>J'ai noté le mot de passe</button>
             </div>
           </div>
         </div>
@@ -187,7 +187,7 @@ export default function AdminUtilisateurs() {
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Supprimer cet utilisateur ?</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Cette action est irrÃ©versible.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Cette action est irréversible.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => handleDelete(modal.id)}>Supprimer</button>
@@ -198,4 +198,3 @@ export default function AdminUtilisateurs() {
     </div>
   )
 }
-

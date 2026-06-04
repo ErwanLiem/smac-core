@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trash2, Pencil, Check, X, Plus } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { getPermissions } from '../utils/permissions'
@@ -88,13 +88,13 @@ const typeLabels: Record<ChampType, string> = {
   NUMBER: 'Nombre',
   DATE: 'Date',
   DATE_TODAY: 'Date du jour',
-  SELECT: 'Liste dÃ©roulante'
+  SELECT: 'Liste déroulante'
 }
 
 const emptyChamp = { code: '', label: '', type: 'TEXT' as ChampType, options: '', obligatoire: false, ordre: 0, visibleReceptionSN: false, visibleReceptionQTE: false }
 
 function Oui({ val }: { val: boolean }) {
-  return val ? <span className="badge badge-success">âœ“</span> : <span style={{ color: '#d1d5db' }}>â€”</span>
+  return val ? <span className="badge badge-success">✓</span> : <span style={{ color: '#d1d5db' }}>—</span>
 }
 
 export default function AdminInventaire() {
@@ -158,7 +158,7 @@ export default function AdminInventaire() {
       </div>
 
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Champs configurÃ©s</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Champs configurés</h2>
         <div style={{ overflowX: 'auto' }}>
           <table className="table" style={{ marginBottom: '20px', minWidth: 'max-content' }}>
             <thead>
@@ -169,13 +169,13 @@ export default function AdminInventaire() {
                 <th>Type</th>
                 <th>Obligatoire</th>
                 <th>Actif</th>
-                <th title="Visible pour les rÃ©ceptions S/N">Visible S/N</th>
-                <th title="Visible pour les rÃ©ceptions quantitÃ©">Visible QTE</th>
+                <th title="Visible pour les réceptions S/N">Visible S/N</th>
+                <th title="Visible pour les réceptions quantité">Visible QTE</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {champs.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>Aucun champ configurÃ©</td></tr>}
+              {champs.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>Aucun champ configuré</td></tr>}
               {champs.map(c => editId === c.id ? (
                 <tr key={c.id}>
                   <td><input type="number" className="form-input" style={{ width: '60px' }} value={editForm.ordre ?? 0} onChange={e => setEditForm({ ...editForm, ordre: Number(e.target.value) })} /></td>
@@ -232,7 +232,7 @@ export default function AdminInventaire() {
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Label *</label>
-                <input required value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} className="form-input" placeholder="Ex: NumÃ©ro de sÃ©rie" style={{ width: '160px' }} />
+                <input required value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} className="form-input" placeholder="Ex: Numéro de série" style={{ width: '160px' }} />
               </div>
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">Type</label>
@@ -277,7 +277,7 @@ export default function AdminInventaire() {
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Ce champ et toutes ses valeurs seront dÃ©finitivement supprimÃ©s.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Ce champ et toutes ses valeurs seront définitivement supprimés.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => handleDelete(modal.id)}>Supprimer</button>
@@ -288,4 +288,3 @@ export default function AdminInventaire() {
     </div>
   )
 }
-

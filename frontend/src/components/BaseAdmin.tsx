@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X, Plus } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
@@ -68,7 +68,7 @@ export interface Champ {
 }
 
 const typeLabels: Record<ChampType, string> = {
-  TEXT: 'Texte', NUMBER: 'Nombre', DATE: 'Date', DATE_TODAY: 'Date du jour', SELECT: 'Liste dÃ©roulante'
+  TEXT: 'Texte', NUMBER: 'Nombre', DATE: 'Date', DATE_TODAY: 'Date du jour', SELECT: 'Liste déroulante'
 }
 
 const emptyChamp = { code: '', label: '', type: 'TEXT' as ChampType, options: '', obligatoire: false, ordre: 0 }
@@ -130,7 +130,7 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
       </div>
 
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Champs configurÃ©s</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Champs configurés</h2>
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -139,7 +139,7 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
           </thead>
           <tbody>
             {champs.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ configurÃ©</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ configuré</td></tr>
             )}
             {champs.map(champ => (
               <tr key={champ.id}>
@@ -171,7 +171,7 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
                     <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{champ.code}</code></td>
                     <td style={{ fontWeight: 500 }}>{champ.label}</td>
                     <td><span className="badge badge-default">{typeLabels[champ.type]}</span></td>
-                    <td>{champ.obligatoire ? <span className="badge badge-info">Oui</span> : <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
+                    <td>{champ.obligatoire ? <span className="badge badge-info">Oui</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
                     <td><span className={`badge ${champ.actif ? 'badge-success' : 'badge-danger'}`}>{champ.actif ? 'Actif' : 'Inactif'}</span></td>
                     <td>
                       {isAdmin && (
@@ -228,7 +228,7 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Toutes les valeurs associÃ©es Ã  ce champ seront dÃ©finitivement supprimÃ©es.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Toutes les valeurs associées à ce champ seront définitivement supprimées.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => handleDelete(modal.id)}>Supprimer</button>
@@ -239,4 +239,3 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
     </div>
   )
 }
-

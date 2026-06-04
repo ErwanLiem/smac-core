@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X, Plus } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
@@ -78,7 +78,7 @@ const typeLabels: Record<ChampType, string> = {
   NUMBER: 'Nombre',
   DATE: 'Date',
   DATE_TODAY: 'Date du jour',
-  SELECT: 'Liste dÃ©roulante'
+  SELECT: 'Liste déroulante'
 }
 
 const emptyChamp = { code: '', label: '', type: 'TEXT' as ChampType, options: '', obligatoire: false, ordre: 0 }
@@ -139,7 +139,7 @@ export default function AdminArticles() {
       </div>
 
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Champs configurÃ©s</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827', marginBottom: '16px' }}>Champs configurés</h2>
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -154,7 +154,7 @@ export default function AdminArticles() {
           </thead>
           <tbody>
             {champs.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ configurÃ©</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ configuré</td></tr>
             )}
             {champs.map(champ => (
               <tr key={champ.id}>
@@ -186,7 +186,7 @@ export default function AdminArticles() {
                     <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{champ.code}</code></td>
                     <td style={{ fontWeight: 500 }}>{champ.label}</td>
                     <td><span className="badge badge-default">{typeLabels[champ.type]}</span></td>
-                    <td>{champ.obligatoire ? <span className="badge badge-info">Oui</span> : <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
+                    <td>{champ.obligatoire ? <span className="badge badge-info">Oui</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
                     <td>
                       <span className={`badge ${champ.actif ? 'badge-success' : 'badge-danger'}`}>
                         {champ.actif ? 'Actif' : 'Inactif'}
@@ -217,7 +217,7 @@ export default function AdminArticles() {
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Label</label>
-              <input required value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} className="form-input" placeholder="Ex: NÂ° RMA" style={{ width: '160px' }} />
+              <input required value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} className="form-input" placeholder="Ex: N° RMA" style={{ width: '160px' }} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Type</label>
@@ -243,7 +243,7 @@ export default function AdminArticles() {
           </form>
           {erreur && (
             <div style={{ marginTop: '12px', padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#dc2626', fontSize: '13px' }}>
-              âš ï¸ {erreur}
+              ⚠️ {erreur}
             </div>
           )}
         </div>
@@ -255,7 +255,7 @@ export default function AdminArticles() {
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
-              Toutes les valeurs associÃ©es Ã  ce champ seront dÃ©finitivement supprimÃ©es.
+              Toutes les valeurs associées à ce champ seront définitivement supprimées.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
@@ -267,4 +267,3 @@ export default function AdminArticles() {
     </div>
   )
 }
-

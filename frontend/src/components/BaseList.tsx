@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trash2, Plus, X, Check, Pencil } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 
@@ -107,7 +107,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   }
 
   function getValeur(item: Item, champId: number) {
-    return item.valeurs.find(v => v.champId === champId)?.valeur ?? 'â€”'
+    return item.valeurs.find(v => v.champId === champId)?.valeur ?? '—'
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -163,7 +163,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
 
       {champs.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
-          <p style={{ marginBottom: '8px', fontWeight: 500 }}>Aucun champ configurÃ©</p>
+          <p style={{ marginBottom: '8px', fontWeight: 500 }}>Aucun champ configuré</p>
           <p style={{ fontSize: '13px' }}>Configurez d'abord les champs dans la section Configuration.</p>
         </div>
       ) : (
@@ -179,12 +179,12 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                     onDragOver={e => e.preventDefault()}
                     onDrop={() => onDrop(c.id)}
                     style={{ cursor: 'grab', userSelect: 'none', whiteSpace: 'nowrap' }}
-                    title="Glisser pour dÃ©placer"
+                    title="Glisser pour déplacer"
                   >
-                    {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>â ¿</span>
+                    {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>⠿</span>
                   </th>
                 ))}
-                <th>AjoutÃ© le</th>
+                <th>Ajouté le</th>
                 <th></th>
               </tr>
               <tr style={{ background: '#141720' }}>
@@ -203,13 +203,13 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
             <tbody>
               {filteredItems.length === 0 && (
                 <tr><td colSpan={champsOrdonnes.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
-                  {hasActiveFiltres ? 'Aucun rÃ©sultat' : 'Aucune donnÃ©e'}
+                  {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
               {filteredItems.map((item, idx) => (
-                <tr key={item.id} style={{ background: idx % 2 === 0 ? '#1a1d27' : '#141720' }}>
+                <tr key={item.id} style={{ background: idx % 2 === 0 ? 'white' : '#e8f0fe' }}>
                   {champsOrdonnes.map(c => (
-                    <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
+                    <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>
                     {new Date(item.createdAt).toLocaleDateString('fr-FR')}
@@ -238,7 +238,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
       {showForm && (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Ajouter â€” {titre}</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Ajouter — {titre}</h3>
             <form onSubmit={handleCreate}>
               {champs.map(c => {
                 const opts = c.options ? (() => { try { return JSON.parse(c.options) } catch { return [] } })() : []
@@ -269,7 +269,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                     <select required={c.obligatoire} className="form-input"
                       value={formValeurs[c.id] ?? ''}
                       onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))}>
-                      <option value="">â€” Choisir â€”</option>
+                      <option value="">— Choisir —</option>
                       {opts.map((o: string) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   ) : (
@@ -288,11 +288,11 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
         </div>
       )}
 
-      {/* Modal Ã©dition */}
+      {/* Modal édition */}
       {editItem && (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Modifier â€” {titre}</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Modifier — {titre}</h3>
             <form onSubmit={handleEdit}>
               {champs.map(c => {
                 const opts = c.options ? (() => { try { return JSON.parse(c.options) } catch { return [] } })() : []
@@ -314,7 +314,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                     <select required={c.obligatoire} className="form-input"
                       value={editItem.valeurs[c.id] ?? ''}
                       onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)}>
-                      <option value="">â€” Choisir â€”</option>
+                      <option value="">— Choisir —</option>
                       {opts.map((o: string) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   ) : (
@@ -338,7 +338,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la suppression</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Cet enregistrement sera dÃ©finitivement supprimÃ©.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>Cet enregistrement sera définitivement supprimé.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => handleDelete(modal.id)}>Supprimer</button>
@@ -349,4 +349,3 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
     </div>
   )
 }
-

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { CheckCircle, XCircle, AlertTriangle, Lock, Copy } from 'lucide-react'
 import { attendusApi } from '../api/attendus'
@@ -91,13 +91,13 @@ export default function AttendusDetail() {
     setDateCreationRMA(data.dateCreationRMA || '')
     setPlateformes(plats)
     setChampsPlateformes(champsPlats.filter((c: any) => c.actif))
-    // Initialiser les accessoires cochÃ©s depuis les donnÃ©es existantes
+    // Initialiser les accessoires cochés depuis les données existantes
     const accMap: Record<number, number[]> = {}
     data.lignes.forEach((l: Ligne) => {
       if (l.accessoires) {
         try {
           const labels: string[] = JSON.parse(l.accessoires)
-          // sera recalculÃ© aprÃ¨s chargement des articles
+          // sera recalculé après chargement des articles
           accMap[l.id] = labels as any
         } catch {}
       }
@@ -148,7 +148,7 @@ export default function AttendusDetail() {
         body: JSON.stringify({
           sn: snSaisie.trim(),
           pn: pnActif,
-          accessoires: accessoiresCochÃ©s.map(aid => articlesAccessoires.find(a => a.id === aid)?.label).filter(Boolean)
+          accessoires: accessoiresCochés.map(aid => articlesAccessoires.find(a => a.id === aid)?.label).filter(Boolean)
         })
       })
       setDernierScan(result)
@@ -195,7 +195,7 @@ export default function AttendusDetail() {
       setDernierScan({ ...result, sn: snScanne })
       setSnSaisie('')
 
-      // Ouvrir modal + son si problÃ¨me
+      // Ouvrir modal + son si problème
       if (result.resultat === 'DEJA_SCANNE') {
         jouerSonAlerte()
         setAlerteScan({ type: 'DEJA_SCANNE', sn: snScanne, pn: result.pn })
@@ -314,7 +314,7 @@ export default function AttendusDetail() {
 
       if (rapport.doublonsInventaire && rapport.doublonsInventaire.length > 0) {
         lines.push(`S/N already in inventory (${rapport.doublonsInventaire.length}):`)
-        rapport.doublonsInventaire.forEach(l => lines.push(`  - ${l.sn} â€” ${l.notes || 'Already in inventory'}`))
+        rapport.doublonsInventaire.forEach(l => lines.push(`  - ${l.sn} — ${l.notes || 'Already in inventory'}`))
         lines.push('')
       }
     }
@@ -346,23 +346,23 @@ export default function AttendusDetail() {
       <div className="page-header">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <button onClick={() => navigate('/attendus')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '13px' }}>â† Attendus</button>
-            {isClos && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#64748b', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> ClÃ´turÃ©</span>}
+            <button onClick={() => navigate('/attendus')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '13px' }}>← Attendus</button>
+            {isClos && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#64748b', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>}
           </div>
           <h1 className="page-title">{attendu.rma ? `RMA ${attendu.rma}` : 'Attendu sans RMA'}</h1>
           <p className="page-subtitle">
-            {attendu.client && `${attendu.client} Â· `}
-            {attendu.bt && `BT : ${attendu.bt} Â· `}
+            {attendu.client && `${attendu.client} · `}
+            {attendu.bt && `BT : ${attendu.bt} · `}
             {new Date(attendu.createdAt).toLocaleDateString('fr-FR')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {!isClos && <button className="btn btn-secondary" onClick={() => setEditInfos(true)}>Modifier infos</button>}
-          <button className="btn btn-secondary" onClick={handleRapport}>Rapport d'Ã©cart</button>
+          <button className="btn btn-secondary" onClick={handleRapport}>Rapport d'écart</button>
           {!isClos && (
             <>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => setShowCloturer(true)}>
-                <Lock size={14} /> ClÃ´turer et enregistrer
+                <Lock size={14} /> Clôturer et enregistrer
               </button>
             </>
           )}
@@ -371,17 +371,17 @@ export default function AttendusDetail() {
 
       {/* Barre de progression globale */}
       <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '8px', padding: '10px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ flex: 1, background: '#0f1117', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
+        <div style={{ flex: 1, background: '#f1f5f9', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
           <div style={{ background: '#2563eb', height: '100%', width: `${totalAttendu > 0 ? (totalRecu / totalAttendu) * 100 : 0}%`, transition: 'width 0.3s' }} />
         </div>
-        <span style={{ fontSize: '13px', fontWeight: 600, color: '#2563eb', whiteSpace: 'nowrap' }}>{totalRecu} / {totalAttendu} reÃ§us</span>
-        {inattendus.length > 0 && <span style={{ fontSize: '12px', color: '#f59e0b' }}>âš ï¸ {inattendus.length} inattendu{inattendus.length > 1 ? 's' : ''}</span>}
+        <span style={{ fontSize: '13px', fontWeight: 600, color: '#2563eb', whiteSpace: 'nowrap' }}>{totalRecu} / {totalAttendu} reçus</span>
+        {inattendus.length > 0 && <span style={{ fontSize: '12px', color: '#f59e0b' }}>⚠️ {inattendus.length} inattendu{inattendus.length > 1 ? 's' : ''}</span>}
       </div>
 
       {/* Corps principal */}
       <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '12px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-        {/* Colonne gauche â€” cartes PN */}
+        {/* Colonne gauche — cartes PN */}
         <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {Object.entries(groupes).map(([pn, lignes]) => {
             const recus = lignes.filter(l => l.statut === 'RECU').length
@@ -395,7 +395,7 @@ export default function AttendusDetail() {
                 style={{
                   border: `2px solid ${actif ? '#2563eb' : complet ? '#86efac' : '#e5e7eb'}`,
                   borderRadius: '8px', padding: '12px',
-                  background: actif ? '#1e3a5f' : complet ? '#1e3a1e' : '#1a1d27',
+                  background: actif ? '#eff6ff' : complet ? '#f0fdf4' : 'white',
                   cursor: 'pointer',
                   transition: 'all 0.15s'
                 }}>
@@ -415,7 +415,7 @@ export default function AttendusDetail() {
           {inattendus.length > 0 && (
             <div style={{ border: '2px solid #fcd34d', borderRadius: '8px', padding: '12px', background: '#fffbeb' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
-                âš ï¸ Inattendus ({inattendus.length})
+                ⚠️ Inattendus ({inattendus.length})
               </div>
               {inattendus.map(l => (
                 <div key={l.id} style={{ fontSize: '11px', fontFamily: 'monospace', color: '#92400e' }}>{l.sn}</div>
@@ -423,11 +423,11 @@ export default function AttendusDetail() {
             </div>
           )}
 
-          {/* DÃ©jÃ  en inventaire */}
+          {/* Déjà en inventaire */}
           {doublonsInv.length > 0 && (
             <div style={{ border: '2px solid #f9a8d4', borderRadius: '8px', padding: '12px', background: '#fdf2f8' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: '#be185d', marginBottom: '8px' }}>
-                ðŸ”´ DÃ©jÃ  en inventaire ({doublonsInv.length})
+                🔴 Déjà en inventaire ({doublonsInv.length})
               </div>
               {doublonsInv.map(l => (
                 <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
@@ -441,10 +441,10 @@ export default function AttendusDetail() {
                         await attendusApi.descanner(l.id)
                         reload()
                       }}
-                      title="DÃ©scannerle S/N â€” remet en attente"
+                      title="Déscannerle S/N — remet en attente"
                       style={{ background: 'none', border: '1px solid #f9a8d4', borderRadius: '4px', cursor: 'pointer', color: '#be185d', padding: '2px 6px', fontSize: '11px', marginLeft: '6px', flexShrink: 0 }}
                     >
-                      âœ• Annuler
+                      ✕ Annuler
                     </button>
                   )}
                 </div>
@@ -457,19 +457,19 @@ export default function AttendusDetail() {
                   }}
                   style={{ marginTop: '6px', width: '100%', fontSize: '11px', padding: '4px', background: '#be185d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                 >
-                  âœ• Tout annuler
+                  ✕ Tout annuler
                 </button>
               )}
             </div>
           )}
         </div>
 
-        {/* Colonne droite â€” panneau de scan */}
+        {/* Colonne droite — panneau de scan */}
         <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {!pnActif ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '40px' }}>â†</div>
-              <p style={{ fontSize: '14px' }}>{isClos ? 'SÃ©lectionnez un P/N pour voir les dÃ©tails' : 'SÃ©lectionnez un P/N pour commencer le scan'}</p>
+              <div style={{ fontSize: '40px' }}>←</div>
+              <p style={{ fontSize: '14px' }}>{isClos ? 'Sélectionnez un P/N pour voir les détails' : 'Sélectionnez un P/N pour commencer le scan'}</p>
             </div>
           ) : (
             <>
@@ -510,19 +510,19 @@ export default function AttendusDetail() {
                         : '#dc2626',
                     }}>
                       {dernierScan.resultat === 'RECU' && !dernierScan.dejaEnInventaire && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} /> S/N validÃ© âœ“ â€” P/N : <strong>{dernierScan.pn}</strong></div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} /> S/N validé ✓ — P/N : <strong>{dernierScan.pn}</strong></div>
                       )}
                       {dernierScan.resultat === 'RECU' && dernierScan.dejaEnInventaire && (
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} /> S/N validÃ© â€” P/N : <strong>{dernierScan.pn}</strong></div>
-                          <div style={{ marginTop: '4px', fontSize: '12px' }}>âš ï¸ Ce S/N est dÃ©jÃ  prÃ©sent en inventaire â€” il sera ignorÃ© Ã  la clÃ´ture</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><CheckCircle size={14} /> S/N validé — P/N : <strong>{dernierScan.pn}</strong></div>
+                          <div style={{ marginTop: '4px', fontSize: '12px' }}>⚠️ Ce S/N est déjà présent en inventaire — il sera ignoré à la clôture</div>
                         </div>
                       )}
                       {dernierScan.resultat === 'DEJA_SCANNE' && null}
                       {dernierScan.resultat === 'INATTENDU' && (
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} /> S/N non attendu pour ce P/N â€” ajoutÃ© au rapport</div>
-                          {dernierScan.dejaEnInventaire && <div style={{ marginTop: '4px', fontSize: '12px' }}>âš ï¸ Ce S/N est dÃ©jÃ  prÃ©sent en inventaire â€” il sera ignorÃ© Ã  la clÃ´ture</div>}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} /> S/N non attendu pour ce P/N — ajouté au rapport</div>
+                          {dernierScan.dejaEnInventaire && <div style={{ marginTop: '4px', fontSize: '12px' }}>⚠️ Ce S/N est déjà présent en inventaire — il sera ignoré à la clôture</div>}
                         </div>
                       )}
                       {dernierScan.resultat === 'ERREUR' && <><XCircle size={14} style={{ display: 'inline', marginRight: '6px' }} />Erreur lors du scan</>}
@@ -534,7 +534,7 @@ export default function AttendusDetail() {
               {/* Liste des S/N pour ce PN */}
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: 600 }}>S/N attendus â€” <code style={{ background: '#1e3a5f', color: '#2563eb', padding: '1px 6px', borderRadius: '4px', fontSize: '12px' }}>{pnActif}</code></h3>
+                  <h3 style={{ fontSize: '14px', fontWeight: 600 }}>S/N attendus — <code style={{ background: '#1e3a5f', color: '#2563eb', padding: '1px 6px', borderRadius: '4px', fontSize: '12px' }}>{pnActif}</code></h3>
                   <span style={{ fontSize: '12px', color: '#6b7280' }}>
                     {lignesPNActif.filter(l => l.statut === 'RECU').length}/{lignesPNActif.length}
                   </span>
@@ -557,8 +557,8 @@ export default function AttendusDetail() {
                       return (
                         <tr key={l.id} style={{ borderTop: '1px solid #f3f4f6', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
                           <td style={{ padding: '6px 14px', fontFamily: 'monospace', fontWeight: l.statut === 'RECU' ? 600 : 400, color: l.statut === 'RECU' ? '#1d4ed8' : '#374151' }}>{l.sn}</td>
-                          <td style={{ padding: '6px 14px', color: '#6b7280' }}>{l.garantie || 'â€”'}</td>
-                          <td style={{ padding: '6px 14px', color: '#6b7280', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.panneClient || 'â€”'}</td>
+                          <td style={{ padding: '6px 14px', color: '#6b7280' }}>{l.garantie || '—'}</td>
+                          <td style={{ padding: '6px 14px', color: '#6b7280', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.panneClient || '—'}</td>
                           {articlesAccessoires.length > 0 && articlesAccessoires.map(acc => (
                             <td key={acc.id} style={{ padding: '6px 10px', textAlign: 'center' }}>
                               {l.statut === 'RECU' ? (
@@ -568,13 +568,13 @@ export default function AttendusDetail() {
                                   onChange={e => toggleAccessoireLigne(l.id, acc.label, e.target.checked)}
                                   style={{ cursor: isClos ? 'default' : 'pointer' }}
                                 />
-                              ) : <span style={{ color: '#e5e7eb' }}>â€”</span>}
+                              ) : <span style={{ color: '#e5e7eb' }}>—</span>}
                             </td>
                           ))}
                           <td style={{ padding: '6px 14px', textAlign: 'center' }}>
-                            {l.statut === 'RECU' && <span style={{ color: '#16a34a', fontSize: '16px' }}>âœ“</span>}
-                            {l.statut === 'ATTENDU' && <span style={{ color: '#d1d5db', fontSize: '16px' }}>â—‹</span>}
-                            {l.statut === 'NON_RECU' && <span style={{ color: '#dc2626', fontSize: '16px' }}>âœ—</span>}
+                            {l.statut === 'RECU' && <span style={{ color: '#16a34a', fontSize: '16px' }}>✓</span>}
+                            {l.statut === 'ATTENDU' && <span style={{ color: '#d1d5db', fontSize: '16px' }}>○</span>}
+                            {l.statut === 'NON_RECU' && <span style={{ color: '#dc2626', fontSize: '16px' }}>✗</span>}
                           </td>
                         </tr>
                       )
@@ -592,9 +592,9 @@ export default function AttendusDetail() {
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '600px', width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Rapport d'Ã©cart</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Rapport d'écart</h3>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn btn-primary" onClick={copierRapport}><Copy size={14} /> {copie ? 'CopiÃ© !' : 'Copier pour email'}</button>
+                <button className="btn btn-primary" onClick={copierRapport}><Copy size={14} /> {copie ? 'Copié !' : 'Copier pour email'}</button>
                 <button className="btn btn-secondary" onClick={() => setShowRapport(false)}>Fermer</button>
               </div>
             </div>
@@ -602,7 +602,7 @@ export default function AttendusDetail() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                 <div style={{ textAlign: 'center', background: '#dcfce7', borderRadius: '8px', padding: '12px' }}>
                   <div style={{ fontSize: '24px', fontWeight: 700, color: '#16a34a' }}>{rapport.recus.length}</div>
-                  <div style={{ fontSize: '12px', color: '#16a34a' }}>ReÃ§us</div>
+                  <div style={{ fontSize: '12px', color: '#16a34a' }}>Reçus</div>
                 </div>
                 <div style={{ textAlign: 'center', background: '#fee2e2', borderRadius: '8px', padding: '12px' }}>
                   <div style={{ fontSize: '24px', fontWeight: 700, color: '#dc2626' }}>{rapport.nonRecus.length}</div>
@@ -619,30 +619,30 @@ export default function AttendusDetail() {
               </div>
               {rapport.nonRecus.length > 0 && (
                 <div style={{ marginBottom: '16px' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>âŒ S/N manquants</h4>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#dc2626', marginBottom: '8px' }}>❌ S/N manquants</h4>
                   {Object.entries(groupParPN(rapport.nonRecus)).map(([pn, ligs]) => (
                     <div key={pn} style={{ marginBottom: '8px' }}>
                       <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>P/N {pn} ({ligs.length})</div>
-                      {ligs.map(l => <div key={l.id} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#6b7280', paddingLeft: '12px' }}>Â· {l.sn}</div>)}
+                      {ligs.map(l => <div key={l.id} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#6b7280', paddingLeft: '12px' }}>· {l.sn}</div>)}
                     </div>
                   ))}
                 </div>
               )}
               {rapport.inattendus.length > 0 && (
                 <div style={{ marginBottom: '16px' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#92400e', marginBottom: '8px' }}>âš ï¸ S/N inattendus</h4>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#92400e', marginBottom: '8px' }}>⚠️ S/N inattendus</h4>
                   {rapport.inattendus.map(l => (
-                    <div key={l.id} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#6b7280', marginBottom: '2px' }}>Â· {l.sn} (P/N : {l.pn})</div>
+                    <div key={l.id} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#6b7280', marginBottom: '2px' }}>· {l.sn} (P/N : {l.pn})</div>
                   ))}
                 </div>
               )}
               {rapport.doublonsInventaire && rapport.doublonsInventaire.length > 0 && (
                 <div style={{ marginBottom: '16px' }}>
-                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#be185d', marginBottom: '8px' }}>ðŸ”´ S/N dÃ©jÃ  en inventaire</h4>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#be185d', marginBottom: '8px' }}>🔴 S/N déjà en inventaire</h4>
                   {rapport.doublonsInventaire.map(l => (
                     <div key={l.id} style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>Â· {l.sn}</span>
-                      <span style={{ marginLeft: '8px', color: '#be185d' }}>{l.notes || 'DÃ©jÃ  en inventaire'}</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>· {l.sn}</span>
+                      <span style={{ marginLeft: '8px', color: '#be185d' }}>{l.notes || 'Déjà en inventaire'}</span>
                     </div>
                   ))}
                 </div>
@@ -651,12 +651,12 @@ export default function AttendusDetail() {
               {rapport.nonRecus.length === 0 && rapport.inattendus.length === 0 && !rapport.doublonsInventaire?.length && (
                 <div style={{ textAlign: 'center', color: '#16a34a', padding: '20px' }}>
                   <CheckCircle size={32} style={{ margin: '0 auto 8px' }} />
-                  <p style={{ fontWeight: 600 }}>Aucun Ã©cart â€” tous les S/N ont Ã©tÃ© reÃ§us !</p>
+                  <p style={{ fontWeight: 600 }}>Aucun écart — tous les S/N ont été reçus !</p>
                 </div>
               )}
 
               <div style={{ marginTop: '16px', background: '#141720', border: '1px solid #2d3148', borderRadius: '8px', padding: '12px' }}>
-                <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', fontWeight: 600 }}>APERÃ‡U EMAIL</div>
+                <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', fontWeight: 600 }}>APERÇU EMAIL</div>
                 <pre style={{ fontSize: '12px', color: '#374151', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{texteRapportEmail()}</pre>
               </div>
             </div>
@@ -668,31 +668,31 @@ export default function AttendusDetail() {
       {showValider && (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Valider la rÃ©ception ?</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Valider la réception ?</h3>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>
-              Les <strong>{attendu.lignes.filter(l => l.statut === 'RECU').length} S/N reÃ§us</strong> vont Ãªtre injectÃ©s dans l'inventaire avec le statut "En stock".
+              Les <strong>{attendu.lignes.filter(l => l.statut === 'RECU').length} S/N reçus</strong> vont être injectés dans l'inventaire avec le statut "En stock".
             </p>
             <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '20px' }}>
-              â„¹ï¸ Vous pourrez continuer Ã  scanner aprÃ¨s validation.
+              ℹ️ Vous pourrez continuer à scanner après validation.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setShowValider(false)}>Annuler</button>
-              <button className="btn btn-primary" onClick={handleValider}>âœ“ Confirmer</button>
+              <button className="btn btn-primary" onClick={handleValider}>✓ Confirmer</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* SuccÃ¨s validation */}
+      {/* Succès validation */}
       {validerOk && (
         <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', padding: '16px 20px', maxWidth: '400px', zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#16a34a', fontWeight: 600, marginBottom: validerOk.snDoublons?.length ? '8px' : 0 }}>
             <CheckCircle size={20} />
-            {validerOk.lignesInjectees} ligne{validerOk.lignesInjectees !== 1 ? 's' : ''} injectÃ©e{validerOk.lignesInjectees !== 1 ? 's' : ''} dans l'inventaire
+            {validerOk.lignesInjectees} ligne{validerOk.lignesInjectees !== 1 ? 's' : ''} injectée{validerOk.lignesInjectees !== 1 ? 's' : ''} dans l'inventaire
           </div>
           {validerOk.snDoublons && validerOk.snDoublons.length > 0 && (
             <div style={{ fontSize: '12px', color: '#f59e0b', borderTop: '1px solid #f3f4f6', paddingTop: '8px' }}>
-              âš ï¸ {validerOk.snDoublons.length} S/N dÃ©jÃ  prÃ©sent{validerOk.snDoublons.length > 1 ? 's' : ''} ignorÃ©{validerOk.snDoublons.length > 1 ? 's' : ''} : {validerOk.snDoublons.join(', ')}
+              ⚠️ {validerOk.snDoublons.length} S/N déjà présent{validerOk.snDoublons.length > 1 ? 's' : ''} ignoré{validerOk.snDoublons.length > 1 ? 's' : ''} : {validerOk.snDoublons.join(', ')}
             </div>
           )}
           <button onClick={() => setValiderOk(null)} style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><XCircle size={16} /></button>
@@ -704,17 +704,17 @@ export default function AttendusDetail() {
         <div className="modal-overlay" onClick={() => { setAlerteScan(null); snInputRef.current?.focus() }}>
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '32px', maxWidth: '420px', width: '100%', textAlign: 'center', border: '3px solid #dc2626' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>âš ï¸</div>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
             {alerteScan.type === 'DEJA_SCANNE' && (
               <>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N dÃ©jÃ  validÃ© !</h3>
-                <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N a dÃ©jÃ  Ã©tÃ© scannÃ© et validÃ© dans cet attendu.</p>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N déjà validé !</h3>
+                <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N a déjà été scanné et validé dans cet attendu.</p>
               </>
             )}
             {alerteScan.type === 'DEJA_INVENTAIRE' && (
               <>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N dÃ©jÃ  en inventaire !</h3>
-                <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N est dÃ©jÃ  prÃ©sent dans l'inventaire. Il sera ignorÃ© Ã  la clÃ´ture.</p>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N déjà en inventaire !</h3>
+                <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N est déjà présent dans l'inventaire. Il sera ignoré à la clôture.</p>
               </>
             )}
             <code style={{ display: 'block', background: '#fee2e2', color: '#dc2626', padding: '8px 16px', borderRadius: '6px', fontWeight: 700, fontSize: '16px', marginBottom: '20px' }}>
@@ -723,28 +723,28 @@ export default function AttendusDetail() {
             {alerteScan.pn && <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '16px' }}>P/N : {alerteScan.pn}</p>}
             <button className="btn btn-primary" style={{ width: '100%' }}
               onClick={() => { setAlerteScan(null); snInputRef.current?.focus() }}>
-              OK â€” Continuer le scan
+              OK — Continuer le scan
             </button>
           </div>
         </div>
       )}
 
-      {/* Modal erreur clÃ´ture */}
+      {/* Modal erreur clôture */}
       {erreurCloture && (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px', color: '#dc2626' }}>âŒ ClÃ´ture impossible</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px', color: '#dc2626' }}>❌ Clôture impossible</h3>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '12px' }}>{erreurCloture.message}</p>
             {erreurCloture.snsEnDoublon.length > 0 && (
               <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#dc2626', marginBottom: '6px' }}>S/N concernÃ©s :</div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#dc2626', marginBottom: '6px' }}>S/N concernés :</div>
                 {erreurCloture.snsEnDoublon.map(sn => (
-                  <div key={sn} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#dc2626' }}>Â· {sn}</div>
+                  <div key={sn} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#dc2626' }}>· {sn}</div>
                 ))}
               </div>
             )}
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
-              Supprimez ces S/N de l'inventaire ou contactez un administrateur avant de clÃ´turer.
+              Supprimez ces S/N de l'inventaire ou contactez un administrateur avant de clôturer.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setErreurCloture(null)}>Fermer</button>
@@ -753,20 +753,20 @@ export default function AttendusDetail() {
         </div>
       )}
 
-      {/* Modal clÃ´turer */}
+      {/* Modal clôturer */}
       {showCloturer && (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>ClÃ´turer et enregistrer ?</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Clôturer et enregistrer ?</h3>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>
-              Les <strong>{attendu.lignes.filter(l => l.statut === 'RECU').length} S/N reÃ§us</strong> seront injectÃ©s dans l'inventaire avec le statut "En stock".
+              Les <strong>{attendu.lignes.filter(l => l.statut === 'RECU').length} S/N reçus</strong> seront injectés dans l'inventaire avec le statut "En stock".
             </p>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Les S/N non scannÃ©s seront marquÃ©s comme <strong>non reÃ§us</strong>.</p>
-            <p style={{ color: '#dc2626', fontSize: '13px', marginBottom: '20px' }}>âš ï¸ Cette action est irrÃ©versible.</p>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Les S/N non scannés seront marqués comme <strong>non reçus</strong>.</p>
+            <p style={{ color: '#dc2626', fontSize: '13px', marginBottom: '20px' }}>⚠️ Cette action est irréversible.</p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setShowCloturer(false)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={handleCloturer}>
-                <Lock size={14} /> ClÃ´turer et enregistrer dans l'inventaire
+                <Lock size={14} /> Clôturer et enregistrer dans l'inventaire
               </button>
             </div>
           </div>
@@ -779,24 +779,24 @@ export default function AttendusDetail() {
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '400px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Modifier les informations</h3>
             <div className="form-group">
-              <label className="form-label">NÂ° RMA</label>
+              <label className="form-label">N° RMA</label>
               <input className="form-input" value={rma} onChange={e => setRma(e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label">NÂ° BT</label>
+              <label className="form-label">N° BT</label>
               <input className="form-input" value={bt} onChange={e => setBt(e.target.value)} />
             </div>
             <div className="form-group">
               <label className="form-label">Plateforme</label>
               <select className="form-input" value={plateforme} onChange={e => setPlateforme(e.target.value)}>
-                <option value="">â€” Choisir une plateforme â€”</option>
+                <option value="">— Choisir une plateforme —</option>
                 {plateformes.map(pl => (
                   <option key={pl.id} value={getPlateformeLabel(pl)}>{getPlateformeLabel(pl)}</option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Date crÃ©ation RMA</label>
+              <label className="form-label">Date création RMA</label>
               <input type="date" className="form-input" value={dateCreationRMA} onChange={e => setDateCreationRMA(e.target.value)} />
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
@@ -809,4 +809,3 @@ export default function AttendusDetail() {
     </div>
   )
 }
-

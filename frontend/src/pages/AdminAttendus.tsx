@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Trash2, Plus, Pencil, Check, X } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
@@ -123,37 +123,37 @@ export default function AdminAttendus() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Configuration â€” Attendus</h1>
-          <p className="page-subtitle">ParamÃ©trez l'import Excel et la clÃ´ture des attendus</p>
+          <h1 className="page-title">Configuration — Attendus</h1>
+          <p className="page-subtitle">Paramétrez l'import Excel et la clôture des attendus</p>
         </div>
       </div>
 
       {/* Config globale */}
       <div className="card" style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>ParamÃ¨tres gÃ©nÃ©raux</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>Paramètres généraux</h2>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div className="form-group">
             <label className="form-label">Nom de l'onglet Excel</label>
             <input className="form-input" value={config.nomOnglet}
               onChange={e => { setConfig(c => ({ ...c, nomOnglet: e.target.value })); setConfigModifiee(true) }}
               placeholder="ex: Terminal Details" />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Nom exact de l'onglet Ã  lire dans le fichier Excel client</p>
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Nom exact de l'onglet à lire dans le fichier Excel client</p>
           </div>
           <div className="form-group">
-            <label className="form-label">Statut Ã  la clÃ´ture</label>
+            <label className="form-label">Statut à la clôture</label>
             <select className="form-input" value={config.statutCloture ?? ''}
               onChange={e => { setConfig(c => ({ ...c, statutCloture: e.target.value || null })); setConfigModifiee(true) }}>
-              <option value="">â€” Recherche automatique (contient "STOCK") â€”</option>
+              <option value="">— Recherche automatique (contient "STOCK") —</option>
               {statuts.map(s => <option key={s.id} value={s.code}>{s.label} ({s.code})</option>)}
             </select>
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Statut assignÃ© aux lignes inventaire lors de la clÃ´ture</p>
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Statut assigné aux lignes inventaire lors de la clôture</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <input type="checkbox" id="obligPN" checked={config.obligatoirePNcatalogue}
               onChange={e => { setConfig(c => ({ ...c, obligatoirePNcatalogue: e.target.checked })); setConfigModifiee(true) }} />
             <div>
               <label htmlFor="obligPN" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>P/N obligatoire dans le catalogue</label>
-              <p style={{ fontSize: '11px', color: '#9ca3af', margin: '2px 0 0' }}>Si dÃ©cochÃ©, l'import est autorisÃ© mÃªme si le P/N n'existe pas dans les articles</p>
+              <p style={{ fontSize: '11px', color: '#9ca3af', margin: '2px 0 0' }}>Si décoché, l'import est autorisé même si le P/N n'existe pas dans les articles</p>
             </div>
           </div>
         </div>
@@ -161,18 +161,18 @@ export default function AdminAttendus() {
         {isAdmin && (
           <div style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button className="btn btn-primary" onClick={handleSaveConfig} disabled={!configModifiee}>
-              Enregistrer les paramÃ¨tres
+              Enregistrer les paramètres
             </button>
-            {succes && <span style={{ color: '#16a34a', fontSize: '13px' }}>âœ“ EnregistrÃ©</span>}
+            {succes && <span style={{ color: '#16a34a', fontSize: '13px' }}>✓ Enregistré</span>}
           </div>
         )}
       </div>
 
-      {/* Champs du formulaire de crÃ©ation */}
+      {/* Champs du formulaire de création */}
       <div className="card" style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#111827' }}>Champs du formulaire de crÃ©ation</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#111827' }}>Champs du formulaire de création</h2>
         <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
-          SÃ©lectionnez les champs inventaire Ã  remplir lors de la crÃ©ation d'un attendu. Ces valeurs seront automatiquement injectÃ©es dans l'inventaire Ã  la clÃ´ture.
+          Sélectionnez les champs inventaire à remplir lors de la création d'un attendu. Ces valeurs seront automatiquement injectées dans l'inventaire à la clôture.
         </p>
         <table className="table">
           <thead>
@@ -184,7 +184,7 @@ export default function AdminAttendus() {
             </tr>
           </thead>
           <tbody>
-            {champsInv.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configurÃ©</td></tr>}
+            {champsInv.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configuré</td></tr>}
             {champsInv.map(champ => {
               const cfg = config.champsAttendu?.find(c => c.code === champ.code) ?? { code: champ.code, visible: false, obligatoire: false }
               return (
@@ -206,9 +206,9 @@ export default function AdminAttendus() {
 
       {/* Mapping colonnes Excel */}
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#111827' }}>Mapping colonnes Excel â†’ inventaire</h2>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#111827' }}>Mapping colonnes Excel → inventaire</h2>
         <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
-          DÃ©finissez quelle colonne Excel correspond Ã  quel champ inventaire. Les rÃ´les <strong>SN</strong> et <strong>PN</strong> sont obligatoires pour identifier les numÃ©ros de sÃ©rie et les rÃ©fÃ©rences produit.
+          Définissez quelle colonne Excel correspond à quel champ inventaire. Les rôles <strong>SN</strong> et <strong>PN</strong> sont obligatoires pour identifier les numéros de série et les références produit.
         </p>
 
         <div style={{ overflowX: 'auto' }}>
@@ -217,7 +217,7 @@ export default function AdminAttendus() {
               <tr>
                 <th>Colonne Excel</th>
                 <th>Champ inventaire</th>
-                <th>RÃ´le spÃ©cial</th>
+                <th>Rôle spécial</th>
                 <th>Actif</th>
                 <th></th>
               </tr>
@@ -225,7 +225,7 @@ export default function AdminAttendus() {
             <tbody>
               {mappings.length === 0 && (
                 <tr><td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>
-                  Aucun mapping configurÃ© â€” le systÃ¨me utilise les colonnes par dÃ©faut
+                  Aucun mapping configuré — le système utilise les colonnes par défaut
                 </td></tr>
               )}
               {mappings.map(m => editId === m.id ? (
@@ -233,15 +233,15 @@ export default function AdminAttendus() {
                   <td><input className="form-input" value={editForm.colonneExcel ?? ''} onChange={e => setEditForm(f => ({ ...f, colonneExcel: e.target.value }))} /></td>
                   <td>
                     <select className="form-input" value={editForm.champInventaireCode ?? ''} onChange={e => setEditForm(f => ({ ...f, champInventaireCode: e.target.value }))}>
-                      <option value="">â€” Choisir â€”</option>
+                      <option value="">— Choisir —</option>
                       {champsInv.map(c => <option key={c.id} value={c.code}>{c.label} ({c.code})</option>)}
                     </select>
                   </td>
                   <td>
                     <select className="form-input" value={editForm.roleSpecial ?? ''} onChange={e => setEditForm(f => ({ ...f, roleSpecial: e.target.value || null }))}>
-                      <option value="">â€” Aucun â€”</option>
-                      <option value="SN">SN (numÃ©ro de sÃ©rie)</option>
-                      <option value="PN">PN (rÃ©fÃ©rence produit)</option>
+                      <option value="">— Aucun —</option>
+                      <option value="SN">SN (numéro de série)</option>
+                      <option value="PN">PN (référence produit)</option>
                     </select>
                   </td>
                   <td style={{ textAlign: 'center' }}><input type="checkbox" checked={editForm.actif ?? true} onChange={e => setEditForm(f => ({ ...f, actif: e.target.checked }))} /></td>
@@ -262,7 +262,7 @@ export default function AdminAttendus() {
                       <span style={{ background: m.roleSpecial === 'SN' ? '#dbeafe' : '#ede9fe', color: m.roleSpecial === 'SN' ? '#1d4ed8' : '#6d28d9', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
                         {m.roleSpecial}
                       </span>
-                    ) : <span style={{ color: '#d1d5db' }}>â€”</span>}
+                    ) : <span style={{ color: '#d1d5db' }}>—</span>}
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     {m.actif ? <span className="badge badge-success">Actif</span> : <span style={{ color: '#d1d5db' }}>Inactif</span>}
@@ -293,16 +293,16 @@ export default function AdminAttendus() {
               <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '200px' }}>
                 <label className="form-label">Champ inventaire *</label>
                 <select required className="form-input" value={newMapping.champInventaireCode} onChange={e => setNewMapping(m => ({ ...m, champInventaireCode: e.target.value }))}>
-                  <option value="">â€” Choisir â€”</option>
+                  <option value="">— Choisir —</option>
                   {champsInv.map(c => <option key={c.id} value={c.code}>{c.label} ({c.code})</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">RÃ´le spÃ©cial</label>
+                <label className="form-label">Rôle spécial</label>
                 <select className="form-input" value={newMapping.roleSpecial} onChange={e => setNewMapping(m => ({ ...m, roleSpecial: e.target.value }))}>
-                  <option value="">â€” Aucun â€”</option>
-                  <option value="SN">SN (numÃ©ro de sÃ©rie)</option>
-                  <option value="PN">PN (rÃ©fÃ©rence produit)</option>
+                  <option value="">— Aucun —</option>
+                  <option value="SN">SN (numéro de série)</option>
+                  <option value="PN">PN (référence produit)</option>
                 </select>
               </div>
               <button type="submit" className="btn btn-primary">+ Ajouter</button>
@@ -313,4 +313,3 @@ export default function AdminAttendus() {
     </div>
   )
 }
-

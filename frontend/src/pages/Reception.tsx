@@ -1,9 +1,9 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle, Plus, Trash2, X } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get } from '../api/client'
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
   if (!raw) return 1
@@ -11,7 +11,7 @@ function getSiteId(): number {
 }
 
 function normalize(str: string): string {
-  return str.toUpperCase().normalize('NFD').replace(/[Ì€-Í¯]/g, '').trim()
+  return str.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
 }
 
 function parseOptions(raw: string | null): string[] {
@@ -40,7 +40,7 @@ function jouerSonAlerte() {
   } catch {}
 }
 
-// â”€â”€â”€ Constantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Constantes ───────────────────────────────────────────────────────────────
 const CODES_PN          = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO']
 const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
 const CODES_TYPE        = ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE']  // articles ET inventaire
@@ -49,7 +49,7 @@ const CODES_CLIENT      = ['CLIENT', 'CLIENTS']
 const CODES_PLATEFORME  = ['PLATEFORME', 'PLATEFORMES']
 const CODES_NOM         = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface Champ {
   id: number; code: string; label: string; type: string
   options: string | null; obligatoire: boolean
@@ -69,7 +69,7 @@ interface LotPrepare {
   quantite: number; statut: string | null; statutId: number | null
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 export default function Reception() {
   const siteId = getSiteId()
   const snInputRef = useRef<HTMLInputElement>(null)
@@ -118,24 +118,24 @@ export default function Reception() {
     const champsActifs = ci.filter(c => c.actif)
     setChampsInv(champsActifs)
 
-    // PrÃ©-remplir DATE_TODAY
+    // Pré-remplir DATE_TODAY
     const today = new Date().toISOString().split('T')[0]
     const preRemplis: Record<number, string> = {}
     champsActifs.forEach(c => { if (c.type === 'DATE_TODAY') preRemplis[c.id] = today })
     if (Object.keys(preRemplis).length > 0) setChampsCommuns(f => ({ ...preRemplis, ...f }))
 
-    // SÃ©parer articles normaux et accessoires
+    // Séparer articles normaux et accessoires
     const champsTypeIds = ca.filter(c => CODES_TYPE.some(code => normalize(c.code) === normalize(code))).map(c => c.id)
     const estAccessoire = (art: Article) => art.valeurs.some(v => champsTypeIds.includes(v.champId) && normalize(String(v.valeur ?? '')) === 'ACCESSOIRE')
     setArticlesAccessoires(a.filter(estAccessoire))
     setArticles(a.filter(art => !estAccessoire(art)))
   }
 
-  // â”€â”€â”€ Labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Labels ───────────────────────────────────────────────────────────────
   function getArticleLabel(art: Article): string {
     const pn    = art.valeurs.find(v => CODES_PN.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur
     const desig = art.valeurs.find(v => CODES_DESIGNATION.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur
-    return [pn, desig].filter(Boolean).join(' â€” ') || `Article #${art.id}`
+    return [pn, desig].filter(Boolean).join(' — ') || `Article #${art.id}`
   }
 
   function getArticleLabelById(id: number): string {
@@ -149,7 +149,7 @@ export default function Reception() {
     return val || champs.map(c => entite.valeurs?.find((v: any) => v.champId === c.id)?.valeur).filter(Boolean)[0] || `#${entite.id}`
   }
 
-  // â”€â”€â”€ Mode suivi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Mode suivi ───────────────────────────────────────────────────────────
   function getModesuivi(artId = articleId): 'SN' | 'QTE' | 'AUTRE' {
     const art = articles.find(a => a.id === artId)
     if (!art) return 'AUTRE'
@@ -167,10 +167,10 @@ export default function Reception() {
   const articleSelectionne = articles.find(a => a.id === articleId)
   const modeSuivi = getModesuivi()
 
-  // â”€â”€â”€ Champs visibles en rÃ©ception â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Champs visibles en réception ─────────────────────────────────────────
   const champsVisibles = champsInv.filter(c => modeSuivi === 'QTE' ? c.visibleReceptionQTE : c.visibleReceptionSN)
 
-  // â”€â”€â”€ S/N â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── S/N ──────────────────────────────────────────────────────────────────
   async function addSN() {
     const sn = snCurrent.trim()
     if (!sn || lignesSN.some(l => l.sn === sn)) return
@@ -202,12 +202,12 @@ export default function Reception() {
     setLignesSN(prev => prev.map(l => l.sn === sn ? { ...l, panneClient: val } : l))
   }
 
-  // â”€â”€â”€ PrÃ©parer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Préparer ─────────────────────────────────────────────────────────────
   function handlePreparer(e: React.FormEvent) {
     e.preventDefault()
     if (!articleId) return
     if (modeSuivi === 'SN' && lignesSN.length === 0) { setErreur('Ajoutez au moins un S/N'); return }
-    if (modeSuivi === 'QTE' && quantite < 1) { setErreur('La quantitÃ© doit Ãªtre supÃ©rieure Ã  0'); return }
+    if (modeSuivi === 'QTE' && quantite < 1) { setErreur('La quantité doit être supérieure à 0'); return }
     setErreur(null)
 
     // Assurer DATE_TODAY
@@ -233,7 +233,7 @@ export default function Reception() {
     }])
   }
 
-  // â”€â”€â”€ Valider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Valider ──────────────────────────────────────────────────────────────
   async function handleValider() {
     if (lotsEnAttente.length === 0) return
     setErreur(null)
@@ -241,7 +241,7 @@ export default function Reception() {
       const idPN  = findChampId(champsInv, CODES_PN)
       const idDesig = findChampId(champsInv, CODES_DESIGNATION)
       const idType  = findChampId(champsInv, CODES_TYPE)
-      const idSN    = findChampId(champsInv, ['SN', 'S_N', 'NUMERO_SERIE', 'NUMÃ‰RO DE SÃ‰RIE'])
+      const idSN    = findChampId(champsInv, ['SN', 'S_N', 'NUMERO_SERIE', 'NUMÉRO DE SÉRIE'])
       const idAcc   = findChampId(champsInv, ['ACCESSOIRES', 'ACCESSOIRE'])
       const idPanne = findChampId(champsInv, ['PANNE_CLIENT', 'PANNE', 'PANNE_DECLARE', 'PANNE_DECLAREE'])
       const idQte   = findChampId(champsInv, ['QUANTITE', 'QTE', 'QUANTITY'])
@@ -310,35 +310,35 @@ export default function Reception() {
     setInfosValidees(false)
   }
 
-  // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <>
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">RÃ©ception</h1>
-          <p className="page-subtitle">Saisie des produits rÃ©ceptionnÃ©s</p>
+          <h1 className="page-title">Réception</h1>
+          <p className="page-subtitle">Saisie des produits réceptionnés</p>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '460px 1fr', gap: '20px', alignItems: 'start' }}>
 
-        {/* â”€â”€ Formulaire gauche â”€â”€ */}
+        {/* ── Formulaire gauche ── */}
         <div className="card">
           <form onSubmit={infosValidees ? handlePreparer : handleValiderInfos}>
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '4px 0 12px' }} />
 
-            {/* Champs de rÃ©ception configurÃ©s */}
+            {/* Champs de réception configurés */}
             {champsVisibles.length === 0 ? (
               <p style={{ color: '#f59e0b', fontSize: '12px', marginBottom: '12px' }}>
-                âš ï¸ Aucun champ de rÃ©ception configurÃ©. Allez dans Configuration â†’ Structure inventaire.
+                ⚠️ Aucun champ de réception configuré. Allez dans Configuration → Structure inventaire.
               </p>
             ) : infosValidees ? (
               /* Mode lecture seule */
               <div style={{ background: '#1e3a1e', border: '1px solid #86efac', borderRadius: '8px', padding: '12px', marginBottom: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a' }}>âœ“ Informations validÃ©es</span>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a' }}>✓ Informations validées</span>
                   <button type="button" onClick={handleModifierInfos}
                     style={{ fontSize: '12px', background: 'none', border: '1px solid #86efac', borderRadius: '4px', color: '#16a34a', cursor: 'pointer', padding: '2px 8px' }}>
                     Modifier
@@ -361,17 +361,17 @@ export default function Reception() {
                       <label className="form-label">{c.label} <span style={{ color: '#dc2626' }}>*</span></label>
                       {CODES_CLIENT.includes(normalize(c.code)) ? (
                         <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
-                          <option value="">â€” Choisir un client â€”</option>
+                          <option value="">— Choisir un client —</option>
                           {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
                         </select>
                       ) : CODES_PLATEFORME.includes(normalize(c.code)) ? (
                         <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
-                          <option value="">â€” Choisir une plateforme â€”</option>
+                          <option value="">— Choisir une plateforme —</option>
                           {plateformes.map(pl => <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>{getEntiteLabel(pl, champsPlateformes)}</option>)}
                         </select>
                       ) : c.type === 'SELECT' ? (
                         <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
-                          <option value="">â€” Choisir â€”</option>
+                          <option value="">— Choisir —</option>
                           {opts.map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
                       ) : (c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
@@ -391,19 +391,19 @@ export default function Reception() {
 
             <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />
 
-            {/* Bouton valider infos â€” avant validation */}
+            {/* Bouton valider infos — avant validation */}
             {!infosValidees && (
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginBottom: '4px' }}>
-                âœ“ Valider les informations
+                ✓ Valider les informations
               </button>
             )}
 
-            {/* Article â€” aprÃ¨s validation des infos */}
+            {/* Article — après validation des infos */}
             {infosValidees && <div className="form-group" style={{ marginTop: '4px' }}>
               <label className="form-label">Article *</label>
               <select required className="form-input" value={articleId}
                 onChange={e => { setArticleId(Number(e.target.value)); setLignesSN([]); setQuantite(1) }}>
-                <option value={0}>â€” Choisir un article â€”</option>
+                <option value={0}>— Choisir un article —</option>
                 {articles.map(a => <option key={a.id} value={a.id}>{getArticleLabel(a)}</option>)}
               </select>
             </div>}
@@ -424,27 +424,27 @@ export default function Reception() {
                 {modeSuivi === 'SN' && (
                   <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontSize: '12px' }}>
                     <CheckCircle size={13} />
-                    <span>Suivi par S/N â€” statut : <strong>{statuts.find(s => s.id === getStatutStock())?.label ?? 'âš ï¸ statut stock introuvable'}</strong></span>
+                    <span>Suivi par S/N — statut : <strong>{statuts.find(s => s.id === getStatutStock())?.label ?? '⚠️ statut stock introuvable'}</strong></span>
                   </div>
                 )}
-                {modeSuivi === 'QTE' && <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>ðŸ“¦ Suivi par quantitÃ©</div>}
+                {modeSuivi === 'QTE' && <div style={{ marginTop: '6px', fontSize: '12px', color: '#6b7280' }}>📦 Suivi par quantité</div>}
               </div>
             )}
 
-            {/* Mode QTE â€” seulement si infos validÃ©es */}
+            {/* Mode QTE — seulement si infos validées */}
             {infosValidees && articleId > 0 && modeSuivi === 'QTE' && (
               <div className="form-group">
-                <label className="form-label">QuantitÃ© *</label>
+                <label className="form-label">Quantité *</label>
                 <input type="number" min={1} required className="form-input" style={{ maxWidth: '120px' }}
                   value={quantite} onChange={e => setQuantite(Number(e.target.value))} />
               </div>
             )}
 
-            {/* Mode SN â€” seulement si infos validÃ©es */}
+            {/* Mode SN — seulement si infos validées */}
             {infosValidees && articleId > 0 && (modeSuivi === 'SN' || modeSuivi === 'AUTRE') && (
               <>
                 <div className="form-group" style={{ marginBottom: '8px' }}>
-                  <label className="form-label">Saisie S/N <span style={{ color: '#9ca3af', fontWeight: 400 }}>(EntrÃ©e pour ajouter)</span></label>
+                  <label className="form-label">Saisie S/N <span style={{ color: '#9ca3af', fontWeight: 400 }}>(Entrée pour ajouter)</span></label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input ref={snInputRef} className="form-input" placeholder="Scanner ou saisir un S/N..."
                       value={snCurrent} onChange={e => setSnCurrent(e.target.value)}
@@ -472,7 +472,7 @@ export default function Reception() {
                           <tr key={l.sn} style={{ borderBottom: i < lignesSN.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
                             <td style={{ padding: '5px 10px', fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8' }}>{l.sn}</td>
                             <td style={{ padding: '3px 6px' }}>
-                              <input className="form-input" placeholder="Panne dÃ©clarÃ©e..."
+                              <input className="form-input" placeholder="Panne déclarée..."
                                 value={l.panneClient} onChange={e => updatePanneClient(l.sn, e.target.value)}
                                 style={{ fontSize: '12px', padding: '3px 6px', minWidth: '120px' }} />
                             </td>
@@ -502,21 +502,21 @@ export default function Reception() {
               </div>
             )}
 
-            {/* SÃ©lection article + bouton prÃ©parer â€” seulement si infos validÃ©es */}
+            {/* Sélection article + bouton préparer — seulement si infos validées */}
             {infosValidees && (
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }}
                 disabled={!articleId || (modeSuivi === 'SN' && lignesSN.length === 0) || (modeSuivi === 'QTE' && quantite < 1)}>
-                PrÃ©parer {modeSuivi === 'QTE' ? `(${quantite} unitÃ©${quantite > 1 ? 's' : ''})` : lignesSN.length > 0 ? `(${lignesSN.length} S/N)` : ''}
+                Préparer {modeSuivi === 'QTE' ? `(${quantite} unité${quantite > 1 ? 's' : ''})` : lignesSN.length > 0 ? `(${lignesSN.length} S/N)` : ''}
               </button>
             )}
           </form>
         </div>
 
-        {/* â”€â”€ Panneau de droite â”€â”€ */}
+        {/* ── Panneau de droite ── */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>
-              Ã€ valider â€” {lotsEnAttente.length} lot{lotsEnAttente.length !== 1 ? 's' : ''}
+              À valider — {lotsEnAttente.length} lot{lotsEnAttente.length !== 1 ? 's' : ''}
             </h2>
             {lotsEnAttente.length > 0 && (
               <button className="btn btn-secondary" style={{ fontSize: '12px' }} onClick={() => setLotsEnAttente([])}>
@@ -528,7 +528,7 @@ export default function Reception() {
 
           {lotsEnAttente.length === 0 ? (
             <p style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center', padding: '48px 0' }}>
-              PrÃ©parez des articles pour les voir apparaÃ®tre ici
+              Préparez des articles pour les voir apparaître ici
             </p>
           ) : (
             <>
@@ -538,12 +538,12 @@ export default function Reception() {
                     <div>
                       <span style={{ fontWeight: 600, fontSize: '13px' }}>{lot.articleLabel}</span>
                       <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                        {champsInv.filter(c => lot.champsCommuns[c.id]).map(c => `${c.label} : ${lot.champsCommuns[c.id]}`).join(' Â· ')}
+                        {champsInv.filter(c => lot.champsCommuns[c.id]).map(c => `${c.label} : ${lot.champsCommuns[c.id]}`).join(' · ')}
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '12px', background: '#e0e7ff', color: '#3730a3', borderRadius: '4px', padding: '2px 8px' }}>
-                        {lot.modesuivi === 'QTE' ? `${lot.quantite} unitÃ©${lot.quantite > 1 ? 's' : ''}` : `${lot.lignes.length} S/N`}
+                        {lot.modesuivi === 'QTE' ? `${lot.quantite} unité${lot.quantite > 1 ? 's' : ''}` : `${lot.lignes.length} S/N`}
                       </span>
                       <button onClick={() => setLotsEnAttente(prev => prev.filter((_, i) => i !== idx))}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db' }}>
@@ -558,7 +558,7 @@ export default function Reception() {
                           <tr key={l.sn} style={{ borderBottom: i < lot.lignes.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
                             <td style={{ padding: '4px 14px', fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8' }}>{l.sn}</td>
                             <td style={{ padding: '4px 14px', color: '#6b7280' }}>
-                              {l.accessoiresLabels.length > 0 ? l.accessoiresLabels.join(', ') : <span style={{ color: '#d1d5db' }}>â€”</span>}
+                              {l.accessoiresLabels.length > 0 ? l.accessoiresLabels.join(', ') : <span style={{ color: '#d1d5db' }}>—</span>}
                             </td>
                           </tr>
                         ))}
@@ -574,7 +574,7 @@ export default function Reception() {
               )}
               <button className="btn btn-primary" style={{ width: '100%', fontSize: '15px', padding: '12px' }} onClick={() => setShowConfirmation(true)}>
                 <CheckCircle size={17} style={{ marginRight: '8px' }} />
-                Valider la rÃ©ception
+                Valider la réception
               </button>
             </>
           )}
@@ -582,37 +582,37 @@ export default function Reception() {
       </div>
     </div>
 
-    {/* Modal alerte S/N dÃ©jÃ  en inventaire */}
+    {/* Modal alerte S/N déjà en inventaire */}
     {alerteSN && (
       <div className="modal-overlay" onClick={() => { setAlerteSN(null); snInputRef.current?.focus() }}>
         <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '32px', maxWidth: '420px', width: '100%', textAlign: 'center', border: '3px solid #dc2626' }}
           onClick={e => e.stopPropagation()}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>âš ï¸</div>
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N dÃ©jÃ  en inventaire !</h3>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N déjà en inventaire !</h3>
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N est actuellement en cours de traitement.</p>
           <code style={{ display: 'block', background: '#fee2e2', color: '#dc2626', padding: '8px 16px', borderRadius: '6px', fontWeight: 700, fontSize: '16px', marginBottom: '12px' }}>
             {alerteSN.sn}
           </code>
           {alerteSN.statut && <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '4px' }}>Statut actuel : <strong>{alerteSN.statut}</strong></p>}
           {alerteSN.rma && <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>RMA : <strong>{alerteSN.rma}</strong></p>}
-          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '20px' }}>Ce S/N n'a pas Ã©tÃ© ajoutÃ© Ã  la rÃ©ception en cours.</p>
+          <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '20px' }}>Ce S/N n'a pas été ajouté à la réception en cours.</p>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setAlerteSN(null); snInputRef.current?.focus() }}>
-            OK â€” Continuer
+            OK — Continuer
           </button>
         </div>
       </div>
     )}
 
-    {/* Modal confirmation rÃ©ception */}
+    {/* Modal confirmation réception */}
     {showConfirmation && (
       <div className="modal-overlay">
         <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la rÃ©ception en stock ?</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Confirmer la réception en stock ?</h3>
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>
-            <strong>{lotsEnAttente.reduce((acc, l) => acc + (l.modesuivi === 'QTE' ? l.quantite : l.lignes.length), 0)} produit{lotsEnAttente.reduce((acc, l) => acc + l.lignes.length, 0) !== 1 ? 's' : ''}</strong> vont Ãªtre enregistrÃ©s dans l'inventaire.
+            <strong>{lotsEnAttente.reduce((acc, l) => acc + (l.modesuivi === 'QTE' ? l.quantite : l.lignes.length), 0)} produit{lotsEnAttente.reduce((acc, l) => acc + l.lignes.length, 0) !== 1 ? 's' : ''}</strong> vont être enregistrés dans l'inventaire.
           </p>
           <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '20px' }}>
-            Si vous confirmez, tous les formulaires seront vidÃ©s.
+            Si vous confirmez, tous les formulaires seront vidés.
           </p>
           {erreur && <div style={{ padding: '8px', background: '#fee2e2', borderRadius: '6px', color: '#dc2626', fontSize: '13px', marginBottom: '12px' }}>{erreur}</div>}
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -627,4 +627,3 @@ export default function Reception() {
     </>
   )
 }
-

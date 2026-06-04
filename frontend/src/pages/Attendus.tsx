@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Upload, FileText, Lock, Clock, Trash2 } from 'lucide-react'
 import { attendusApi } from '../api/attendus'
@@ -83,11 +83,11 @@ export default function Attendus() {
   function getClientLabel(cl: any): string { return getEntiteLabel(cl, champsClients) }
 
   function getDonneeLabel(attendu: Attendu): string {
-    // Afficher les premiÃ¨res valeurs des donneesCommunes pour la liste
+    // Afficher les premières valeurs des donneesCommunes pour la liste
     if (!attendu.donneesCommunes) return ''
     try {
       const d = JSON.parse(attendu.donneesCommunes)
-      return Object.values(d).filter(Boolean).slice(0, 2).join(' Â· ')
+      return Object.values(d).filter(Boolean).slice(0, 2).join(' · ')
     } catch { return '' }
   }
 
@@ -138,7 +138,7 @@ export default function Attendus() {
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
           <FileText size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
           <p style={{ fontWeight: 500, marginBottom: '8px' }}>Aucun attendu</p>
-          <p style={{ fontSize: '13px' }}>Importez un fichier Excel client pour dÃ©marrer</p>
+          <p style={{ fontSize: '13px' }}>Importez un fichier Excel client pour démarrer</p>
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -156,17 +156,17 @@ export default function Attendus() {
             </thead>
             <tbody>
               {attendus.map((a, idx) => (
-                <tr key={a.id} style={{ background: idx % 2 === 0 ? '#1a1d27' : '#141720', cursor: 'pointer' }}
+                <tr key={a.id} style={{ background: idx % 2 === 0 ? 'white' : '#e8f0fe', cursor: 'pointer' }}
                   onClick={() => navigate(`/attendus/${a.id}`)}>
                   <td>
                     {a.statut === 'CLOS'
-                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#64748b', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> ClÃ´turÃ©</span>
+                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#64748b', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>
                       : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', padding: '2px 8px', borderRadius: '4px' }}><Clock size={11} /> En cours</span>
                     }
                   </td>
-                  <td style={{ fontWeight: 500 }}>{a.rma || <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
-                  <td>{a.bt || <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
-                  <td>{a.client || <span style={{ color: '#d1d5db' }}>â€”</span>}</td>
+                  <td style={{ fontWeight: 500 }}>{a.rma || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  <td>{a.bt || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  <td>{a.client || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   <td><span style={{ background: '#1e3a5f', color: '#2563eb', borderRadius: '4px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{a._count.lignes}</span></td>
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>{new Date(a.createdAt).toLocaleDateString('fr-FR')}</td>
                   <td onClick={e => e.stopPropagation()}>
@@ -189,7 +189,7 @@ export default function Attendus() {
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Supprimer l'attendu ?</h3>
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
-              L'attendu <strong>{modalDelete.rma || `#${modalDelete.id}`}</strong> et toutes ses lignes seront dÃ©finitivement supprimÃ©s.
+              L'attendu <strong>{modalDelete.rma || `#${modalDelete.id}`}</strong> et toutes ses lignes seront définitivement supprimés.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModalDelete(null)}>Annuler</button>
@@ -203,10 +203,10 @@ export default function Attendus() {
       {showImport && (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Nouvel attendu â€” Import Excel</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Nouvel attendu — Import Excel</h3>
             <form onSubmit={handleImport}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* Champs inventaire configurÃ©s */}
+                {/* Champs inventaire configurés */}
                 {configChamps.filter(cc => cc.visible).map(cc => {
                   const champ = champsInv.find(c => c.code === cc.code)
                   if (!champ) return null
@@ -218,17 +218,17 @@ export default function Attendus() {
                       <label className="form-label">{champ.label}{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
                       {isClient ? (
                         <select required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))}>
-                          <option value="">â€” Choisir un client â€”</option>
+                          <option value="">— Choisir un client —</option>
                           {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
                         </select>
                       ) : isPlateforme ? (
                         <select required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))}>
-                          <option value="">â€” Choisir une plateforme â€”</option>
+                          <option value="">— Choisir une plateforme —</option>
                           {plateformes.map(pl => <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>{getEntiteLabel(pl, champsPlateformes)}</option>)}
                         </select>
                       ) : champ.type === 'SELECT' ? (
                         <select required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))}>
-                          <option value="">â€” Choisir â€”</option>
+                          <option value="">— Choisir —</option>
                           {opts.map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
                       ) : (champ.type === 'DATE' || champ.type === 'DATE_TODAY') ? (
@@ -253,7 +253,7 @@ export default function Attendus() {
                   <Upload size={24} style={{ margin: '0 auto 8px', color: '#2563eb' }} />
                   {fichier
                     ? <p style={{ color: '#2563eb', fontWeight: 500, fontSize: '13px' }}>{fichier.name}</p>
-                    : <p style={{ color: '#9ca3af', fontSize: '13px' }}>Cliquez pour sÃ©lectionner le fichier Excel client</p>
+                    : <p style={{ color: '#9ca3af', fontSize: '13px' }}>Cliquez pour sélectionner le fichier Excel client</p>
                   }
                 </div>
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
@@ -279,4 +279,3 @@ export default function Attendus() {
     </div>
   )
 }
-

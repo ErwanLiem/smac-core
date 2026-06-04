@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Warehouse } from 'lucide-react'
 import { post } from '../api/client'
@@ -48,7 +48,7 @@ export default function Login() {
             <Warehouse size={32} color="white" />
           </div>
           <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#111827', marginBottom: '4px' }}>SMAC</h1>
-          <p style={{ color: '#6b7280' }}>Gestion industrielle â€” Vallery</p>
+          <p style={{ color: '#6b7280' }}>Gestion industrielle — Vallery</p>
         </div>
 
         {/* Formulaire */}
@@ -75,7 +75,7 @@ export default function Login() {
                 value={motDePasse}
                 onChange={e => setMotDePasse(e.target.value)}
                 className="form-input"
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="••••••••"
                 required
               />
             </div>
@@ -99,4 +99,3 @@ export default function Login() {
     </div>
   )
 }
-
