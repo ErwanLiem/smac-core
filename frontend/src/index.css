@@ -265,15 +265,6 @@ body {
 .form-input::placeholder { color: #475569; }
 select.form-input option { background: #1a1d27; color: #e2e8f0; }
 
-/* Champ date dark theme */
-input[type="date"] {
-  background-color: #141720 !important;
-  color: #e2e8f0 !important;
-}
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: brightness(0) invert(1) opacity(0.5);
-  cursor: pointer;
-}
 
 /* Sélecteurs de date en dark theme */
 input[type="date"],
