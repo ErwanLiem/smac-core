@@ -555,7 +555,7 @@ export default function AttendusDetail() {
                     {lignesPNActif.map((l, i) => {
                       const accs: string[] = l.accessoires ? (() => { try { return JSON.parse(l.accessoires) } catch { return [] } })() : []
                       return (
-                        <tr key={l.id} style={{ borderTop: '1px solid #f3f4f6', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
+                        <tr key={l.id} style={{ borderTop: '1px solid #f3f4f6', background: i % 2 === 0 ? '#1a1d27' : '#141720' }}>
                           <td style={{ padding: '6px 14px', fontFamily: 'monospace', fontWeight: l.statut === 'RECU' ? 600 : 400, color: l.statut === 'RECU' ? '#1d4ed8' : '#374151' }}>{l.sn}</td>
                           <td style={{ padding: '6px 14px', color: '#6b7280' }}>{l.garantie || '—'}</td>
                           <td style={{ padding: '6px 14px', color: '#6b7280', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.panneClient || '—'}</td>

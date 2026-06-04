@@ -469,7 +469,7 @@ export default function Reception() {
                       </thead>
                       <tbody>
                         {lignesSN.map((l, i) => (
-                          <tr key={l.sn} style={{ borderBottom: i < lignesSN.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
+                          <tr key={l.sn} style={{ borderBottom: i < lignesSN.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? '#1a1d27' : '#141720' }}>
                             <td style={{ padding: '5px 10px', fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8' }}>{l.sn}</td>
                             <td style={{ padding: '3px 6px' }}>
                               <input className="form-input" placeholder="Panne déclarée..."
@@ -555,7 +555,7 @@ export default function Reception() {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                       <tbody>
                         {lot.lignes.map((l, i) => (
-                          <tr key={l.sn} style={{ borderBottom: i < lot.lignes.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
+                          <tr key={l.sn} style={{ borderBottom: i < lot.lignes.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? '#1a1d27' : '#141720' }}>
                             <td style={{ padding: '4px 14px', fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8' }}>{l.sn}</td>
                             <td style={{ padding: '4px 14px', color: '#6b7280' }}>
                               {l.accessoiresLabels.length > 0 ? l.accessoiresLabels.join(', ') : <span style={{ color: '#d1d5db' }}>—</span>}

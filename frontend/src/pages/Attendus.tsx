@@ -156,7 +156,7 @@ export default function Attendus() {
             </thead>
             <tbody>
               {attendus.map((a, idx) => (
-                <tr key={a.id} style={{ background: idx % 2 === 0 ? 'white' : '#e8f0fe', cursor: 'pointer' }}
+                <tr key={a.id} style={{ background: idx % 2 === 0 ? '#1a1d27' : '#141720', cursor: 'pointer' }}
                   onClick={() => navigate(`/attendus/${a.id}`)}>
                   <td>
                     {a.statut === 'CLOS'

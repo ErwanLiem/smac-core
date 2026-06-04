@@ -316,7 +316,7 @@ export default function Inventaire() {
                 </td></tr>
               )}
               {filteredInventaires.map((item, idx) => (
-                <tr key={item.id} style={{ background: selection.has(item.id) ? '#dbeafe' : idx % 2 === 0 ? 'white' : '#e8f0fe' }}>
+                <tr key={item.id} style={{ background: selection.has(item.id) ? '#dbeafe' : idx % 2 === 0 ? '#1a1d27' : '#141720' }}>
                   <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                     <input type="checkbox"
                       checked={selection.has(item.id)}
