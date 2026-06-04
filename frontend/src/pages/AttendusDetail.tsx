@@ -54,8 +54,8 @@ export default function AttendusDetail() {
   const [articlesAccessoires, setArticlesAccessoires] = useState<ArticleAccessoire[]>([])
   const [pnActif, setPnActif] = useState<string | null>(null)
   const [snSaisie, setSnSaisie] = useState('')
-  const [accessoiresCochés, setAccessoiresCochés] = useState<number[]>([])
   const [dernierScan, setDernierScan] = useState<{ resultat: string; pn?: string } | null>(null)
+  const [accessoiresParLigne, setAccessoiresParLigne] = useState<Record<number, number[]>>({})
   const [showRapport, setShowRapport] = useState(false)
   const [rapport, setRapport] = useState<Rapport | null>(null)
   const [showCloturer, setShowCloturer] = useState(false)
@@ -75,6 +75,17 @@ export default function AttendusDetail() {
     setAttendu(data)
     setRma(data.rma || '')
     setBt(data.bt || '')
+    // Initialiser les accessoires cochés depuis les données existantes
+    const accMap: Record<number, number[]> = {}
+    data.lignes.forEach((l: Ligne) => {
+      if (l.accessoires) {
+        try {
+          const labels: string[] = JSON.parse(l.accessoires)
+          // sera recalculé après chargement des articles
+          accMap[l.id] = labels as any
+        } catch {}
+      }
+    })
 
     // Filtrer les articles accessoires (type = ACCESSOIRE)
     const champsTypeIds = champsArts.filter((c: any) =>
@@ -145,21 +156,30 @@ export default function AttendusDetail() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          sn: snSaisie.trim(),
-          pn: pnActif,
-          accessoires: accessoiresCochés.map(aid => articlesAccessoires.find(a => a.id === aid)?.label).filter(Boolean)
-        })
+        body: JSON.stringify({ sn: snSaisie.trim(), pn: pnActif, accessoires: [] })
       })
       const result = await res.json()
       setDernierScan(result)
       setSnSaisie('')
-      setAccessoiresCochés([])
       reload()
     } catch {
       setDernierScan({ resultat: 'ERREUR' })
     }
     snInputRef.current?.focus()
+  }
+
+  async function toggleAccessoireLigne(ligneId: number, accLabel: string, checked: boolean) {
+    const ligne = attendu?.lignes.find(l => l.id === ligneId)
+    if (!ligne) return
+    let accs: string[] = []
+    try { accs = ligne.accessoires ? JSON.parse(ligne.accessoires) : [] } catch {}
+    if (checked) {
+      accs = [...accs, accLabel]
+    } else {
+      accs = accs.filter(a => a !== accLabel)
+    }
+    await attendusApi.updateLigne(ligneId, { accessoires: JSON.stringify(accs) })
+    reload()
   }
 
   async function handleSaveInfos() {
@@ -337,26 +357,6 @@ export default function AttendusDetail() {
                       style={{ marginBottom: '10px' }}
                     />
 
-                    {/* Accessoires */}
-                    {articlesAccessoires.length > 0 && (
-                      <div style={{ marginBottom: '10px' }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', marginBottom: '6px' }}>Accessoires reçus</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                          {articlesAccessoires.map(acc => (
-                            <label key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', background: accessoiresCochés.includes(acc.id) ? '#eff6ff' : '#f9fafb', border: `1px solid ${accessoiresCochés.includes(acc.id) ? '#bfdbfe' : '#e5e7eb'}`, borderRadius: '6px', padding: '4px 10px' }}>
-                              <input type="checkbox"
-                                checked={accessoiresCochés.includes(acc.id)}
-                                onChange={() => setAccessoiresCochés(prev =>
-                                  prev.includes(acc.id) ? prev.filter(id => id !== acc.id) : [...prev, acc.id]
-                                )}
-                              />
-                              {acc.label}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!snSaisie.trim()}>
                       Valider le scan
                     </button>
@@ -390,19 +390,32 @@ export default function AttendusDetail() {
                       <th style={{ padding: '6px 14px', textAlign: 'left', color: '#6b7280', fontWeight: 600 }}>S/N</th>
                       <th style={{ padding: '6px 14px', textAlign: 'left', color: '#6b7280', fontWeight: 600 }}>Garantie</th>
                       <th style={{ padding: '6px 14px', textAlign: 'left', color: '#6b7280', fontWeight: 600 }}>Panne client</th>
-                      <th style={{ padding: '6px 14px', textAlign: 'left', color: '#6b7280', fontWeight: 600 }}>Accessoires</th>
+                      {articlesAccessoires.length > 0 && articlesAccessoires.map(acc => (
+                        <th key={acc.id} style={{ padding: '6px 10px', textAlign: 'center', color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap', fontSize: '11px' }}>{acc.label}</th>
+                      ))}
                       <th style={{ padding: '6px 14px', textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>Statut</th>
                     </tr>
                   </thead>
                   <tbody>
                     {lignesPNActif.map((l, i) => {
-                      const accs = l.accessoires ? (() => { try { return JSON.parse(l.accessoires) } catch { return [] } })() : []
+                      const accs: string[] = l.accessoires ? (() => { try { return JSON.parse(l.accessoires) } catch { return [] } })() : []
                       return (
                         <tr key={l.id} style={{ borderTop: '1px solid #f3f4f6', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
                           <td style={{ padding: '6px 14px', fontFamily: 'monospace', fontWeight: l.statut === 'RECU' ? 600 : 400, color: l.statut === 'RECU' ? '#1d4ed8' : '#374151' }}>{l.sn}</td>
                           <td style={{ padding: '6px 14px', color: '#6b7280' }}>{l.garantie || '—'}</td>
                           <td style={{ padding: '6px 14px', color: '#6b7280', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.panneClient || '—'}</td>
-                          <td style={{ padding: '6px 14px', color: '#6b7280' }}>{accs.length > 0 ? accs.join(', ') : '—'}</td>
+                          {articlesAccessoires.length > 0 && articlesAccessoires.map(acc => (
+                            <td key={acc.id} style={{ padding: '6px 10px', textAlign: 'center' }}>
+                              {l.statut === 'RECU' ? (
+                                <input type="checkbox"
+                                  checked={accs.includes(acc.label)}
+                                  disabled={isClos}
+                                  onChange={e => toggleAccessoireLigne(l.id, acc.label, e.target.checked)}
+                                  style={{ cursor: isClos ? 'default' : 'pointer' }}
+                                />
+                              ) : <span style={{ color: '#e5e7eb' }}>—</span>}
+                            </td>
+                          ))}
                           <td style={{ padding: '6px 14px', textAlign: 'center' }}>
                             {l.statut === 'RECU' && <span style={{ color: '#16a34a', fontSize: '16px' }}>✓</span>}
                             {l.statut === 'ATTENDU' && <span style={{ color: '#d1d5db', fontSize: '16px' }}>○</span>}
