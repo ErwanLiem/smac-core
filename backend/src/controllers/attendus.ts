@@ -422,6 +422,23 @@ export async function cloturer(req: Request, res: Response, next: any) {
     })
     if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
 
+    // ---- Vérifier qu'aucun S/N reçu n'est déjà en inventaire ----
+    const champsInvCheck = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
+    const champSNCheck = champsInvCheck.find(c => ['SN', 'S_N', 'NUMERO_SERIE'].includes(c.code.toUpperCase()))
+    if (champSNCheck) {
+      const lignesRecues = attendu.lignes.filter(l => l.statut === 'RECU')
+      const snsRecus = lignesRecues.map(l => l.sn)
+      const existants = await prisma.valeurChampInventaire.findMany({
+        where: { champId: champSNCheck.id, valeur: { in: snsRecus } }
+      })
+      if (existants.length > 0) {
+        return res.status(400).json({
+          error: `Clôture impossible : ${existants.length} S/N déjà présent${existants.length > 1 ? 's' : ''} en inventaire.`,
+          snsEnDoublon: existants.map(e => e.valeur)
+        })
+      }
+    }
+
     // Marquer les lignes encore ATTENDU comme NON_RECU
     await prisma.ligneAttendue.updateMany({
       where: { attenduId: Number(id), statut: 'ATTENDU' },

@@ -59,6 +59,7 @@ export default function AttendusDetail() {
   const [showRapport, setShowRapport] = useState(false)
   const [rapport, setRapport] = useState<Rapport | null>(null)
   const [showCloturer, setShowCloturer] = useState(false)
+  const [erreurCloture, setErreurCloture] = useState<{ message: string; snsEnDoublon: string[] } | null>(null)
   const [showValider, setShowValider] = useState(false)
   const [validerOk, setValiderOk] = useState<{ lignesInjectees: number; snDoublons?: string[] } | null>(null)
   const [copie, setCopie] = useState(false)
@@ -206,10 +207,17 @@ export default function AttendusDetail() {
     try {
       const result = await attendusApi.cloturer(Number(id))
       setShowCloturer(false)
+      setErreurCloture(null)
       setValiderOk(result)
       reload()
     } catch (e: any) {
-      alert('Erreur : ' + e.message)
+      try {
+        const parsed = JSON.parse(e.message)
+        setErreurCloture({ message: parsed.error, snsEnDoublon: parsed.snsEnDoublon || [] })
+        setShowCloturer(false)
+      } catch {
+        alert('Erreur : ' + e.message)
+      }
     }
   }
 
@@ -564,6 +572,30 @@ export default function AttendusDetail() {
             </div>
           )}
           <button onClick={() => setValiderOk(null)} style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><XCircle size={16} /></button>
+        </div>
+      )}
+
+      {/* Modal erreur clôture */}
+      {erreurCloture && (
+        <div className="modal-overlay">
+          <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '100%' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px', color: '#dc2626' }}>❌ Clôture impossible</h3>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '12px' }}>{erreurCloture.message}</p>
+            {erreurCloture.snsEnDoublon.length > 0 && (
+              <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#dc2626', marginBottom: '6px' }}>S/N concernés :</div>
+                {erreurCloture.snsEnDoublon.map(sn => (
+                  <div key={sn} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#dc2626' }}>· {sn}</div>
+                ))}
+              </div>
+            )}
+            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
+              Supprimez ces S/N de l'inventaire ou contactez un administrateur avant de clôturer.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setErreurCloture(null)}>Fermer</button>
+            </div>
+          </div>
         </div>
       )}
 
