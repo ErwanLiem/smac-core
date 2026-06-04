@@ -60,12 +60,12 @@ interface Article {
   valeurs: { champId: number; valeur: string | null; champ: Champ }[]
 }
 interface Statut { id: number; label: string; couleur: string; code?: string }
-interface LigneSN { sn: string; accessoires: number[] }
+interface LigneSN { sn: string; accessoires: number[]; panneClient: string }
 interface LotPrepare {
   id: number; articleId: number; articleLabel: string
   modesuivi: 'SN' | 'QTE' | 'AUTRE'
   champsCommuns: Record<number, string>
-  lignes: { sn: string; accessoiresIds: number[]; accessoiresLabels: string[] }[]
+  lignes: { sn: string; accessoiresIds: number[]; accessoiresLabels: string[]; panneClient: string }[]
   quantite: number; statut: string | null; statutId: number | null
 }
 
@@ -183,7 +183,7 @@ export default function Reception() {
         return
       }
     } catch {}
-    setLignesSN(prev => [...prev, { sn, accessoires: [] }])
+    setLignesSN(prev => [...prev, { sn, accessoires: [], panneClient: '' }])
     setSnCurrent('')
     snInputRef.current?.focus()
   }
@@ -196,6 +196,10 @@ export default function Reception() {
       const has = l.accessoires.includes(accId)
       return { ...l, accessoires: has ? l.accessoires.filter(id => id !== accId) : [...l.accessoires, accId] }
     }))
+  }
+
+  function updatePanneClient(sn: string, val: string) {
+    setLignesSN(prev => prev.map(l => l.sn === sn ? { ...l, panneClient: val } : l))
   }
 
   // ─── Préparer ─────────────────────────────────────────────────────────────
@@ -221,8 +225,8 @@ export default function Reception() {
       modesuivi: modeSuivi,
       champsCommuns: champsAvecDateToday,
       lignes: modeSuivi === 'SN'
-        ? lignesSN.map(l => ({ sn: l.sn, accessoiresIds: l.accessoires, accessoiresLabels: l.accessoires.map(id => getArticleLabelById(id)) }))
-        : [{ sn: '', accessoiresIds: [], accessoiresLabels: [] }],
+        ? lignesSN.map(l => ({ sn: l.sn, accessoiresIds: l.accessoires, accessoiresLabels: l.accessoires.map(id => getArticleLabelById(id)), panneClient: l.panneClient }))
+        : [{ sn: '', accessoiresIds: [], accessoiresLabels: [], panneClient: '' }],
       quantite,
       statut: statuts.find(s => s.id === statutId)?.label ?? null,
       statutId
@@ -239,6 +243,7 @@ export default function Reception() {
       const idType  = findChampId(champsInv, CODES_TYPE)
       const idSN    = findChampId(champsInv, ['SN', 'S_N', 'NUMERO_SERIE', 'NUMÉRO DE SÉRIE'])
       const idAcc   = findChampId(champsInv, ['ACCESSOIRES', 'ACCESSOIRE'])
+      const idPanne = findChampId(champsInv, ['PANNE_CLIENT', 'PANNE', 'PANNE_DECLARE', 'PANNE_DECLAREE'])
       const idQte   = findChampId(champsInv, ['QUANTITE', 'QTE', 'QUANTITY'])
 
       const inventaireExistant: any[] = await inventaireApi.getAll(siteId)
@@ -273,8 +278,9 @@ export default function Reception() {
         } else {
           for (const ligne of lot.lignes) {
             const valeurs = [...valeursCommunes]
-            if (idSN && ligne.sn) valeurs.push({ champId: idSN, valeur: ligne.sn })
-            if (idAcc && ligne.accessoiresLabels.length > 0) valeurs.push({ champId: idAcc, valeur: ligne.accessoiresLabels.join(', ') })
+            if (idSN && ligne.sn)                            valeurs.push({ champId: idSN,    valeur: ligne.sn })
+            if (idAcc && ligne.accessoiresLabels.length > 0) valeurs.push({ champId: idAcc,   valeur: ligne.accessoiresLabels.join(', ') })
+            if (idPanne && ligne.panneClient)                valeurs.push({ champId: idPanne, valeur: ligne.panneClient })
             await inventaireApi.create(siteId, { articleId: lot.articleId, statutId: lot.statutId, valeurs })
           }
         }
@@ -319,7 +325,6 @@ export default function Reception() {
 
         {/* ── Formulaire gauche ── */}
         <div className="card">
-          <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#111827' }}>Saisie du lot</h2>
           <form onSubmit={infosValidees ? handlePreparer : handleValiderInfos}>
 
             {/* Article — seulement si infos validées */}
@@ -330,8 +335,6 @@ export default function Reception() {
                 <option value={0}>— Choisir un article —</option>
                 {articles.map(a => <option key={a.id} value={a.id}>{getArticleLabel(a)}</option>)}
               </select>
-            </div>
-
             </div>}
 
             {/* Infos article */}
@@ -455,6 +458,7 @@ export default function Reception() {
                       <thead>
                         <tr style={{ background: '#eff6ff' }}>
                           <th style={{ padding: '6px 10px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>S/N ({lignesSN.length})</th>
+                          <th style={{ padding: '6px 10px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}>Panne client</th>
                           {articlesAccessoires.map(acc => (
                             <th key={acc.id} style={{ padding: '6px 8px', textAlign: 'center', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}>
                               {getArticleLabel(acc)}
@@ -467,6 +471,11 @@ export default function Reception() {
                         {lignesSN.map((l, i) => (
                           <tr key={l.sn} style={{ borderBottom: i < lignesSN.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? 'white' : '#fafafa' }}>
                             <td style={{ padding: '5px 10px', fontFamily: 'monospace', fontWeight: 600, color: '#1d4ed8' }}>{l.sn}</td>
+                            <td style={{ padding: '3px 6px' }}>
+                              <input className="form-input" placeholder="Panne déclarée..."
+                                value={l.panneClient} onChange={e => updatePanneClient(l.sn, e.target.value)}
+                                style={{ fontSize: '12px', padding: '3px 6px', minWidth: '120px' }} />
+                            </td>
                             {articlesAccessoires.map(acc => (
                               <td key={acc.id} style={{ padding: '5px 8px', textAlign: 'center' }}>
                                 <input type="checkbox" checked={l.accessoires.includes(acc.id)}
@@ -516,11 +525,6 @@ export default function Reception() {
             )}
           </div>
 
-          {valide && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', color: '#16a34a', fontSize: '14px', marginBottom: '16px' }}>
-              <CheckCircle size={18} /> Réception validée et enregistrée dans l'inventaire !
-            </div>
-          )}
 
           {lotsEnAttente.length === 0 ? (
             <p style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center', padding: '48px 0' }}>
