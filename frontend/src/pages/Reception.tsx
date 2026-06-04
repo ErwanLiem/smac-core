@@ -454,7 +454,7 @@ export default function Reception() {
                 </div>
                 {lignesSN.length > 0 && (
                   <div style={{ border: '1px solid #2d3148', borderRadius: '6px', overflow: 'hidden', marginBottom: '12px' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <table className="table">
                       <thead>
                         <tr style={{ background: '#1e3a5f' }}>
                           <th style={{ padding: '6px 10px', textAlign: 'left', color: '#2563eb', fontWeight: 600, borderBottom: '1px solid #bfdbfe' }}>S/N ({lignesSN.length})</th>
@@ -552,7 +552,7 @@ export default function Reception() {
                     </div>
                   </div>
                   {lot.modesuivi !== 'QTE' && lot.lignes.length > 0 && (
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <table className="table">
                       <tbody>
                         {lot.lignes.map((l, i) => (
                           <tr key={l.sn} style={{ borderBottom: i < lot.lignes.length - 1 ? '1px solid #f3f4f6' : 'none', background: i % 2 === 0 ? '#1a1d27' : '#141720' }}>

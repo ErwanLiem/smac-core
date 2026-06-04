@@ -539,7 +539,7 @@ export default function AttendusDetail() {
                     {lignesPNActif.filter(l => l.statut === 'RECU').length}/{lignesPNActif.length}
                   </span>
                 </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <table className="table">
                   <thead>
                     <tr style={{ background: '#141720' }}>
                       <th style={{ padding: '6px 14px', textAlign: 'left', color: '#6b7280', fontWeight: 600 }}>S/N</th>
