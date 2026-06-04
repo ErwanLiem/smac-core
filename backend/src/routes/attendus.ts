@@ -13,7 +13,6 @@ router.put('/:id', ctrl.update)
 router.post('/:id/scanner', ctrl.scannerSN)
 router.put('/ligne/:id', ctrl.updateLigne)
 router.post('/ligne/:id/descanner', ctrl.descanner)
-router.post('/:id/valider', ctrl.valider)
 router.post('/:id/cloturer', ctrl.cloturer)
 router.get('/:id/rapport', ctrl.rapport)
 
