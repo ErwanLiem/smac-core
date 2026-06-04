@@ -81,6 +81,47 @@ export async function importExcel(req: Request, res: Response, next: any) {
       return res.status(400).json({ error: 'Colonnes Serial Number / Part Number introuvables' })
     }
 
+    // Extraire les lignes d'abord pour vérifier les PN
+    const lignesRaw: any[] = []
+    for (let i = headerRowIdx + 1; i < data.length; i++) {
+      const row = data[i]
+      if (!row || !row[iSN] || !row[iPN]) continue
+      const sn = String(row[iSN]).trim()
+      const pn = String(row[iPN]).trim()
+      if (!sn || !pn) continue
+      lignesRaw.push({
+        sn, pn,
+        panneClient: iPanne !== -1 && row[iPanne] ? String(row[iPanne]).trim() : null,
+        garantie:    iGarantie !== -1 && row[iGarantie] ? String(row[iGarantie]).trim() : null,
+      })
+    }
+
+    // Vérifier que tous les PN existent dans le catalogue articles
+    const pnsUniques = [...new Set(lignesRaw.map(l => l.pn))]
+    const champsPNArt = await prisma.champArticle.findMany({
+      where: { siteId: Number(siteId) }
+    })
+    const champsPNIds = champsPNArt
+      .filter(c => ['PN', 'P_N', 'PART_NUMBER', 'PART_NO'].includes(c.code.toUpperCase()))
+      .map(c => c.id)
+
+    const articlesExistants = await prisma.article.findMany({
+      where: { siteId: Number(siteId) },
+      include: { valeurs: { where: { champId: { in: champsPNIds } } } }
+    })
+    const pnsCatalogue = new Set(
+      articlesExistants.flatMap(a => a.valeurs.map(v => v.valeur)).filter(Boolean)
+    )
+
+    const pnsInconnus = pnsUniques.filter(pn => !pnsCatalogue.has(pn))
+    if (pnsInconnus.length > 0) {
+      fs.unlinkSync(file.path)
+      return res.status(400).json({
+        error: `Les P/N suivants n'existent pas dans le catalogue articles : ${pnsInconnus.join(', ')}`,
+        pnsInconnus
+      })
+    }
+
     // Créer l'attendu
     const attendu = await prisma.attendu.create({
       data: {
@@ -92,25 +133,7 @@ export async function importExcel(req: Request, res: Response, next: any) {
       }
     })
 
-    // Importer les lignes (à partir de la ligne après les headers)
-    const lignes: any[] = []
-    for (let i = headerRowIdx + 1; i < data.length; i++) {
-      const row = data[i]
-      if (!row || !row[iSN] || !row[iPN]) continue
-      const sn = String(row[iSN]).trim()
-      const pn = String(row[iPN]).trim()
-      if (!sn || !pn || sn === '' || pn === '') continue
-
-      lignes.push({
-        attenduId: attendu.id,
-        sn,
-        pn,
-        panneClient: iPanne !== -1 && row[iPanne] ? String(row[iPanne]).trim() : null,
-        garantie:    iGarantie !== -1 && row[iGarantie] ? String(row[iGarantie]).trim() : null,
-        statut: 'ATTENDU'
-      })
-    }
-
+    const lignes = lignesRaw.map(l => ({ ...l, attenduId: attendu.id, statut: 'ATTENDU' }))
     await prisma.ligneAttendue.createMany({ data: lignes })
 
     // Nettoyer le fichier temporaire
@@ -239,26 +262,88 @@ export async function valider(req: Request, res: Response, next: any) {
       }
     })
 
+    // Charger les articles du site pour trouver par PN
+    const champsPNArticle = await prisma.champArticle.findMany({
+      where: { siteId: attendu.siteId, code: { in: ['PN', 'P_N', 'PART_NUMBER', 'PART_NO'] } }
+    })
+    const articlesAvecValeurs = await prisma.article.findMany({
+      where: { siteId: attendu.siteId },
+      include: { valeurs: true }
+    })
+
+    function trouverArticleParPN(pn: string): number | null {
+      if (!pn || !champsPNArticle.length) return null
+      const champIds = champsPNArticle.map(c => c.id)
+      const art = articlesAvecValeurs.find(a =>
+        a.valeurs.some(v => champIds.includes(v.champId) && v.valeur === pn)
+      )
+      return art?.id ?? null
+    }
+
+    // Charger les champs de l'article pour auto-remplissage
+    const champsArticle = await prisma.champArticle.findMany({
+      where: { siteId: attendu.siteId, actif: true }
+    })
+
+    // Vérifier les S/N déjà en inventaire
+    const idSNInv = champsInv.find(c => ['SN', 'S_N', 'NUMERO_SERIE', 'NUMÉRO DE SÉRIE'].some(code =>
+      c.code.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '') === code.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    ))?.id
+
+    const snsExistants = idSNInv ? await prisma.valeurChampInventaire.findMany({
+      where: { champId: idSNInv }
+    }) : []
+    const snsDejaPresents = new Set(snsExistants.map(v => v.valeur))
+
     // Injecter les lignes RECU dans l'inventaire
     const lignesRecues = attendu.lignes.filter(l => l.statut === 'RECU')
+    const snDoublons: string[] = []
 
     for (const ligne of lignesRecues) {
+      // Vérifier doublon S/N
+      if (idSNInv && snsDejaPresents.has(ligne.sn)) {
+        snDoublons.push(ligne.sn)
+        continue
+      }
+
+      const articleId = trouverArticleParPN(ligne.pn)
+      const article = articlesAvecValeurs.find(a => a.id === articleId)
+
       const valeurs: { champId: number; valeur: string }[] = []
-      if (idSN && ligne.sn)          valeurs.push({ champId: idSN, valeur: ligne.sn })
-      if (idPN && ligne.pn)          valeurs.push({ champId: idPN, valeur: ligne.pn })
-      if (idGarantie && ligne.garantie) valeurs.push({ champId: idGarantie, valeur: ligne.garantie })
+
+      // Auto-remplir depuis l'article
+      if (article) {
+        for (const valArt of article.valeurs) {
+          const champArt = champsArticle.find(c => c.id === valArt.champId)
+          if (!champArt || !valArt.valeur) continue
+          // Trouver le champ inventaire correspondant au même code
+          const champInvCorr = champsInv.find(c =>
+            c.code.toUpperCase() === champArt.code.toUpperCase()
+          )
+          if (champInvCorr) valeurs.push({ champId: champInvCorr.id, valeur: valArt.valeur })
+        }
+      }
+
+      // Champs spécifiques à la réception
+      if (idSN && ligne.sn)                  valeurs.push({ champId: idSN, valeur: ligne.sn })
+      if (idPN && ligne.pn)                  valeurs.push({ champId: idPN, valeur: ligne.pn })
+      if (idGarantie && ligne.garantie)      valeurs.push({ champId: idGarantie, valeur: ligne.garantie })
       if (idPanneClient && ligne.panneClient) valeurs.push({ champId: idPanneClient, valeur: ligne.panneClient })
-      if (idBL && attendu.rma)       valeurs.push({ champId: idBL, valeur: attendu.rma })
-      if (idBT && attendu.bt)        valeurs.push({ champId: idBT, valeur: attendu.bt })
+      if (idBL && attendu.rma)               valeurs.push({ champId: idBL, valeur: attendu.rma })
+      if (idBT && attendu.bt)                valeurs.push({ champId: idBT, valeur: attendu.bt })
 
       await prisma.inventaire.create({
         data: {
           siteId: attendu.siteId,
-          articleId: 1, // À adapter selon la logique article
+          articleId: articleId,
           statutId: statutStock?.id ?? null,
           valeurs: { create: valeurs }
         }
       })
+    }
+
+    if (snDoublons.length > 0) {
+      return res.json({ success: true, lignesInjectees: lignesRecues.length - snDoublons.length, snDoublons })
     }
 
     await logActivite({

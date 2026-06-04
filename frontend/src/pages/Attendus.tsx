@@ -73,7 +73,10 @@ export default function Attendus() {
       reload()
       navigate(`/attendus/${result.id}`)
     } catch (e: any) {
-      try { setErreur(JSON.parse(e.message)?.error ?? 'Erreur import') } catch { setErreur('Erreur import') }
+      try {
+        const parsed = JSON.parse(e.message)
+        setErreur(parsed?.error ?? 'Erreur import')
+      } catch { setErreur('Erreur import') }
     } finally {
       setLoading(false)
     }

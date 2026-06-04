@@ -59,6 +59,8 @@ export default function AttendusDetail() {
   const [showRapport, setShowRapport] = useState(false)
   const [rapport, setRapport] = useState<Rapport | null>(null)
   const [showCloturer, setShowCloturer] = useState(false)
+  const [showValider, setShowValider] = useState(false)
+  const [validerOk, setValiderOk] = useState<{ lignesInjectees: number; snDoublons?: string[] } | null>(null)
   const [copie, setCopie] = useState(false)
   const [editInfos, setEditInfos] = useState(false)
   const [rma, setRma] = useState('')
@@ -137,8 +139,7 @@ export default function AttendusDetail() {
       })
       setDernierScan(result)
       setSnSaisie('')
-      setAccessoiresCochés([])
-      reload()
+            reload()
     } catch {
       setDernierScan({ resultat: 'ERREUR' })
     }
@@ -189,8 +190,14 @@ export default function AttendusDetail() {
   }
 
   async function handleValider() {
-    await attendusApi.valider(Number(id))
-    reload()
+    try {
+      const result = await attendusApi.valider(Number(id))
+      setValiderOk(result)
+      setShowValider(false)
+      reload()
+    } catch (e: any) {
+      alert('Erreur lors de la validation : ' + e.message)
+    }
   }
 
   async function handleCloturer() {
@@ -267,7 +274,7 @@ export default function AttendusDetail() {
           <button className="btn btn-secondary" onClick={handleRapport}>Rapport d'écart</button>
           {!isClos && (
             <>
-              <button className="btn btn-primary" onClick={handleValider}>✓ Valider → Inventaire</button>
+              <button className="btn btn-primary" onClick={() => setShowValider(true)}>✓ Valider → Inventaire</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => setShowCloturer(true)}>
                 <Lock size={14} /> Clôturer
               </button>
@@ -489,6 +496,41 @@ export default function AttendusDetail() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal valider */}
+      {showValider && (
+        <div className="modal-overlay">
+          <div style={{ background: 'white', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Valider la réception ?</h3>
+            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>
+              Les <strong>{attendu.lignes.filter(l => l.statut === 'RECU').length} S/N reçus</strong> vont être injectés dans l'inventaire avec le statut "En stock".
+            </p>
+            <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '20px' }}>
+              ℹ️ Vous pourrez continuer à scanner après validation.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setShowValider(false)}>Annuler</button>
+              <button className="btn btn-primary" onClick={handleValider}>✓ Confirmer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Succès validation */}
+      {validerOk && (
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px 20px', maxWidth: '400px', zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#16a34a', fontWeight: 600, marginBottom: validerOk.snDoublons?.length ? '8px' : 0 }}>
+            <CheckCircle size={20} />
+            {validerOk.lignesInjectees} ligne{validerOk.lignesInjectees !== 1 ? 's' : ''} injectée{validerOk.lignesInjectees !== 1 ? 's' : ''} dans l'inventaire
+          </div>
+          {validerOk.snDoublons && validerOk.snDoublons.length > 0 && (
+            <div style={{ fontSize: '12px', color: '#f59e0b', borderTop: '1px solid #f3f4f6', paddingTop: '8px' }}>
+              ⚠️ {validerOk.snDoublons.length} S/N déjà présent{validerOk.snDoublons.length > 1 ? 's' : ''} ignoré{validerOk.snDoublons.length > 1 ? 's' : ''} : {validerOk.snDoublons.join(', ')}
+            </div>
+          )}
+          <button onClick={() => setValiderOk(null)} style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><XCircle size={16} /></button>
         </div>
       )}
 

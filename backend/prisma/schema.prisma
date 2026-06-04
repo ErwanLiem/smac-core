@@ -138,12 +138,12 @@ model valeurChampPlateforme {
 model inventaire {
   id               Int                @id @default(autoincrement())
   siteId           Int
-  articleId        Int
+  articleId        Int?
   statutId         Int?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   site             site               @relation(fields: [siteId], references: [id], map: "Inventaire_siteId_fkey")
-  article          article            @relation(fields: [articleId], references: [id], map: "Inventaire_articleId_fkey")
+  article          article?           @relation(fields: [articleId], references: [id], map: "Inventaire_articleId_fkey")
   statut           statut?            @relation(fields: [statutId], references: [id], onDelete: Cascade, map: "Inventaire_statutId_fkey")
   valeurs          valeurChampInventaire[]
 
