@@ -412,7 +412,7 @@ export default function AttendusDetail() {
                     </button>
                   </form>
 
-                  {dernierScan && (
+                  {dernierScan && dernierScan.resultat !== 'DEJA_SCANNE' && (
                     <div style={{
                       marginTop: '10px', padding: '10px 14px', borderRadius: '8px', fontSize: '13px',
                       background: dernierScan.resultat === 'RECU' && !dernierScan.dejaEnInventaire ? '#dcfce7'
@@ -435,12 +435,7 @@ export default function AttendusDetail() {
                           <div style={{ marginTop: '4px', fontSize: '12px' }}>⚠️ Ce S/N est déjà présent en inventaire — il sera ignoré à la clôture</div>
                         </div>
                       )}
-                      {dernierScan.resultat === 'DEJA_SCANNE' && (
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><XCircle size={14} /> S/N déjà scanné dans cet attendu — ajouté en doublon au rapport</div>
-                          {dernierScan.dejaEnInventaire && <div style={{ marginTop: '4px', fontSize: '12px' }}>⚠️ Ce S/N est également déjà présent en inventaire</div>}
-                        </div>
-                      )}
+                      {dernierScan.resultat === 'DEJA_SCANNE' && null}
                       {dernierScan.resultat === 'INATTENDU' && (
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} /> S/N non attendu pour ce P/N — ajouté au rapport</div>

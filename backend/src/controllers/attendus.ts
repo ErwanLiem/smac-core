@@ -17,6 +17,20 @@ function normalize(s: string): string {
   return String(s ?? '').toLowerCase().trim()
 }
 
+const CODES_SN = ['SN', 'S_N', 'SERIAL', 'NUMERO_SERIE', 'NUMERO DE SERIE', 'NUMERODE SERIE', 'SERIAL_NUMBER']
+
+function normalizeCode(code: string): string {
+  return code.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+}
+
+function findChampSN(champs: any[]): any | null {
+  return champs.find(c => {
+    const norm = normalizeCode(c.code).replace(/\s+/g, '_')
+    const normSpace = normalizeCode(c.code).replace(/_/g, ' ')
+    return CODES_SN.includes(norm) || CODES_SN.includes(normSpace) || CODES_SN.includes(normalizeCode(c.code))
+  }) ?? null
+}
+
 function findCol(headers: string[], candidates: string[]): number {
   return headers.findIndex(h => candidates.some(c => normalize(h).includes(normalize(c))))
 }
@@ -204,7 +218,7 @@ export async function scannerSN(req: Request, res: Response, next: any) {
 
     // Vérifier si le S/N est déjà en inventaire BDD
     const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
-    const champSN = champsInv.find(c => ['SN', 'S_N', 'NUMERO_SERIE'].includes(c.code.toUpperCase()))
+    const champSN = findChampSN(champsInv)
     let dejaEnInventaire = false
     if (champSN) {
       const existing = await prisma.valeurChampInventaire.findFirst({
