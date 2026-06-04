@@ -224,20 +224,20 @@ export async function scannerSN(req: Request, res: Response, next: any) {
       // Vérifier si déjà scanné dans cet attendu (statut RECU)
       const dejaScanne = attendu.lignes.find(l => l.sn === snNorm && l.statut === 'RECU')
 
-      // Créer une ligne INATTENDU dans tous les cas (rapport d'écart)
-      await prisma.ligneAttendue.create({
-        data: {
-          attenduId: Number(id),
-          sn: snNorm,
-          pn: pn || 'INCONNU',
-          statut: 'INATTENDU',
-          accessoires: accessoiresJson
-        }
-      })
-
       if (dejaScanne) {
+        // Pas de ligne INATTENDU — juste un retour info
         res.json({ resultat: 'DEJA_SCANNE', pn: dejaScanne.pn, dejaEnInventaire })
       } else {
+        // S/N vraiment inattendu → créer une ligne
+        await prisma.ligneAttendue.create({
+          data: {
+            attenduId: Number(id),
+            sn: snNorm,
+            pn: pn || 'INCONNU',
+            statut: 'INATTENDU',
+            accessoires: accessoiresJson
+          }
+        })
         res.json({ resultat: 'INATTENDU', dejaEnInventaire })
       }
     }

@@ -55,6 +55,7 @@ export default function AttendusDetail() {
   const [pnActif, setPnActif] = useState<string | null>(null)
   const [snSaisie, setSnSaisie] = useState('')
   const [dernierScan, setDernierScan] = useState<{ resultat: string; pn?: string; dejaEnInventaire?: boolean; sn?: string } | null>(null)
+  const [alerteScan, setAlerteScan] = useState<{ type: 'DEJA_SCANNE' | 'DEJA_INVENTAIRE'; sn: string; pn?: string } | null>(null)
   const [accessoiresParLigne, setAccessoiresParLigne] = useState<Record<number, number[]>>({})
   const [showRapport, setShowRapport] = useState(false)
   const [rapport, setRapport] = useState<Rapport | null>(null)
@@ -150,6 +151,23 @@ export default function AttendusDetail() {
   }
 
   // Scan direct via l'API correcte
+  function jouerSonAlerte() {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const oscillator = ctx.createOscillator()
+      const gain = ctx.createGain()
+      oscillator.connect(gain)
+      gain.connect(ctx.destination)
+      oscillator.type = 'square'
+      oscillator.frequency.setValueAtTime(880, ctx.currentTime)
+      oscillator.frequency.setValueAtTime(440, ctx.currentTime + 0.1)
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+      oscillator.start(ctx.currentTime)
+      oscillator.stop(ctx.currentTime + 0.4)
+    } catch {}
+  }
+
   async function scannerSN(e: React.FormEvent) {
     e.preventDefault()
     if (!snSaisie.trim() || !pnActif) return
@@ -163,8 +181,19 @@ export default function AttendusDetail() {
         body: JSON.stringify({ sn: snSaisie.trim(), pn: pnActif, accessoires: [] })
       })
       const result = await res.json()
-      setDernierScan({ ...result, sn: snSaisie.trim() })
+      const snScanne = snSaisie.trim()
+      setDernierScan({ ...result, sn: snScanne })
       setSnSaisie('')
+
+      // Ouvrir modal + son si problème
+      if (result.resultat === 'DEJA_SCANNE') {
+        jouerSonAlerte()
+        setAlerteScan({ type: 'DEJA_SCANNE', sn: snScanne, pn: result.pn })
+      } else if (result.resultat === 'RECU' && result.dejaEnInventaire) {
+        jouerSonAlerte()
+        setAlerteScan({ type: 'DEJA_INVENTAIRE', sn: snScanne, pn: result.pn })
+      }
+
       reload()
     } catch {
       setDernierScan({ resultat: 'ERREUR' })
@@ -572,6 +601,36 @@ export default function AttendusDetail() {
             </div>
           )}
           <button onClick={() => setValiderOk(null)} style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}><XCircle size={16} /></button>
+        </div>
+      )}
+
+      {/* Modal alerte scan */}
+      {alerteScan && (
+        <div className="modal-overlay" onClick={() => { setAlerteScan(null); snInputRef.current?.focus() }}>
+          <div style={{ background: 'white', borderRadius: '12px', padding: '32px', maxWidth: '420px', width: '100%', textAlign: 'center', border: '3px solid #dc2626' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
+            {alerteScan.type === 'DEJA_SCANNE' && (
+              <>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N déjà validé !</h3>
+                <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N a déjà été scanné et validé dans cet attendu.</p>
+              </>
+            )}
+            {alerteScan.type === 'DEJA_INVENTAIRE' && (
+              <>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N déjà en inventaire !</h3>
+                <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N est déjà présent dans l'inventaire. Il sera ignoré à la clôture.</p>
+              </>
+            )}
+            <code style={{ display: 'block', background: '#fee2e2', color: '#dc2626', padding: '8px 16px', borderRadius: '6px', fontWeight: 700, fontSize: '16px', marginBottom: '20px' }}>
+              {alerteScan.sn}
+            </code>
+            {alerteScan.pn && <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '16px' }}>P/N : {alerteScan.pn}</p>}
+            <button className="btn btn-primary" style={{ width: '100%' }}
+              onClick={() => { setAlerteScan(null); snInputRef.current?.focus() }}>
+              OK — Continuer le scan
+            </button>
+          </div>
         </div>
       )}
 
