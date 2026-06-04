@@ -135,7 +135,7 @@ export default function Attendus() {
       </div>
 
       {attendus.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
+        <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#64748b' }}>
           <FileText size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
           <p style={{ fontWeight: 500, marginBottom: '8px' }}>Aucun attendu</p>
           <p style={{ fontSize: '13px' }}>Importez un fichier Excel client pour démarrer</p>
@@ -160,7 +160,7 @@ export default function Attendus() {
                   onClick={() => navigate(`/attendus/${a.id}`)}>
                   <td>
                     {a.statut === 'CLOS'
-                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#64748b', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>
+                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#f1f5f9', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>
                       : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#dcfce7', color: '#16a34a', padding: '2px 8px', borderRadius: '4px' }}><Clock size={11} /> En cours</span>
                     }
                   </td>
@@ -168,7 +168,7 @@ export default function Attendus() {
                   <td>{a.bt || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   <td>{a.client || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   <td><span style={{ background: '#1e3a5f', color: '#2563eb', borderRadius: '4px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{a._count.lignes}</span></td>
-                  <td style={{ color: '#9ca3af', fontSize: '13px' }}>{new Date(a.createdAt).toLocaleDateString('fr-FR')}</td>
+                  <td style={{ color: '#64748b', fontSize: '13px' }}>{new Date(a.createdAt).toLocaleDateString('fr-FR')}</td>
                   <td onClick={e => e.stopPropagation()}>
                     {a.statut === 'EN_COURS' && (
                       <button className="btn btn-danger btn-icon" onClick={e => { e.stopPropagation(); setModalDelete(a) }}>
@@ -188,7 +188,7 @@ export default function Attendus() {
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>Supprimer l'attendu ?</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '24px' }}>
+            <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '24px' }}>
               L'attendu <strong>{modalDelete.rma || `#${modalDelete.id}`}</strong> et toutes ses lignes seront définitivement supprimés.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -253,7 +253,7 @@ export default function Attendus() {
                   <Upload size={24} style={{ margin: '0 auto 8px', color: '#2563eb' }} />
                   {fichier
                     ? <p style={{ color: '#2563eb', fontWeight: 500, fontSize: '13px' }}>{fichier.name}</p>
-                    : <p style={{ color: '#9ca3af', fontSize: '13px' }}>Cliquez pour sélectionner le fichier Excel client</p>
+                    : <p style={{ color: '#64748b', fontSize: '13px' }}>Cliquez pour sélectionner le fichier Excel client</p>
                   }
                 </div>
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
