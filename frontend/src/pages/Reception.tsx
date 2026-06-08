@@ -94,7 +94,7 @@ export default function Reception() {
   const [lignesSN, setLignesSN]           = useState<LigneSN[]>([])
   const [snCurrent, setSnCurrent]         = useState('')
   const [quantite, setQuantite]           = useState<number>(1)
-  const [alerteSN, setAlerteSN]           = useState<{ sn: string; statut: string | null; rma: string | null } | null>(null)
+  const [alerteSN, setAlerteSN]           = useState<{ sn: string; statut: string | null; rma: string | null; contexte?: 'inventaire' | 'listeCours' | 'listeAttente' } | null>(null)
 
   useEffect(() => { reload() }, [siteId])
 
@@ -173,12 +173,27 @@ export default function Reception() {
   // ─── S/N ──────────────────────────────────────────────────────────────────
   async function addSN() {
     const sn = snCurrent.trim()
-    if (!sn || lignesSN.some(l => l.sn === sn)) return
+    if (!sn) return
+
+    if (lignesSN.some(l => l.sn === sn)) {
+      jouerSonAlerte()
+      setAlerteSN({ sn, statut: null, rma: null, contexte: 'listeCours' })
+      setSnCurrent('')
+      return
+    }
+
+    if (lotsEnAttente.some(lot => lot.lignes.some(l => l.sn === sn))) {
+      jouerSonAlerte()
+      setAlerteSN({ sn, statut: null, rma: null, contexte: 'listeAttente' })
+      setSnCurrent('')
+      return
+    }
+
     try {
       const check = await get<any>(`/inventaire/${siteId}/check-sn/${encodeURIComponent(sn)}`)
       if (check.existe && !check.estFinal) {
         jouerSonAlerte()
-        setAlerteSN({ sn, statut: check.statut, rma: check.rma })
+        setAlerteSN({ sn, statut: check.statut, rma: check.rma, contexte: 'inventaire' })
         setSnCurrent('')
         return
       }
@@ -231,6 +246,10 @@ export default function Reception() {
       statut: statuts.find(s => s.id === statutId)?.label ?? null,
       statutId
     }])
+
+    setArticleId(0)
+    setLignesSN([])
+    setQuantite(1)
   }
 
   // ─── Valider ──────────────────────────────────────────────────────────────
@@ -582,14 +601,22 @@ export default function Reception() {
       </div>
     </div>
 
-    {/* Modal alerte S/N déjà en inventaire */}
+    {/* Modal alerte S/N doublon */}
     {alerteSN && (
       <div className="modal-overlay" onClick={() => { setAlerteSN(null); snInputRef.current?.focus() }}>
         <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '32px', maxWidth: '420px', width: '100%', textAlign: 'center', border: '3px solid #dc2626' }}
           onClick={e => e.stopPropagation()}>
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
-          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>S/N déjà en inventaire !</h3>
-          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>Ce S/N est actuellement en cours de traitement.</p>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>
+            {alerteSN.contexte === 'listeCours'    ? 'S/N déjà en cours de saisie !'
+            : alerteSN.contexte === 'listeAttente' ? 'S/N déjà préparé !'
+            : 'S/N déjà en inventaire !'}
+          </h3>
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '8px' }}>
+            {alerteSN.contexte === 'listeCours'    ? 'Ce S/N est déjà dans la liste en cours de saisie.'
+            : alerteSN.contexte === 'listeAttente' ? 'Ce S/N est déjà dans un lot en attente de validation.'
+            : 'Ce S/N est actuellement en cours de traitement dans l\'inventaire.'}
+          </p>
           <code style={{ display: 'block', background: '#fee2e2', color: '#dc2626', padding: '8px 16px', borderRadius: '6px', fontWeight: 700, fontSize: '16px', marginBottom: '12px' }}>
             {alerteSN.sn}
           </code>

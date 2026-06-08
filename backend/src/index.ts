@@ -10,6 +10,8 @@ import attendusRouter from './routes/attendus'
 import configAttendusRouter from './routes/configAttendus'
 import utilisateursRouter from './routes/utilisateurs'
 import authRouter from './routes/auth'
+import reglesAlerteRouter from './routes/reglesAlerte'
+import productionRouter from './routes/production'
 import { requireAuth } from './middleware/auth'
 import { Prisma } from '@prisma/client'
 
@@ -39,6 +41,8 @@ app.use('/api/plateformes', requireAuth, plateformesRouter)
 app.use('/api/inventaire', requireAuth, inventaireRouter)
 app.use('/api/attendus', requireAuth, attendusRouter)
 app.use('/api/config-attendus', requireAuth, configAttendusRouter)
+app.use('/api/regles-alerte', requireAuth, reglesAlerteRouter)
+app.use('/api/production', requireAuth, productionRouter)
 app.use('/api/gestion', requireAuth, utilisateursRouter)
 
 // Middleware global de gestion des erreurs

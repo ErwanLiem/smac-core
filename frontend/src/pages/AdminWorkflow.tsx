@@ -54,7 +54,7 @@ export default function AdminWorkflow() {
   const [editStatut, setEditStatut] = useState<Statut | null>(null)
   const [editTransition, setEditTransition] = useState<Transition | null>(null)
 
-  const [newStatut, setNewStatut] = useState({ code: '', label: '', couleur: '#6b7280', ordre: 0, estFinal: false })
+  const [newStatut, setNewStatut] = useState({ code: '', label: '', couleur: '#6b7280', ordre: 0, estFinal: false, estStock: false, estTransfert: false })
   const [newTransition, setNewTransition] = useState({ statutFromId: 0, statutToId: 0, labelBouton: '', couleurBouton: '#3b82f6' })
 
   useEffect(() => { reload() }, [siteId])
@@ -71,7 +71,7 @@ export default function AdminWorkflow() {
   async function ajouterStatut(e: React.FormEvent) {
     e.preventDefault()
     await workflowApi.createStatut(siteId, newStatut)
-    setNewStatut({ code: '', label: '', couleur: '#6b7280', ordre: 0, estFinal: false })
+    setNewStatut({ code: '', label: '', couleur: '#6b7280', ordre: 0, estFinal: false, estStock: false, estTransfert: false })
     reload()
   }
 
@@ -101,7 +101,9 @@ export default function AdminWorkflow() {
       label: editStatut.label,
       couleur: editStatut.couleur,
       ordre: editStatut.ordre,
-      estFinal: editStatut.estFinal
+      estFinal: editStatut.estFinal,
+      estStock: editStatut.estStock,
+      estTransfert: editStatut.estTransfert,
     })
     setEditStatut(null)
     reload()
@@ -144,7 +146,7 @@ export default function AdminWorkflow() {
               <th>Code</th>
               <th>Label</th>
               <th style={{ width: '40px' }}>Couleur</th>
-              <th>Final</th>
+              <th>Rôles</th>
               <th></th>
             </tr>
           </thead>
@@ -155,7 +157,12 @@ export default function AdminWorkflow() {
                 <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{s.code}</code></td>
                 <td><StatutBadge statut={s} /></td>
                 <td style={{ textAlign: 'center' }}><ColorSquare color={s.couleur} /></td>
-                <td>{s.estFinal ? <span className="badge badge-info">Final</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                <td style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  {s.estStock     && <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', background: '#1e3a5f', color: '#60a5fa', border: '1px solid #2563eb' }}>Stock</span>}
+                  {s.estTransfert && <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', background: '#1c1917', color: '#fb923c', border: '1px solid #ea580c' }}>Transfert</span>}
+                  {s.estFinal     && <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', background: '#052e16', color: '#4ade80', border: '1px solid #16a34a' }}>Final</span>}
+                  {!s.estStock && !s.estTransfert && !s.estFinal && <span style={{ color: '#4b5563' }}>—</span>}
+                </td>
                 <td style={{ width: '80px', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                   {isAdmin && (<>
                     <button className="btn btn-secondary btn-icon" title="Modifier" onClick={() => setEditStatut(s)}>
@@ -174,32 +181,44 @@ export default function AdminWorkflow() {
         {/* Formulaire ajout statut */}
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajouter un statut</p>
-          <form onSubmit={ajouterStatut} style={{ display: 'grid', gridTemplateColumns: '140px 180px 120px 80px auto auto', gap: '10px', alignItems: 'flex-end' }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Code</label>
-              <input required value={newStatut.code} onChange={e => setNewStatut(f => ({ ...f, code: e.target.value }))} className="form-input" placeholder="EX_STATUT" />
+          <form onSubmit={ajouterStatut}>
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 180px 120px 60px auto', gap: '10px', alignItems: 'flex-end', marginBottom: '10px' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Code</label>
+                <input required value={newStatut.code} onChange={e => setNewStatut(f => ({ ...f, code: e.target.value }))} className="form-input" placeholder="EX_STATUT" />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Label</label>
+                <input required value={newStatut.label} onChange={e => setNewStatut(f => ({ ...f, label: e.target.value }))} className="form-input" placeholder="Ex: En réparation" />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Couleur</label>
+                <select value={newStatut.couleur} onChange={e => setNewStatut(f => ({ ...f, couleur: e.target.value }))} className="form-input">
+                  {COULEURS_PALETTE.map(c => (
+                    <option key={c} value={c} style={{ background: c, color: '#fff' }}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Ordre</label>
+                <input type="number" value={newStatut.ordre} onChange={e => setNewStatut(f => ({ ...f, ordre: Number(e.target.value) }))} className="form-input" />
+              </div>
+              {isAdmin && <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>+ Ajouter</button>}
             </div>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Label</label>
-              <input required value={newStatut.label} onChange={e => setNewStatut(f => ({ ...f, label: e.target.value }))} className="form-input" placeholder="Ex: En réparation" />
+            <div style={{ display: 'flex', gap: '20px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={newStatut.estStock} onChange={e => setNewStatut(f => ({ ...f, estStock: e.target.checked }))} />
+                Rôle Stock <span style={{ fontSize: '11px', color: '#60a5fa' }}>(1er statut après réception)</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={newStatut.estTransfert} onChange={e => setNewStatut(f => ({ ...f, estTransfert: e.target.checked }))} />
+                Rôle Transfert <span style={{ fontSize: '11px', color: '#fb923c' }}>(attente transfert production)</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={newStatut.estFinal} onChange={e => setNewStatut(f => ({ ...f, estFinal: e.target.checked }))} />
+                Rôle Final <span style={{ fontSize: '11px', color: '#4ade80' }}>(statut de sortie)</span>
+              </label>
             </div>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Couleur</label>
-              <select value={newStatut.couleur} onChange={e => setNewStatut(f => ({ ...f, couleur: e.target.value }))} className="form-input">
-                {COULEURS_PALETTE.map(c => (
-                  <option key={c} value={c} style={{ background: c, color: '#fff' }}>{c}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Ordre</label>
-              <input type="number" value={newStatut.ordre} onChange={e => setNewStatut(f => ({ ...f, ordre: Number(e.target.value) }))} className="form-input" />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '2px' }}>
-              <input type="checkbox" id="estFinal" checked={newStatut.estFinal} onChange={e => setNewStatut(f => ({ ...f, estFinal: e.target.checked }))} />
-              <label htmlFor="estFinal" style={{ fontSize: '13px', color: '#e2e8f0' }}>Final</label>
-            </div>
-            {isAdmin && <button type="submit" className="btn btn-primary">+ Ajouter</button>}
           </form>
         </div>
       </div>
@@ -307,14 +326,25 @@ export default function AdminWorkflow() {
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label className="form-label">Ordre</label>
-                  <input type="number" className="form-input" value={editStatut.ordre} onChange={e => setEditStatut(s => s ? { ...s, ordre: Number(e.target.value) } : s)} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '26px' }}>
-                  <input type="checkbox" id="editFinal" checked={editStatut.estFinal} onChange={e => setEditStatut(s => s ? { ...s, estFinal: e.target.checked } : s)} />
-                  <label htmlFor="editFinal" style={{ fontSize: '13px', color: '#e2e8f0' }}>Final</label>
+              <div className="form-group">
+                <label className="form-label">Ordre</label>
+                <input type="number" className="form-input" value={editStatut.ordre} onChange={e => setEditStatut(s => s ? { ...s, ordre: Number(e.target.value) } : s)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Rôles</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                    <input type="checkbox" checked={editStatut.estStock} onChange={e => setEditStatut(s => s ? { ...s, estStock: e.target.checked } : s)} />
+                    <span>Stock</span><span style={{ fontSize: '11px', color: '#60a5fa' }}>— 1er statut après réception</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                    <input type="checkbox" checked={editStatut.estTransfert} onChange={e => setEditStatut(s => s ? { ...s, estTransfert: e.target.checked } : s)} />
+                    <span>Transfert</span><span style={{ fontSize: '11px', color: '#fb923c' }}>— attente transfert production</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                    <input type="checkbox" checked={editStatut.estFinal} onChange={e => setEditStatut(s => s ? { ...s, estFinal: e.target.checked } : s)} />
+                    <span>Final</span><span style={{ fontSize: '11px', color: '#4ade80' }}>— statut de sortie</span>
+                  </label>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>

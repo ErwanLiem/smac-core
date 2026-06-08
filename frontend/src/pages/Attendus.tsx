@@ -21,7 +21,7 @@ interface ChampInv {
 }
 
 const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
-const CODES_CLIENT = ['CLIENT', 'CLIENTS']
+const CODES_CLIENT    = ['CLIENT', 'CLIENTS']
 const CODES_PLATEFORME = ['PLATEFORME', 'PLATEFORMES']
 
 function parseOptions(raw: string | null): string[] {
@@ -48,7 +48,7 @@ export default function Attendus() {
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [modalDelete, setModalDelete] = useState<Attendu | null>(null)
-  const [configChamps, setConfigChamps] = useState<{ code: string; visible: boolean; obligatoire: boolean }[]>([])
+  const [configChamps, setConfigChamps] = useState<{ code: string; visible: boolean; obligatoire: boolean; visibleListe: boolean }[]>([])
 
   useEffect(() => { reload() }, [siteId])
 
@@ -82,14 +82,15 @@ export default function Attendus() {
 
   function getClientLabel(cl: any): string { return getEntiteLabel(cl, champsClients) }
 
-  function getDonneeLabel(attendu: Attendu): string {
-    // Afficher les premières valeurs des donneesCommunes pour la liste
+  function getDonneeByCode(attendu: Attendu, code: string): string {
     if (!attendu.donneesCommunes) return ''
     try {
       const d = JSON.parse(attendu.donneesCommunes)
-      return Object.values(d).filter(Boolean).slice(0, 2).join(' · ')
+      return d[code] ?? ''
     } catch { return '' }
   }
+
+  const colonnesListe = configChamps.filter(c => c.visibleListe)
 
   async function handleDelete(a: Attendu) {
     try {
@@ -146,9 +147,10 @@ export default function Attendus() {
             <thead>
               <tr>
                 <th>Statut</th>
-                <th>RMA</th>
-                <th>BT</th>
-                <th>Client</th>
+                {colonnesListe.map(c => {
+                  const champ = champsInv.find(ci => ci.code === c.code)
+                  return <th key={c.code}>{champ?.label ?? c.code}</th>
+                })}
                 <th>Lignes</th>
                 <th>Date import</th>
                 <th></th>
@@ -164,9 +166,9 @@ export default function Attendus() {
                       : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#1e3a1e', color: '#4ade80', padding: '2px 8px', borderRadius: '4px' }}><Clock size={11} /> En cours</span>
                     }
                   </td>
-                  <td style={{ fontWeight: 500 }}>{a.rma || <span style={{ color: '#d1d5db' }}>—</span>}</td>
-                  <td>{a.bt || <span style={{ color: '#d1d5db' }}>—</span>}</td>
-                  <td>{a.client || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  {colonnesListe.map(c => (
+                    <td key={c.code}>{getDonneeByCode(a, c.code) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  ))}
                   <td><span style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: '4px', padding: '2px 8px', fontSize: '12px', fontWeight: 600 }}>{a._count.lignes}</span></td>
                   <td>{new Date(a.createdAt).toLocaleDateString('fr-FR')}</td>
                   <td onClick={e => e.stopPropagation()}>

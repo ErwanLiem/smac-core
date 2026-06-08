@@ -11,6 +11,8 @@ import {
   Users,
   Building2,
   Package,
+  AlertTriangle,
+  Truck,
 } from 'lucide-react'
 import type { Utilisateur } from '../types'
 
@@ -56,6 +58,8 @@ export default function Sidebar() {
       title: 'PRODUCTION',
       items: [
         { name: 'Suivi', path: '/suivi', icon: ClipboardList },
+        { name: 'Planning', path: '/planning', icon: ClipboardList },
+        { name: 'Inventaire labo', path: '/inventaire-labo', icon: Package },
       ],
     },
     {
@@ -64,6 +68,7 @@ export default function Sidebar() {
         { name: 'Attendus', path: '/attendus', icon: ClipboardList },
         { name: 'Réception', path: '/reception', icon: Package },
         { name: 'Inventaire', path: '/inventaire', icon: Warehouse },
+        { name: 'Attente transfert', path: '/logistique', icon: Truck },
       ],
     },
     {
@@ -74,9 +79,11 @@ export default function Sidebar() {
         { name: 'Config. plateformes', path: '/admin/plateformes', icon: Building2 },
         { name: 'Config. inventaire', path: '/admin/inventaire', icon: Database },
         { name: 'Config. Attendus', path: '/admin/attendus', icon: Settings },
-        { name: 'Workflow', path: '/admin/workflow', icon: Settings },
-        { name: 'Rôles', path: '/admin/roles', icon: Settings },
-        { name: 'Utilisateurs', path: '/admin/utilisateurs', icon: Users },
+        { name: 'Config. règles alerte', path: '/admin/regles-alerte', icon: AlertTriangle },
+        { name: 'Config. production', path: '/admin/production', icon: Settings },
+        { name: 'Config. workflow', path: '/admin/workflow', icon: Settings },
+        { name: 'Config. rôles', path: '/admin/roles', icon: Settings },
+        { name: 'Config. utilisateurs', path: '/admin/utilisateurs', icon: Users },
       ],
     },
   ].map(section => ({

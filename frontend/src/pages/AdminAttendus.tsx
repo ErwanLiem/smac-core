@@ -14,6 +14,7 @@ interface ChampAttenduConfig {
   code: string
   visible: boolean
   obligatoire: boolean
+  visibleListe: boolean
 }
 
 interface ConfigAttendus {
@@ -179,14 +180,15 @@ export default function AdminAttendus() {
             <tr>
               <th>Champ inventaire</th>
               <th style={{ color: '#9ca3af', fontWeight: 400, fontSize: '12px' }}>Code</th>
-              <th style={{ textAlign: 'center' }}>Visible</th>
+              <th style={{ textAlign: 'center' }}>Formulaire</th>
               <th style={{ textAlign: 'center' }}>Obligatoire</th>
+              <th style={{ textAlign: 'center' }}>Visible liste attendu</th>
             </tr>
           </thead>
           <tbody>
-            {champsInv.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configuré</td></tr>}
+            {champsInv.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configuré</td></tr>}
             {champsInv.map(champ => {
-              const cfg = config.champsAttendu?.find(c => c.code === champ.code) ?? { code: champ.code, visible: false, obligatoire: false }
+              const cfg = config.champsAttendu?.find(c => c.code === champ.code) ?? { code: champ.code, visible: false, obligatoire: false, visibleListe: false }
               return (
                 <tr key={champ.code}>
                   <td style={{ fontWeight: 500 }}>{champ.label}</td>
@@ -196,6 +198,9 @@ export default function AdminAttendus() {
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <input type="checkbox" checked={cfg.obligatoire} disabled={!cfg.visible || !isAdmin} onChange={e => updateChamp(champ.code, { obligatoire: e.target.checked })} />
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input type="checkbox" checked={cfg.visibleListe ?? false} disabled={!isAdmin} onChange={e => updateChamp(champ.code, { visibleListe: e.target.checked })} />
                   </td>
                 </tr>
               )

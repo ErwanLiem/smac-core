@@ -16,6 +16,11 @@ import Inventaire from './pages/Inventaire'
 import Reception from './pages/Reception'
 import Attendus from './pages/Attendus'
 import AdminAttendus from './pages/AdminAttendus'
+import AdminReglesAlerte from './pages/AdminReglesAlerte'
+import AdminProduction from './pages/AdminProduction'
+import Planning from './pages/Planning'
+import Logistique from './pages/Logistique'
+import InventaireLabo from './pages/InventaireLabo'
 import AttendusDetail from './pages/AttendusDetail'
 import Layout from './components/Layout'
 
@@ -49,6 +54,11 @@ function App() {
             <Route path="/reception" element={<Reception />} />
             <Route path="/attendus" element={<Attendus />} />
             <Route path="/admin/attendus" element={<AdminAttendus />} />
+            <Route path="/admin/regles-alerte" element={<AdminReglesAlerte />} />
+            <Route path="/admin/production" element={<AdminProduction />} />
+            <Route path="/planning" element={<Planning />} />
+            <Route path="/logistique" element={<Logistique />} />
+            <Route path="/inventaire-labo" element={<InventaireLabo />} />
             <Route path="/attendus/:id" element={<AttendusDetail />} />
             <Route path="/admin/roles" element={<AdminRoles />} />
             <Route path="/admin/utilisateurs" element={<AdminUtilisateurs />} />

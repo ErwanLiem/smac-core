@@ -14,6 +14,8 @@ export interface Statut {
   icone?: string
   ordre: number
   estFinal: boolean
+  estStock: boolean
+  estTransfert: boolean
 }
 
 export interface Transition {

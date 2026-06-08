@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { logActivite } from '../utils/historique'
+import { verifierReglesAlerte } from '../utils/reglesAlerte'
 
 const prisma = new PrismaClient()
 
@@ -139,23 +140,40 @@ export async function create(req: Request, res: Response, next) {
     const { articleId, statutId, valeurs } = req.body
     // valeurs = [{ champId, valeur }]
 
+    // Vérifier les règles d'alerte sur l'entrée existante (statut final) pour ce S/N
+    const champs = await prisma.champInventaire.findMany({ where: { siteId: Number(siteId) } })
+    const CODES_SN_INV = ['SN', 'S_N', 'SERIAL', 'SERIAL_NUMBER', 'NUMERO_SERIE', 'NUMERO_DE_SERIE']
+    function normSN(s: string) { return s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '_').trim() }
+    const champsSN = champs.filter(c => CODES_SN_INV.includes(normSN(c.code)))
+    const snValue: string | null = champsSN.length > 0
+      ? (valeurs.find((v: any) => champsSN.some((cs: any) => cs.id === v.champId))?.valeur ?? null)
+      : null
+    const alerte = await verifierReglesAlerte(prisma, Number(siteId), snValue, champs)
+
+    // Fusionner les champs auto-fill de la règle
+    let valeursFinales = [...valeurs]
+    if (alerte?.champsAutoFill?.length) {
+      for (const af of alerte.champsAutoFill) {
+        const champ = champs.find(c => c.code.toUpperCase() === af.codeChamp.toUpperCase())
+        if (champ && !valeursFinales.some(v => v.champId === champ.id)) {
+          valeursFinales.push({ champId: champ.id, valeur: af.valeur })
+        }
+      }
+    }
+
     const inventaire = await prisma.inventaire.create({
       data: {
         siteId: Number(siteId),
         articleId: Number(articleId),
         statutId: statutId ? Number(statutId) : null,
-        valeurs: {
-          create: valeurs
-        }
+        couleurAlerte: alerte?.couleurAlerte ?? null,
+        regleAlerteId: alerte?.regleAlerteId ?? null,
+        valeurs: { create: valeursFinales }
       },
       include: {
         article: true,
         statut: true,
-        valeurs: {
-          include: {
-            champ: true
-          }
-        }
+        valeurs: { include: { champ: true } }
       }
     })
 
@@ -168,7 +186,7 @@ export async function create(req: Request, res: Response, next) {
       details: {
         articleId: Number(articleId),
         statutId: statutId ? Number(statutId) : null,
-        valeurs: valeurs.map((v: any) => ({ champId: v.champId, valeur: v.valeur }))
+        valeurs: valeursFinales.map((v: any) => ({ champId: v.champId, valeur: v.valeur }))
       }
     })
 

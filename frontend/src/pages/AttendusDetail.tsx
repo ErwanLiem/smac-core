@@ -20,12 +20,14 @@ interface Attendu {
   id: number
   rma: string | null
   bt: string | null
-  client: string | null
   statut: string
   createdAt: string
   closedAt: string | null
+  donneesCommunes: string | null
   lignes: Ligne[]
 }
+
+interface ChampInv { id: number; code: string; label: string; type: string; options: string | null; actif: boolean }
 
 interface Rapport {
   nonRecus: Ligne[]
@@ -44,6 +46,21 @@ function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
   if (!raw) return 1
   return JSON.parse(raw)?.site?.id ?? 1
+}
+
+const CODES_NOM       = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
+const CODES_CLIENT    = ['CLIENT', 'CLIENTS']
+const CODES_PLATEFORME = ['PLATEFORME', 'PLATEFORMES']
+
+function parseOptions(raw: string | null): string[] {
+  if (!raw) return []
+  try { return JSON.parse(raw) } catch { return [] }
+}
+
+function getEntiteLabel(entite: any, champs: any[]): string {
+  const champNom = champs.find((c: any) => CODES_NOM.includes(c.code.toUpperCase()))
+  const val = champNom ? entite.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur : null
+  return val || entite.valeurs?.map((v: any) => v.valeur).filter(Boolean)[0] || `#${entite.id}`
 }
 
 export default function AttendusDetail() {
@@ -67,30 +84,48 @@ export default function AttendusDetail() {
   const [validerOk, setValiderOk] = useState<{ lignesInjectees: number; snDoublons?: string[] } | null>(null)
   const [copie, setCopie] = useState(false)
   const [editInfos, setEditInfos] = useState(false)
-  const [rma, setRma] = useState('')
-  const [bt, setBt] = useState('')
-  const [plateforme, setPlateforme] = useState('')
-  const [dateCreationRMA, setDateCreationRMA] = useState('')
+  const [editDonnees, setEditDonnees] = useState<Record<string, string>>({})
+  const [configChamps, setConfigChamps] = useState<{ code: string; visible: boolean; obligatoire: boolean; visibleListe: boolean }[]>([])
+  const [champsInv, setChampsInv] = useState<ChampInv[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  const [champsClients, setChampsClients] = useState<any[]>([])
   const [plateformes, setPlateformes] = useState<any[]>([])
   const [champsPlateformes, setChampsPlateformes] = useState<any[]>([])
 
   useEffect(() => { reload() }, [id])
 
+
   async function reload() {
-    const [data, arts, champsArts, plats, champsPlats] = await Promise.all([
+    const [data, arts, champsArts, plats, champsPlats, ci, cl, cc, cfg] = await Promise.all([
       attendusApi.getDetail(Number(id)),
       get<any[]>(`/articles/${siteId}`),
       get<any[]>(`/articles/${siteId}/champs`),
       get<any[]>(`/plateformes/${siteId}`),
-      get<any[]>(`/plateformes/${siteId}/champs`)
+      get<any[]>(`/plateformes/${siteId}/champs`),
+      get<ChampInv[]>(`/inventaire/${siteId}/champs`),
+      get<any[]>(`/clients/${siteId}`),
+      get<any[]>(`/clients/${siteId}/champs`),
+      get<any>(`/config-attendus/${siteId}`)
     ])
     setAttendu(data)
-    setRma(data.rma || '')
-    setBt(data.bt || '')
-    setPlateforme(data.plateforme || '')
-    setDateCreationRMA(data.dateCreationRMA || '')
     setPlateformes(plats)
     setChampsPlateformes(champsPlats.filter((c: any) => c.actif))
+    setChampsInv(ci.filter((c: any) => c.actif))
+    setClients(cl)
+    setChampsClients(cc.filter((c: any) => c.actif))
+
+    // Initialiser editDonnees depuis donneesCommunes
+    let donnees: Record<string, string> = {}
+    if (data.donneesCommunes) { try { donnees = JSON.parse(data.donneesCommunes) } catch {} }
+    setEditDonnees(donnees)
+
+    // Config champs attendu
+    if (cfg?.config?.champsAttendu) {
+      try {
+        const parsed = typeof cfg.config.champsAttendu === 'string' ? JSON.parse(cfg.config.champsAttendu) : cfg.config.champsAttendu
+        setConfigChamps(parsed)
+      } catch {}
+    }
     // Initialiser les accessoires cochés depuis les données existantes
     const accMap: Record<number, number[]> = {}
     data.lignes.forEach((l: Ligne) => {
@@ -227,17 +262,9 @@ export default function AttendusDetail() {
 
   const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
 
-  function getPlateformeLabel(pl: any): string {
-    const champNom = champsPlateformes.find((c: any) => CODES_NOM.includes(c.code.toUpperCase()))
-    if (champNom) {
-      const val = pl.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur
-      if (val) return val
-    }
-    return pl.valeurs?.map((v: any) => v.valeur).filter(Boolean)[0] || `Plateforme #${pl.id}`
-  }
 
   async function handleSaveInfos() {
-    await attendusApi.update(Number(id), { rma, bt, plateforme, dateCreationRMA })
+    await attendusApi.update(Number(id), { donneesCommunes: editDonnees })
     setEditInfos(false)
     reload()
   }
@@ -341,7 +368,7 @@ export default function AttendusDetail() {
   const lignesPNActif = pnActif ? (groupes[pnActif] || []) : []
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div>
       {/* Header */}
       <div className="page-header">
         <div>
@@ -349,16 +376,26 @@ export default function AttendusDetail() {
             <button onClick={() => navigate('/attendus')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '13px' }}>← Attendus</button>
             {isClos && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#1e2130', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>}
           </div>
-          <h1 className="page-title">{attendu.rma ? `RMA ${attendu.rma}` : 'Attendu sans RMA'}</h1>
+          <h1 className="page-title">
+            {(() => {
+              const colonnes = configChamps.filter(c => c.visibleListe)
+              if (colonnes.length > 0 && editDonnees[colonnes[0].code]) return editDonnees[colonnes[0].code]
+              if (attendu.rma) return attendu.rma
+              return `Attendu #${attendu.id}`
+            })()}
+          </h1>
           <p className="page-subtitle">
-            {attendu.client && `${attendu.client} · `}
-            {attendu.bt && `BT : ${attendu.bt} · `}
+            {configChamps.filter(c => c.visibleListe).slice(1).map(c => {
+              const champ = champsInv.find(ci => ci.code === c.code)
+              return editDonnees[c.code] ? `${champ?.label ?? c.code} : ${editDonnees[c.code]}` : null
+            }).filter(Boolean).join(' · ')}
+            {configChamps.filter(c => c.visibleListe).slice(1).some(c => editDonnees[c.code]) ? ' · ' : ''}
             {new Date(attendu.createdAt).toLocaleDateString('fr-FR')}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {!isClos && <button className="btn btn-secondary" onClick={() => setEditInfos(true)}>Modifier infos</button>}
-          <button className="btn btn-secondary" onClick={handleRapport}>Rapport d'écart</button>
+          <button className="btn btn-secondary" onClick={handleRapport}>Rapport d'erreur</button>
           {!isClos && (
             <>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => setShowCloturer(true)}>
@@ -379,10 +416,10 @@ export default function AttendusDetail() {
       </div>
 
       {/* Corps principal */}
-      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '12px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '12px' }}>
 
         {/* Colonne gauche — cartes PN */}
-        <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {Object.entries(groupes).map(([pn, lignes]) => {
             const recus = lignes.filter(l => l.statut === 'RECU').length
             const total = lignes.length
@@ -413,19 +450,38 @@ export default function AttendusDetail() {
 
           {/* Inattendus */}
           {inattendus.length > 0 && (
-            <div style={{ border: '2px solid #fcd34d', borderRadius: '8px', padding: '12px', background: '#fffbeb' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+            <div style={{ border: '2px solid #fcd34d', borderRadius: '8px', padding: '12px', background: '#2d2200' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: '#fbbf24', marginBottom: '8px' }}>
                 ⚠️ Inattendus ({inattendus.length})
               </div>
               {inattendus.map(l => (
-                <div key={l.id} style={{ fontSize: '11px', fontFamily: 'monospace', color: '#92400e' }}>{l.sn}</div>
+                <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#fbbf24', fontWeight: 600 }}>{l.sn}</div>
+                  {!isClos && (
+                    <button
+                      onClick={async () => { await attendusApi.descanner(l.id); reload() }}
+                      title="Annuler ce scan inattendu"
+                      style={{ background: 'none', border: '1px solid #fcd34d', borderRadius: '4px', cursor: 'pointer', color: '#fbbf24', padding: '2px 6px', fontSize: '11px', marginLeft: '6px', flexShrink: 0 }}
+                    >
+                      ✕ Annuler
+                    </button>
+                  )}
+                </div>
               ))}
+              {!isClos && inattendus.length > 0 && (
+                <button
+                  onClick={async () => { for (const l of inattendus) await attendusApi.descanner(l.id); reload() }}
+                  style={{ marginTop: '6px', width: '100%', fontSize: '11px', padding: '4px', background: '#92400e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  ✕ Tout annuler
+                </button>
+              )}
             </div>
           )}
 
           {/* Déjà en inventaire */}
           {doublonsInv.length > 0 && (
-            <div style={{ border: '2px solid #f9a8d4', borderRadius: '8px', padding: '12px', background: '#fdf2f8' }}>
+            <div style={{ border: '2px solid #f9a8d4', borderRadius: '8px', padding: '12px', background: '#2d0a1e' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: '#be185d', marginBottom: '8px' }}>
                 🔴 Déjà en inventaire ({doublonsInv.length})
               </div>
@@ -465,7 +521,7 @@ export default function AttendusDetail() {
         </div>
 
         {/* Colonne droite — panneau de scan */}
-        <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {!pnActif ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', flexDirection: 'column', gap: '8px' }}>
               <div style={{ fontSize: '40px' }}>←</div>
@@ -592,7 +648,7 @@ export default function AttendusDetail() {
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '600px', width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Rapport d'écart</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Rapport d'erreur</h3>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button className="btn btn-primary" onClick={copierRapport}><Copy size={14} /> {copie ? 'Copié !' : 'Copier pour email'}</button>
                 <button className="btn btn-secondary" onClick={() => setShowRapport(false)}>Fermer</button>
@@ -776,30 +832,48 @@ export default function AttendusDetail() {
       {/* Modal modifier infos */}
       {editInfos && (
         <div className="modal-overlay">
-          <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '400px', width: '100%' }}>
+          <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '480px', width: '100%' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Modifier les informations</h3>
-            <div className="form-group">
-              <label className="form-label">N° RMA</label>
-              <input className="form-input" value={rma} onChange={e => setRma(e.target.value)} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {configChamps.filter(c => c.visible).map(cc => {
+                const champ = champsInv.find(c => c.code === cc.code)
+                if (!champ) return null
+                const opts = parseOptions(champ.options)
+                const isClient = CODES_CLIENT.includes(champ.code.toUpperCase())
+                const isPlateforme = CODES_PLATEFORME.includes(champ.code.toUpperCase())
+                return (
+                  <div key={cc.code} className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">{champ.label}{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                    {isClient ? (
+                      <select className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))}>
+                        <option value="">— Choisir un client —</option>
+                        {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
+                      </select>
+                    ) : isPlateforme ? (
+                      <select className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))}>
+                        <option value="">— Choisir une plateforme —</option>
+                        {plateformes.map(pl => <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>{getEntiteLabel(pl, champsPlateformes)}</option>)}
+                      </select>
+                    ) : champ.type === 'SELECT' ? (
+                      <select className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))}>
+                        <option value="">— Choisir —</option>
+                        {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (champ.type === 'DATE' || champ.type === 'DATE_TODAY') ? (
+                      <input type="date" className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))} />
+                    ) : champ.type === 'NUMBER' ? (
+                      <input type="number" className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))} />
+                    ) : (
+                      <input type="text" className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))} />
+                    )}
+                  </div>
+                )
+              })}
+              {configChamps.filter(c => c.visible).length === 0 && (
+                <p style={{ color: '#9ca3af', fontSize: '13px' }}>Aucun champ configuré — allez dans Configuration → Attendus.</p>
+              )}
             </div>
-            <div className="form-group">
-              <label className="form-label">N° BT</label>
-              <input className="form-input" value={bt} onChange={e => setBt(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Plateforme</label>
-              <select className="form-input" value={plateforme} onChange={e => setPlateforme(e.target.value)}>
-                <option value="">— Choisir une plateforme —</option>
-                {plateformes.map(pl => (
-                  <option key={pl.id} value={getPlateformeLabel(pl)}>{getPlateformeLabel(pl)}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Date création RMA</label>
-              <input type="date" className="form-input" value={dateCreationRMA} onChange={e => setDateCreationRMA(e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
               <button className="btn btn-secondary" onClick={() => setEditInfos(false)}>Annuler</button>
               <button className="btn btn-primary" onClick={handleSaveInfos}>Enregistrer</button>
             </div>

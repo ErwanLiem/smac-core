@@ -14,18 +14,18 @@ export async function getStatuts(req: Request, res: Response) {
 }
 
 export async function createStatut(req: Request, res: Response) {
-  const { code, label, couleur, icone, ordre, estFinal } = req.body
+  const { code, label, couleur, icone, ordre, estFinal, estStock, estTransfert } = req.body
   const statut = await prisma.statut.create({
-    data: { siteId: Number(req.params.siteId), code, label, couleur, icone, ordre, estFinal }
+    data: { siteId: Number(req.params.siteId), code, label, couleur, icone, ordre, estFinal, estStock, estTransfert }
   })
   res.status(201).json(statut)
 }
 
 export async function updateStatut(req: Request, res: Response) {
-  const { label, couleur, icone, ordre, estFinal } = req.body
+  const { label, couleur, icone, ordre, estFinal, estStock, estTransfert } = req.body
   const statut = await prisma.statut.update({
     where: { id: Number(req.params.id) },
-    data: { label, couleur, icone, ordre, estFinal }
+    data: { label, couleur, icone, ordre, estFinal, estStock, estTransfert }
   })
   res.json(statut)
 }

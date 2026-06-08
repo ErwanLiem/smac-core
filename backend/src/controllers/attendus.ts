@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import * as fs from 'fs'
+import { verifierReglesAlerte } from '../utils/reglesAlerte'
 
 const prisma = new PrismaClient()
 
@@ -129,6 +130,18 @@ async function creerEntreeInventaire(params: {
   // Dédupliquer (les champs explicites écrasent l'auto-remplissage)
   const valeursMap = new Map<number, string>()
   for (const v of valeurs) valeursMap.set(v.champId, v.valeur)
+
+  // Vérifier les règles d'alerte sur l'entrée existante (statut final) pour ce S/N
+  const alerte = await verifierReglesAlerte(prisma, siteId, ligne.sn, champsInv)
+
+  // Ajouter les champs auto-fill de la règle (sans écraser les valeurs existantes)
+  if (alerte?.champsAutoFill?.length) {
+    for (const af of alerte.champsAutoFill) {
+      const champ = champsInv.find(c => c.code.toUpperCase() === af.codeChamp.toUpperCase())
+      if (champ && !valeursMap.has(champ.id)) valeursMap.set(champ.id, af.valeur)
+    }
+  }
+
   const valeursDedupliquees = Array.from(valeursMap.entries()).map(([champId, valeur]) => ({ champId, valeur }))
 
   await prisma.inventaire.create({
@@ -136,6 +149,8 @@ async function creerEntreeInventaire(params: {
       siteId,
       articleId: article?.id ?? null,
       statutId: statutStockId,
+      couleurAlerte: alerte?.couleurAlerte ?? null,
+      regleAlerteId: alerte?.regleAlerteId ?? null,
       valeurs: { create: valeursDedupliquees }
     }
   })
@@ -300,10 +315,13 @@ export async function importExcel(req: Request, res: Response, next: any) {
 export async function update(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
-    const { rma, bt, donneesCommunes } = req.body
+    const { donneesCommunes } = req.body
+    const donnees: Record<string, string> = donneesCommunes ?? {}
+    const rmaAuto = Object.entries(donnees).find(([k]) => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(k)))?.[1] ?? null
+    const btAuto  = Object.entries(donnees).find(([k]) => ['BT', 'BT_RECEP', 'BON_TRANSPORT'].includes(normalizeCode(k)))?.[1] ?? null
     const attendu = await prisma.attendu.update({
       where: { id: Number(id) },
-      data: { rma, bt, donneesCommunes: donneesCommunes ? JSON.stringify(donneesCommunes) : null }
+      data: { rma: rmaAuto, bt: btAuto, donneesCommunes: Object.keys(donnees).length > 0 ? JSON.stringify(donnees) : null }
     })
     res.json(attendu)
   } catch (e) { next(e) }
@@ -441,11 +459,14 @@ export async function cloturer(req: Request, res: Response, next: any) {
     // Charger données pour injection
     const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId, actif: true } })
     const { champsArticle, trouverParPN } = await chargerArticles(attendu.siteId)
-    // Statut de clôture : depuis la config ou fallback recherche "STOCK"
+    // Statut de clôture : rôle estStock en priorité, sinon config, sinon fallback code STOCK
     const configSite = await prisma.configAttendus.findUnique({ where: { siteId: attendu.siteId } })
-    const statutStock = configSite?.statutCloture
-      ? await prisma.statut.findFirst({ where: { siteId: attendu.siteId, code: configSite.statutCloture } })
-      : await prisma.statut.findFirst({ where: { siteId: attendu.siteId, OR: [{ code: { contains: 'STOCK' } }, { label: { contains: 'stock' } }] } })
+    const statutStock =
+      await prisma.statut.findFirst({ where: { siteId: attendu.siteId, estStock: true } })
+      ?? (configSite?.statutCloture
+        ? await prisma.statut.findFirst({ where: { siteId: attendu.siteId, code: configSite.statutCloture } })
+        : await prisma.statut.findFirst({ where: { siteId: attendu.siteId, OR: [{ code: { contains: 'STOCK' } }, { label: { contains: 'stock' } }] } })
+      )
 
     // S/N à exclure (déjà en inventaire avec statut non final)
     const idsSN = getIdsSN(champsInv)

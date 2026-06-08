@@ -60,40 +60,45 @@ export async function getRoles(req: Request, res: Response) {
   res.json(roles)
 }
 
-export async function createRole(req: Request, res: Response) {
-  const siteId = Number(req.params.siteId)
-  const { code, label, permissions } = req.body
-  const role = await prisma.role.create({
-    data: {
-      siteId, code, label,
-      permissions: { create: (permissions ?? []).map((p: { page: string; action: string }) => ({ page: p.page, action: p.action })) }
-    },
-    include: { permissions: true }
-  })
-  res.json(role)
+export async function createRole(req: Request, res: Response, next: any) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const { code, label, permissions } = req.body
+    const role = await prisma.role.create({
+      data: {
+        siteId, code, label,
+        permissions: { create: (permissions ?? []).map((p: { page: string; action: string }) => ({ page: p.page, action: p.action })) }
+      },
+      include: { permissions: true }
+    })
+    res.json(role)
+  } catch (e) { next(e) }
 }
 
-export async function updateRole(req: Request, res: Response) {
-  const id = Number(req.params.id)
-  const { label, permissions } = req.body
-
-  await prisma.permissionRole.deleteMany({ where: { roleId: id } })
-  const role = await prisma.role.update({
-    where: { id },
-    data: {
-      label,
-      permissions: { create: (permissions ?? []).map((p: { page: string; action: string }) => ({ page: p.page, action: p.action })) }
-    },
-    include: { permissions: true }
-  })
-  res.json(role)
+export async function updateRole(req: Request, res: Response, next: any) {
+  try {
+    const id = Number(req.params.id)
+    const { label, permissions } = req.body
+    await prisma.permissionRole.deleteMany({ where: { roleId: id } })
+    const role = await prisma.role.update({
+      where: { id },
+      data: {
+        label,
+        permissions: { create: (permissions ?? []).map((p: { page: string; action: string }) => ({ page: p.page, action: p.action })) }
+      },
+      include: { permissions: true }
+    })
+    res.json(role)
+  } catch (e) { next(e) }
 }
 
-export async function deleteRole(req: Request, res: Response) {
-  const id = Number(req.params.id)
-  await prisma.permissionRole.deleteMany({ where: { roleId: id } })
-  await prisma.role.delete({ where: { id } })
-  res.json({ ok: true })
+export async function deleteRole(req: Request, res: Response, next: any) {
+  try {
+    const id = Number(req.params.id)
+    await prisma.permissionRole.deleteMany({ where: { roleId: id } })
+    await prisma.role.delete({ where: { id } })
+    res.json({ ok: true })
+  } catch (e) { next(e) }
 }
 
 export async function getPagesDisponibles(_req: Request, res: Response) {
@@ -113,46 +118,50 @@ export async function getUtilisateurs(req: Request, res: Response) {
   res.json(utilisateurs.map(u => ({ ...u, motDePasse: undefined })))
 }
 
-export async function createUtilisateur(req: Request, res: Response) {
-  const siteId = Number(req.params.siteId)
-  const { nom, prenom, login, roleId } = req.body
-
-  const mdpGenere = genererMotDePasse()
-  const mdpHash = await bcrypt.hash(mdpGenere, 12)
-
-  const utilisateur = await prisma.utilisateur.create({
-    data: { siteId, nom, prenom, login, motDePasse: mdpHash, roleId, doitChangerMdp: true },
-    include: { role: true }
-  })
-
-  // On retourne le mot de passe en clair UNE SEULE FOIS à la création
-  res.json({ ...utilisateur, motDePasse: undefined, mdpGenere })
+export async function createUtilisateur(req: Request, res: Response, next: any) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const { nom, prenom, login, roleId } = req.body
+    const mdpGenere = genererMotDePasse()
+    const mdpHash = await bcrypt.hash(mdpGenere, 12)
+    const utilisateur = await prisma.utilisateur.create({
+      data: { siteId, nom, prenom, login, motDePasse: mdpHash, roleId, doitChangerMdp: true },
+      include: { role: true }
+    })
+    res.json({ ...utilisateur, motDePasse: undefined, mdpGenere })
+  } catch (e) { next(e) }
 }
 
-export async function updateUtilisateur(req: Request, res: Response) {
-  const id = Number(req.params.id)
-  const { nom, prenom, login, roleId, actif } = req.body
-  const utilisateur = await prisma.utilisateur.update({
-    where: { id },
-    data: { nom, prenom, login, roleId, actif },
-    include: { role: true }
-  })
-  res.json({ ...utilisateur, motDePasse: undefined })
+export async function updateUtilisateur(req: Request, res: Response, next: any) {
+  try {
+    const id = Number(req.params.id)
+    const { nom, prenom, login, roleId, actif } = req.body
+    const utilisateur = await prisma.utilisateur.update({
+      where: { id },
+      data: { nom, prenom, login, roleId, actif },
+      include: { role: true }
+    })
+    res.json({ ...utilisateur, motDePasse: undefined })
+  } catch (e) { next(e) }
 }
 
-export async function deleteUtilisateur(req: Request, res: Response) {
-  const id = Number(req.params.id)
-  await prisma.utilisateur.delete({ where: { id } })
-  res.json({ ok: true })
+export async function deleteUtilisateur(req: Request, res: Response, next: any) {
+  try {
+    const id = Number(req.params.id)
+    await prisma.utilisateur.delete({ where: { id } })
+    res.json({ ok: true })
+  } catch (e) { next(e) }
 }
 
-export async function reinitialiserMdp(req: Request, res: Response) {
-  const id = Number(req.params.id)
-  const mdpGenere = genererMotDePasse()
-  const mdpHash = await bcrypt.hash(mdpGenere, 12)
-  await prisma.utilisateur.update({
-    where: { id },
-    data: { motDePasse: mdpHash, doitChangerMdp: true }
-  })
-  res.json({ mdpGenere })
+export async function reinitialiserMdp(req: Request, res: Response, next: any) {
+  try {
+    const id = Number(req.params.id)
+    const mdpGenere = genererMotDePasse()
+    const mdpHash = await bcrypt.hash(mdpGenere, 12)
+    await prisma.utilisateur.update({
+      where: { id },
+      data: { motDePasse: mdpHash, doitChangerMdp: true }
+    })
+    res.json({ mdpGenere })
+  } catch (e) { next(e) }
 }

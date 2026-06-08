@@ -15,9 +15,11 @@ model article {
   updatedAt        DateTime           @updatedAt
   site             site               @relation(fields: [siteId], references: [id], map: "Article_siteId_fkey")
   statut           statut?            @relation(fields: [statutId], references: [id], map: "Article_statutId_fkey")
-  historiquestatut historiquestatut[]
-  valeurs          valeurChamp[]
-  inventaires      inventaire[]
+  historiquestatut  historiquestatut[]
+  valeurs           valeurChamp[]
+  inventaires       inventaire[]
+  demandesTransfert demandeTransfert[]
+  inventairesLabo   inventaireLabo[]
 
   @@index([siteId], map: "Article_siteId_fkey")
   @@index([statutId], map: "Article_statutId_fkey")
@@ -140,16 +142,21 @@ model inventaire {
   siteId           Int
   articleId        Int?
   statutId         Int?
+  couleurAlerte    String?
+  regleAlerteId    Int?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   site             site               @relation(fields: [siteId], references: [id], map: "Inventaire_siteId_fkey")
   article          article?           @relation(fields: [articleId], references: [id], map: "Inventaire_articleId_fkey")
   statut           statut?            @relation(fields: [statutId], references: [id], onDelete: Cascade, map: "Inventaire_statutId_fkey")
+  regleAlerte      regleAlerte?       @relation(fields: [regleAlerteId], references: [id], map: "Inventaire_regleAlerteId_fkey")
   valeurs          valeurChampInventaire[]
+  lignesTransfert  ligneDemandeTransfert[]
 
   @@index([siteId], map: "Inventaire_siteId_fkey")
   @@index([articleId], map: "Inventaire_articleId_fkey")
   @@index([statutId], map: "Inventaire_statutId_fkey")
+  @@index([regleAlerteId], map: "Inventaire_regleAlerteId_fkey")
 }
 
 model champInventaire {
@@ -306,6 +313,124 @@ model site {
   attendu              attendu[]
   configAttendus       configAttendus?
   configImportExcel    configImportExcel[]
+  regleAlerte          regleAlerte[]
+  configProduction     configProduction?
+  technicienProduction technicienProduction[]
+  demandeTransfert     demandeTransfert[]
+  inventaireLabo       inventaireLabo[]
+}
+
+// ─── Module Production ───────────────────────────────────────────────────────
+
+// Configuration du module production par site
+model configProduction {
+  id                   Int     @id @default(autoincrement())
+  siteId               Int     @unique
+  champPNCode          String  @default("PN")    // code du champInventaire jouant le rôle P/N
+  champRMACode         String  @default("BL")    // code du champInventaire jouant le rôle RMA/BL
+  labelPN              String  @default("P/N")   // label affiché dans l'interface
+  labelRMA             String  @default("RMA")   // label affiché dans l'interface
+  champTypeArticleCode String  @default("TYPE")  // code du champArticle contenant le type
+  typesArticleQTE      String? @db.LongText      // JSON: ["PDA","TABLETTE"] — types éligibles transfert QTE
+  champsAffichageQTE   String? @db.LongText      // JSON: ["PN","DESIGNATION","TYPE"] — champs à afficher dans la liste
+  site                 site    @relation(fields: [siteId], references: [id], map: "ConfigProduction_siteId_fkey")
+}
+
+// Techniciens affectés à la production sur un site
+model technicienProduction {
+  id               Int                  @id @default(autoincrement())
+  siteId           Int
+  userId           Int
+  quotaJournalier  Int                  @default(10)
+  actif            Boolean              @default(true)
+  site             site                 @relation(fields: [siteId], references: [id], map: "TechnicienProduction_siteId_fkey")
+  utilisateur      utilisateur          @relation(fields: [userId], references: [id], map: "TechnicienProduction_userId_fkey")
+  absences         absenceTechnicien[]
+
+  @@unique([siteId, userId], map: "TechnicienProduction_siteId_userId_key")
+  @@index([siteId], map: "TechnicienProduction_siteId_fkey")
+  @@index([userId], map: "TechnicienProduction_userId_fkey")
+}
+
+// Absences ou réductions de capacité d'un technicien
+model absenceTechnicien {
+  id             Int                  @id @default(autoincrement())
+  technicienId   Int
+  date           DateTime             @db.Date
+  motif          String?
+  quotaOverride  Int?                 // null = absent total, sinon quota réduit pour ce jour
+  technicien     technicienProduction @relation(fields: [technicienId], references: [id], onDelete: Cascade, map: "AbsenceTechnicien_technicienId_fkey")
+
+  @@unique([technicienId, date], map: "AbsenceTechnicien_technicienId_date_key")
+  @@index([technicienId], map: "AbsenceTechnicien_technicienId_fkey")
+}
+
+// Demande de transfert vers la production (SN ou QTE)
+model demandeTransfert {
+  id              Int                     @id @default(autoincrement())
+  siteId          Int
+  type            String                  // 'SN' | 'QTE'
+  statut          String                  @default("EN_ATTENTE") // EN_ATTENTE | VALIDEE | ANNULEE
+  datePlanifiee   DateTime                @db.Date
+  quantite        Int
+  // Champs SN
+  pnValeur        String?                 // valeur P/N du groupe
+  rmaValeur       String?                 // valeur RMA/BL du groupe
+  // Champs QTE
+  articleId       Int?
+  createdAt       DateTime                @default(now())
+  site            site                    @relation(fields: [siteId], references: [id], map: "DemandeTransfert_siteId_fkey")
+  article         article?                @relation(fields: [articleId], references: [id], map: "DemandeTransfert_articleId_fkey")
+  lignes          ligneDemandeTransfert[]
+
+  @@index([siteId], map: "DemandeTransfert_siteId_fkey")
+  @@index([articleId], map: "DemandeTransfert_articleId_fkey")
+}
+
+// Lignes d'une demande SN : pointe vers les inventaires concernés
+model ligneDemandeTransfert {
+  id                 Int              @id @default(autoincrement())
+  demandeTransfertId Int
+  inventaireId       Int
+  demande            demandeTransfert @relation(fields: [demandeTransfertId], references: [id], onDelete: Cascade, map: "LigneDemandeTransfert_demandeId_fkey")
+  inventaire         inventaire       @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "LigneDemandeTransfert_inventaireId_fkey")
+
+  @@unique([demandeTransfertId, inventaireId], map: "LigneDemandeTransfert_demandeId_inventaireId_key")
+  @@index([demandeTransfertId], map: "LigneDemandeTransfert_demandeId_fkey")
+  @@index([inventaireId], map: "LigneDemandeTransfert_inventaireId_fkey")
+}
+
+// Inventaire labo (articles à la quantité, ex: PDAs)
+model inventaireLabo {
+  id        Int      @id @default(autoincrement())
+  siteId    Int
+  articleId Int
+  quantite  Int      @default(0)
+  updatedAt DateTime @updatedAt
+  site      site     @relation(fields: [siteId], references: [id], map: "InventaireLabo_siteId_fkey")
+  article   article  @relation(fields: [articleId], references: [id], map: "InventaireLabo_articleId_fkey")
+
+  @@unique([siteId, articleId], map: "InventaireLabo_siteId_articleId_key")
+  @@index([siteId], map: "InventaireLabo_siteId_fkey")
+  @@index([articleId], map: "InventaireLabo_articleId_fkey")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+model regleAlerte {
+  id             Int          @id @default(autoincrement())
+  siteId         Int
+  nom            String
+  codeChampDate  String       // code du champInventaire de type DATE à surveiller
+  seuilMois      Int          @default(3)
+  couleurAlerte  String       @default("#f59e0b")
+  champsAutoFill String?      @db.LongText // JSON: [{ codeChamp: "NOTE", valeur: "Sous garantie" }]
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  site           site         @relation(fields: [siteId], references: [id], map: "RegleAlerte_siteId_fkey")
+  inventaires    inventaire[]
+
+  @@index([siteId], map: "RegleAlerte_siteId_fkey")
 }
 
 model statut {
@@ -317,6 +442,8 @@ model statut {
   icone                                      String?
   ordre                                      Int                @default(0)
   estFinal                                   Boolean            @default(false)
+  estStock                                   Boolean            @default(false)
+  estTransfert                               Boolean            @default(false)
   article                                    article[]
   inventaire                                 inventaire[]
   historiquestatut                           historiquestatut[]
@@ -355,8 +482,9 @@ model utilisateur {
   actif            Boolean  @default(true)
   doitChangerMdp   Boolean  @default(true)
   createdAt        DateTime @default(now())
-  role             role     @relation(fields: [roleId], references: [id], map: "Utilisateur_roleId_fkey")
-  site             site     @relation(fields: [siteId], references: [id], map: "Utilisateur_siteId_fkey")
+  role                 role                   @relation(fields: [roleId], references: [id], map: "Utilisateur_roleId_fkey")
+  site                 site                   @relation(fields: [siteId], references: [id], map: "Utilisateur_siteId_fkey")
+  technicienProduction technicienProduction[]
 
   @@index([roleId], map: "Utilisateur_roleId_fkey")
   @@index([siteId], map: "Utilisateur_siteId_fkey")

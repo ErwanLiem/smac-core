@@ -43,6 +43,7 @@ interface Inventaire {
   article: Article
   statutId: number | null
   statut: Statut | null
+  couleurAlerte: string | null
   createdAt: string
   valeurs: ValeurChamp[]
 }
@@ -316,7 +317,14 @@ export default function Inventaire() {
                 </td></tr>
               )}
               {filteredInventaires.map((item, idx) => (
-                <tr key={item.id} style={{ background: selection.has(item.id) ? '#dbeafe' : idx % 2 === 0 ? '#1a1d27' : '#141720' }}>
+                <tr key={item.id} style={{
+                  background: selection.has(item.id)
+                    ? '#1e3a5f'
+                    : item.couleurAlerte
+                      ? `${item.couleurAlerte}26`
+                      : idx % 2 === 0 ? '#1a1d27' : '#141720',
+                  borderLeft: item.couleurAlerte ? `3px solid ${item.couleurAlerte}` : undefined,
+                }}>
                   <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                     <input type="checkbox"
                       checked={selection.has(item.id)}
@@ -410,7 +418,7 @@ export default function Inventaire() {
             <form onSubmit={handleEdit}>
               <div className="form-group">
                 <label className="form-label">Article</label>
-                <input type="text" disabled className="form-input" value={getArticleLabel(editItem.articleId)} style={{ background: '#f3f4f6', cursor: 'not-allowed' }} />
+                <input type="text" disabled className="form-input" value={getArticleLabel(editItem.articleId)} style={{ background: '#141720', color: '#9ca3af', cursor: 'not-allowed' }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Statut</label>

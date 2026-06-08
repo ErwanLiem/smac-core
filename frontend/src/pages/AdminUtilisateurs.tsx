@@ -20,7 +20,7 @@ export default function AdminUtilisateurs() {
   const [form, setForm] = useState({ nom: '', prenom: '', login: '', roleId: 0 })
   const [editId, setEditId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ nom: '', prenom: '', login: '', roleId: 0, actif: true })
-  const [modal, setModal] = useState<{ type: 'delete' | 'mdp'; id: number; mdp?: string } | null>(null)
+  const [modal, setModal] = useState<{ type: 'delete' | 'mdp' | 'erreur'; id: number; mdp?: string; message?: string } | null>(null)
 
   useEffect(() => { reload() }, [siteId])
 
@@ -35,16 +35,24 @@ export default function AdminUtilisateurs() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    const result = await post<{ mdpGenere: string }>(`/gestion/${siteId}/utilisateurs`, form)
-    setForm({ nom: '', prenom: '', login: '', roleId: 0 })
-    setModal({ type: 'mdp', id: 0, mdp: result.mdpGenere })
-    reload()
+    try {
+      const result = await post<{ mdpGenere: string }>(`/gestion/${siteId}/utilisateurs`, form)
+      setForm({ nom: '', prenom: '', login: '', roleId: 0 })
+      setModal({ type: 'mdp', id: 0, mdp: result.mdpGenere })
+      reload()
+    } catch (e: any) {
+      setModal({ type: 'erreur', id: 0, message: e.message ?? 'Erreur lors de la création' })
+    }
   }
 
   async function handleUpdate(id: number) {
-    await put(`/gestion/utilisateurs/${id}`, editForm)
-    setEditId(null)
-    reload()
+    try {
+      await put(`/gestion/utilisateurs/${id}`, editForm)
+      setEditId(null)
+      reload()
+    } catch (e: any) {
+      setModal({ type: 'erreur', id, message: e.message ?? 'Erreur lors de la modification' })
+    }
   }
 
   async function handleDelete(id: number) {
@@ -191,6 +199,22 @@ export default function AdminUtilisateurs() {
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
               <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => handleDelete(modal.id)}>Supprimer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal erreur */}
+      {modal?.type === 'erreur' && (
+        <div className="modal-overlay">
+          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '420px', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '22px' }}>⚠️</span>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#f87171' }}>Impossible de créer l'utilisateur</h3>
+            </div>
+            <p style={{ color: '#d1d5db', fontSize: '14px', marginBottom: '24px' }}>{modal.message}</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={() => setModal(null)}>Fermer</button>
             </div>
           </div>
         </div>
