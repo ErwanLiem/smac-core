@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import * as fs from 'fs'
 import { verifierReglesAlerte } from '../utils/reglesAlerte'
+import { hasRole } from '../utils/roles'
 
 const prisma = new PrismaClient()
 
@@ -87,6 +88,7 @@ async function creerEntreeInventaire(params: {
   const idPlateforme  = findChampId(['PLATEFORME', 'PLATEFORMES', 'PLATFORM'])
   const idClient      = findChampId(['CLIENT', 'CLIENTS'])
   const idAccessoires = findChampId(['ACCESSOIRES', 'ACCESSOIRE', 'ACCESSORIES'])
+  const idCaisse      = findChampId(['CAISSE'])
 
   const valeurs: { champId: number; valeur: string }[] = []
 
@@ -126,6 +128,7 @@ async function creerEntreeInventaire(params: {
       if (accs.length > 0) valeurs.push({ champId: idAccessoires, valeur: accs.join(', ') })
     } catch {}
   }
+  if (idCaisse && ligne.caisse) valeurs.push({ champId: idCaisse, valeur: ligne.caisse })
 
   // Dédupliquer (les champs explicites écrasent l'auto-remplissage)
   const valeursMap = new Map<number, string>()
@@ -302,6 +305,31 @@ export async function importExcel(req: Request, res: Response, next: any) {
     const rmaAuto = Object.entries(donnees).find(([k]) => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(k)))?.[1] || null
     const btAuto  = Object.entries(donnees).find(([k]) => ['BT', 'BT_RECEP', 'BON_TRANSPORT'].includes(normalizeCode(k)))?.[1] || null
 
+    // Vérifier l'unicité des champs marqués uniqueValeur
+    if (config?.champsAttendu) {
+      try {
+        const champsConfig: any[] = typeof config.champsAttendu === 'string' ? JSON.parse(config.champsAttendu) : (config.champsAttendu as any)
+        const champsUniques = champsConfig.filter((c: any) => c.uniqueValeur && c.visible)
+        if (champsUniques.length > 0) {
+          const attendusExistants = await prisma.attendu.findMany({ where: { siteId: Number(siteId), statut: { not: 'CLOS' } } })
+          for (const champCfg of champsUniques) {
+            const valeur = donnees[champCfg.code]
+            if (!valeur) continue
+            for (const att of attendusExistants) {
+              if (!att.donneesCommunes) continue
+              try {
+                const dc: Record<string, string> = JSON.parse(att.donneesCommunes)
+                if (dc[champCfg.code] === valeur) {
+                  fs.unlinkSync(file.path)
+                  return res.status(400).json({ error: `Un attendu non clôturé possède déjà la valeur "${valeur}" pour le champ "${champCfg.code}" (Attendu #${att.id}). Ce champ est configuré comme unique.` })
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+    }
+
     const attendu = await prisma.attendu.create({
       data: { siteId: Number(siteId), rma: rmaAuto, bt: btAuto, donneesCommunes: Object.keys(donnees).length > 0 ? JSON.stringify(donnees) : null, statut: 'EN_COURS' }
     })
@@ -342,7 +370,7 @@ export async function deleteAttendu(req: Request, res: Response, next: any) {
 export async function scannerSN(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
-    const { sn, pn, accessoires } = req.body
+    const { sn, pn, accessoires, caisse } = req.body
 
     const attendu = await prisma.attendu.findUnique({ where: { id: Number(id) }, include: { lignes: true } })
     if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
@@ -365,7 +393,7 @@ export async function scannerSN(req: Request, res: Response, next: any) {
       include: { inventaire: { include: { statut: true } } }
     })
 
-    if (existingVal && !(existingVal.inventaire?.statut?.estFinal ?? false)) {
+    if (existingVal && !(hasRole(existingVal.inventaire?.statut?.roles, 'estFinal'))) {
       dejaEnInventaire = true
       const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(c.code)))
       if (champsRMA.length > 0) {
@@ -379,7 +407,7 @@ export async function scannerSN(req: Request, res: Response, next: any) {
     if (ligne) {
       await prisma.ligneAttendue.update({
         where: { id: ligne.id },
-        data: { statut: 'RECU', snRecu: snNorm, accessoires: accessoiresJson }
+        data: { statut: 'RECU', snRecu: snNorm, accessoires: accessoiresJson, caisse: caisse || null }
       })
       // Si doublon actif → créer une ligne DOUBLON_INVENTAIRE pour le rapport
       if (dejaEnInventaire) {
@@ -442,7 +470,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
       where: { champId: { in: idsSNCheck }, valeur: { in: lignesRecues.map(l => l.sn) } },
       include: { inventaire: { include: { statut: true } } }
     }) : []
-    const doublonsActifs = existants.filter(e => !(e.inventaire?.statut?.estFinal ?? false))
+    const doublonsActifs = existants.filter(e => !(hasRole(e.inventaire?.statut?.roles, 'estFinal')))
     if (doublonsActifs.length > 0) {
       return res.status(400).json({
         error: `Clôture impossible : ${doublonsActifs.length} S/N déjà présent${doublonsActifs.length > 1 ? 's' : ''} en inventaire avec un statut non final.`,
@@ -462,7 +490,11 @@ export async function cloturer(req: Request, res: Response, next: any) {
     // Statut de clôture : rôle estStock en priorité, sinon config, sinon fallback code STOCK
     const configSite = await prisma.configAttendus.findUnique({ where: { siteId: attendu.siteId } })
     const statutStock =
-      await prisma.statut.findFirst({ where: { siteId: attendu.siteId, estStock: true } })
+      await (async () => {
+        const sIds = (await prisma.statut.findMany({ where: { siteId: attendu.siteId }, select: { id: true, roles: true } }))
+          .filter(s => hasRole(s.roles, 'estStock')).map(s => s.id)
+        return sIds.length > 0 ? prisma.statut.findFirst({ where: { id: { in: sIds } } }) : null
+      })()
       ?? (configSite?.statutCloture
         ? await prisma.statut.findFirst({ where: { siteId: attendu.siteId, code: configSite.statutCloture } })
         : await prisma.statut.findFirst({ where: { siteId: attendu.siteId, OR: [{ code: { contains: 'STOCK' } }, { label: { contains: 'stock' } }] } })
@@ -475,7 +507,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
       include: { inventaire: { include: { statut: true } } }
     }) : []
     const snsDejaPresents = new Set(
-      snsExistants.filter(v => !(v.inventaire?.statut?.estFinal ?? false)).map(v => v.valeur)
+      snsExistants.filter(v => !(hasRole(v.inventaire?.statut?.roles, 'estFinal'))).map(v => v.valeur)
     )
 
     const dateAujourdhui = new Date().toISOString().split('T')[0]
@@ -483,9 +515,14 @@ export async function cloturer(req: Request, res: Response, next: any) {
     const snDoublons: string[] = []
 
     for (const ligne of lignesRecues) {
-      if (snsDejaPresents.has(ligne.sn)) { snDoublons.push(ligne.sn); continue }
+      if (snsDejaPresents.has(ligne.sn)) {
+        snDoublons.push(ligne.sn)
+        await prisma.ligneAttendue.update({ where: { id: ligne.id }, data: { statut: 'DOUBLON_INVENTAIRE', notes: 'Déjà présent en inventaire au moment de la clôture' } })
+        continue
+      }
       const article = trouverParPN(ligne.pn)
       await creerEntreeInventaire({ siteId: attendu.siteId, ligne, attendu, article, champsInv, champsArticle, statutStockId: statutStock?.id ?? null, dateAujourdhui })
+      await prisma.ligneAttendue.update({ where: { id: ligne.id }, data: { statut: 'INJECTE' } })
       lignesInjectees++
     }
 
@@ -505,22 +542,26 @@ export async function rapport(req: Request, res: Response) {
   const lignesNormales = attendu.lignes.filter(l => l.statut !== 'DOUBLON_INVENTAIRE')
   const nonRecus   = lignesNormales.filter(l => l.statut === 'NON_RECU' || l.statut === 'ATTENDU')
   const inattendus = lignesNormales.filter(l => l.statut === 'INATTENDU')
-  const recus      = lignesNormales.filter(l => l.statut === 'RECU')
+  // RECU = reçu mais pas encore injecté (attendu ouvert) ; INJECTE = injecté lors de la clôture
+  const recus      = lignesNormales.filter(l => l.statut === 'RECU' || l.statut === 'INJECTE')
+  // On ne vérifie les doublons inventaire qu'en temps réel sur les RECU (avant clôture)
+  // Après clôture, les INJECTE sont dans l'inventaire mais ne sont PAS des doublons
+  const recusNonInjectes = lignesNormales.filter(l => l.statut === 'RECU')
 
   // Calculer doublons inventaire en temps réel
   const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
   const idsSN = getIdsSN(champsInv)
   const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(c.code)))
 
-  const valeursExistantes = recus.length > 0 ? await prisma.valeurChampInventaire.findMany({
-    where: { champId: { in: idsSN }, valeur: { in: recus.map(l => l.sn) } },
+  const valeursExistantes = recusNonInjectes.length > 0 ? await prisma.valeurChampInventaire.findMany({
+    where: { champId: { in: idsSN }, valeur: { in: recusNonInjectes.map(l => l.sn) } },
     include: { inventaire: { include: { statut: true } } }
   }) : []
 
   // Garder uniquement les doublons avec statut NON final
   const doublonsInventaire: any[] = []
-  for (const val of valeursExistantes.filter(e => !(e.inventaire?.statut?.estFinal ?? false))) {
-    const ligne = recus.find(l => l.sn === val.valeur)
+  for (const val of valeursExistantes.filter(e => !(hasRole(e.inventaire?.statut?.roles, 'estFinal')))) {
+    const ligne = recusNonInjectes.find(l => l.sn === val.valeur)
     if (!ligne) continue
     let rmaExistant = null
     if (champsRMA.length > 0) {

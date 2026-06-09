@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { serializeRoles } from '../utils/roles'
 
 const prisma = new PrismaClient()
 
@@ -10,24 +11,36 @@ export async function getStatuts(req: Request, res: Response) {
     where: { siteId: Number(req.params.siteId) },
     orderBy: { ordre: 'asc' }
   })
-  res.json(statuts)
+  // Transformer roles (JSON string) en tableau pour le frontend
+  res.json(statuts.map(s => ({
+    ...s,
+    roles: (() => { try { return JSON.parse(s.roles || '[]') } catch { return [] } })()
+  })))
 }
 
 export async function createStatut(req: Request, res: Response) {
-  const { code, label, couleur, icone, ordre, estFinal, estStock, estTransfert } = req.body
+  const { code, label, couleur, icone, ordre, roles } = req.body
   const statut = await prisma.statut.create({
-    data: { siteId: Number(req.params.siteId), code, label, couleur, icone, ordre, estFinal, estStock, estTransfert }
+    data: {
+      siteId: Number(req.params.siteId),
+      code, label, couleur, icone,
+      ordre: ordre ?? 0,
+      roles: serializeRoles(roles ?? [])
+    }
   })
-  res.status(201).json(statut)
+  res.status(201).json({ ...statut, roles: JSON.parse(statut.roles || '[]') })
 }
 
 export async function updateStatut(req: Request, res: Response) {
-  const { label, couleur, icone, ordre, estFinal, estStock, estTransfert } = req.body
+  const { label, couleur, icone, ordre, roles } = req.body
   const statut = await prisma.statut.update({
     where: { id: Number(req.params.id) },
-    data: { label, couleur, icone, ordre, estFinal, estStock, estTransfert }
+    data: {
+      label, couleur, icone, ordre,
+      roles: serializeRoles(roles ?? [])
+    }
   })
-  res.json(statut)
+  res.json({ ...statut, roles: JSON.parse(statut.roles || '[]') })
 }
 
 export async function deleteStatut(req: Request, res: Response) {

@@ -13,10 +13,14 @@ export default function Suivi() {
   const siteId = getSiteId()
   const [articles, setArticles] = useState<Article[]>([])
   const [transitions, setTransitions] = useState<Transition[]>([])
+  const [chargement, setChargement] = useState(true)
 
   useEffect(() => {
-    articlesApi.getArticles(siteId).then(setArticles)
-    workflowApi.getTransitions(siteId).then(setTransitions)
+    setChargement(true)
+    Promise.all([
+      articlesApi.getArticles(siteId).then(setArticles),
+      workflowApi.getTransitions(siteId).then(setTransitions)
+    ]).then(() => setChargement(false))
   }, [siteId])
 
   async function handleTransition(article: Article, transitionId: number) {
@@ -40,6 +44,9 @@ export default function Suivi() {
         </div>
       </div>
 
+      {chargement ? (
+        <div className="loading-container"><div className="loading-spinner" /></div>
+      ) : (
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <table className="table">
           <thead>
@@ -118,6 +125,7 @@ export default function Suivi() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   )
 }

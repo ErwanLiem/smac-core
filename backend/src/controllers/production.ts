@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
+import { hasRole, serializeRoles } from '../utils/roles'
 
 const prisma = new PrismaClient()
 
@@ -7,6 +8,12 @@ const prisma = new PrismaClient()
 
 function normCode(s: string) {
   return s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '_').trim()
+}
+
+/** Trouve les IDs de tous les statuts ayant un rôle donné pour un site */
+async function getStatutIdsByRole(siteId: number, role: string): Promise<number[]> {
+  const statuts = await prisma.statut.findMany({ where: { siteId }, select: { id: true, roles: true } })
+  return statuts.filter(s => hasRole(s.roles, role)).map(s => s.id)
 }
 
 // ─── CONFIG PRODUCTION ───────────────────────────────────────────────────────
@@ -23,6 +30,7 @@ export async function getConfig(req: Request, res: Response, next: any) {
       ...config,
       typesArticleQTE:    config.typesArticleQTE    ? JSON.parse(config.typesArticleQTE)    : [],
       champsAffichageQTE: config.champsAffichageQTE ? JSON.parse(config.champsAffichageQTE) : [],
+      colonnesLabo:       config.colonnesLabo       ? JSON.parse(config.colonnesLabo)       : null,
     })
   } catch (e) { next(e) }
 }
@@ -30,12 +38,13 @@ export async function getConfig(req: Request, res: Response, next: any) {
 export async function updateConfig(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { champPNCode, champRMACode, labelPN, labelRMA, champTypeArticleCode, typesArticleQTE, champsAffichageQTE } = req.body
+    const { champPNCode, champRMACode, labelPN, labelRMA, champTypeArticleCode, typesArticleQTE, champsAffichageQTE, colonnesLabo } = req.body
     const data = {
       champPNCode, champRMACode, labelPN, labelRMA,
       champTypeArticleCode: champTypeArticleCode ?? 'TYPE',
       typesArticleQTE: typesArticleQTE !== undefined ? JSON.stringify(typesArticleQTE) : undefined,
       champsAffichageQTE: champsAffichageQTE !== undefined ? JSON.stringify(champsAffichageQTE) : undefined,
+      colonnesLabo: colonnesLabo !== undefined ? JSON.stringify(colonnesLabo) : undefined,
     }
     const config = await prisma.configProduction.upsert({
       where: { siteId: Number(siteId) },
@@ -47,6 +56,7 @@ export async function updateConfig(req: Request, res: Response, next: any) {
       ...config,
       typesArticleQTE: config.typesArticleQTE ? JSON.parse(config.typesArticleQTE) : [],
       champsAffichageQTE: config.champsAffichageQTE ? JSON.parse(config.champsAffichageQTE) : [],
+      colonnesLabo: config.colonnesLabo ? JSON.parse(config.colonnesLabo) : null,
     })
   } catch (e) { next(e) }
 }
@@ -241,31 +251,47 @@ export async function getCartes(req: Request, res: Response, next: any) {
       return res.json([])
     }
 
-    // Récupérer tous les inventaires avec statut estStock = true
+    const champCAISSE      = champsInv.find(c => normCode(c.code) === 'CAISSE')
+    const champDESIGNATION = champsInv.find(c => normCode(c.code) === 'DESIGNATION')
+
+    // Récupérer tous les inventaires avec statut rôle 'estStock'
+    const stockIds = await getStatutIdsByRole(Number(siteId), 'estStock')
     const inventaires = await prisma.inventaire.findMany({
       where: {
         siteId: Number(siteId),
-        statut: { estStock: true }
+        statutId: stockIds.length > 0 ? { in: stockIds } : undefined
       },
       include: { valeurs: true }
     })
 
     // Grouper par P/N × RMA
-    const groupes = new Map<string, { pnValeur: string; rmaValeur: string; ids: number[]; quantite: number }>()
+    const groupes = new Map<string, { pnValeur: string; rmaValeur: string; designationValeur: string; ids: number[]; quantite: number; caisseMap: Map<string, number> }>()
 
     for (const inv of inventaires) {
-      const pnVal  = inv.valeurs.find(v => v.champId === champPN.id)?.valeur  ?? ''
-      const rmaVal = inv.valeurs.find(v => v.champId === champRMA.id)?.valeur ?? ''
+      const pnVal     = inv.valeurs.find(v => v.champId === champPN.id)?.valeur    ?? ''
+      const rmaVal    = inv.valeurs.find(v => v.champId === champRMA.id)?.valeur   ?? ''
+      const caisseVal = champCAISSE      ? (inv.valeurs.find(v => v.champId === champCAISSE.id)?.valeur      ?? '') : ''
+      const desgVal   = champDESIGNATION ? (inv.valeurs.find(v => v.champId === champDESIGNATION.id)?.valeur ?? '') : ''
       const key = `${pnVal}__${rmaVal}`
       if (!groupes.has(key)) {
-        groupes.set(key, { pnValeur: pnVal, rmaValeur: rmaVal, ids: [], quantite: 0 })
+        groupes.set(key, { pnValeur: pnVal, rmaValeur: rmaVal, designationValeur: desgVal, ids: [], quantite: 0, caisseMap: new Map() })
       }
       const g = groupes.get(key)!
       g.ids.push(inv.id)
       g.quantite++
+      if (caisseVal) g.caisseMap.set(caisseVal, (g.caisseMap.get(caisseVal) ?? 0) + 1)
     }
 
-    res.json(Array.from(groupes.values()))
+    const result = Array.from(groupes.values()).map(g => ({
+      pnValeur: g.pnValeur,
+      rmaValeur: g.rmaValeur,
+      designationValeur: g.designationValeur,
+      ids: g.ids,
+      quantite: g.quantite,
+      caisses: Array.from(g.caisseMap.entries()).map(([numero, quantite]) => ({ numero, quantite }))
+    }))
+
+    res.json(result)
   } catch (e) { next(e) }
 }
 
@@ -282,7 +308,7 @@ export async function getDemandes(req: Request, res: Response, next: any) {
       },
       include: {
         article: { include: { valeurs: { include: { champ: true } } } },
-        lignes: { include: { inventaire: { include: { statut: true, valeurs: true } } } }
+        lignes: { include: { inventaire: { include: { statut: true, valeurs: { include: { champ: { select: { id: true, code: true } } } } } } } }
       },
       orderBy: [{ datePlanifiee: 'asc' }, { createdAt: 'desc' }]
     })
@@ -293,27 +319,34 @@ export async function getDemandes(req: Request, res: Response, next: any) {
 export async function createDemandeSN(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { datePlanifiee, quantite, pnValeur, rmaValeur } = req.body
+    const { datePlanifiee, quantite, pnValeur, rmaValeur, caisseValeur } = req.body
 
     const config = await prisma.configProduction.findUnique({ where: { siteId: Number(siteId) } })
     const champPNCode  = config?.champPNCode  ?? 'PN'
     const champRMACode = config?.champRMACode ?? 'BL'
 
     const champsInv = await prisma.champInventaire.findMany({ where: { siteId: Number(siteId) } })
-    const champPN  = champsInv.find(c => normCode(c.code) === normCode(champPNCode))
-    const champRMA = champsInv.find(c => normCode(c.code) === normCode(champRMACode))
+    const champPN     = champsInv.find(c => normCode(c.code) === normCode(champPNCode))
+    const champRMA    = champsInv.find(c => normCode(c.code) === normCode(champRMACode))
+    const champCAISSE = champsInv.find(c => normCode(c.code) === 'CAISSE')
 
     if (!champPN || !champRMA) return res.status(400).json({ error: 'Champs P/N ou RMA non configurés' })
 
-    // Trouver les inventaires estStock pour ce P/N × RMA
+    // Trouver les inventaires rôle 'estStock' pour ce P/N × RMA (+ caisse si fournie)
+    const stockIds2 = await getStatutIdsByRole(Number(siteId), 'estStock')
     const candidats = await prisma.inventaire.findMany({
-      where: { siteId: Number(siteId), statut: { estStock: true } },
+      where: { siteId: Number(siteId), statutId: stockIds2.length > 0 ? { in: stockIds2 } : undefined },
       include: { valeurs: true }
     })
     const matches = candidats.filter(inv => {
-      const pn  = inv.valeurs.find(v => v.champId === champPN.id)?.valeur  ?? ''
-      const rma = inv.valeurs.find(v => v.champId === champRMA.id)?.valeur ?? ''
-      return pn === pnValeur && rma === rmaValeur
+      const pn  = inv.valeurs.find(v => v.champId === champPN!.id)?.valeur  ?? ''
+      const rma = inv.valeurs.find(v => v.champId === champRMA!.id)?.valeur ?? ''
+      if (pn !== pnValeur || rma !== rmaValeur) return false
+      if (caisseValeur) {
+        const caisse = champCAISSE ? (inv.valeurs.find(v => v.champId === champCAISSE.id)?.valeur ?? '') : ''
+        return caisse === caisseValeur
+      }
+      return true
     })
 
     const qte = Math.min(Number(quantite), matches.length)
@@ -321,8 +354,11 @@ export async function createDemandeSN(req: Request, res: Response, next: any) {
 
     const selectionnes = matches.slice(0, qte)
 
-    // Trouver le statut estTransfert
-    const statutTransfert = await prisma.statut.findFirst({ where: { siteId: Number(siteId), estTransfert: true } })
+    // Trouver le statut avec rôle 'estTransfert'
+    const transfertIds = await getStatutIdsByRole(Number(siteId), 'estTransfert')
+    const statutTransfert = transfertIds.length > 0
+      ? await prisma.statut.findFirst({ where: { id: { in: transfertIds } } })
+      : null
     if (!statutTransfert) return res.status(400).json({ error: 'Aucun statut avec rôle Transfert configuré dans le workflow' })
 
     // Créer la demande + lignes + changer les statuts
@@ -410,6 +446,18 @@ export async function validerDemande(req: Request, res: Response, next: any) {
     if (!demande) return res.status(404).json({ error: 'Demande introuvable' })
     if (demande.statut !== 'EN_ATTENTE') return res.status(400).json({ error: 'Demande déjà traitée' })
 
+    if (demande.type === 'SN' && demande.lignes.length > 0) {
+      // Déclencher la transition workflow depuis le statut estTransfert
+      const invIds = demande.lignes.map(l => l.inventaireId)
+      const premierInv = await prisma.inventaire.findFirst({ where: { id: { in: invIds } }, select: { statutId: true } })
+      if (premierInv?.statutId) {
+        const transition = await prisma.transition.findFirst({ where: { siteId: demande.siteId, statutFromId: premierInv.statutId } })
+        if (transition) {
+          await prisma.inventaire.updateMany({ where: { id: { in: invIds } }, data: { statutId: transition.statutToId } })
+        }
+      }
+    }
+
     if (demande.type === 'QTE' && demande.articleId) {
       // Incrémenter l'inventaire labo
       await prisma.inventaireLabo.upsert({
@@ -417,6 +465,20 @@ export async function validerDemande(req: Request, res: Response, next: any) {
         create: { siteId: demande.siteId, articleId: demande.articleId, quantite: demande.quantite },
         update: { quantite: { increment: demande.quantite } }
       })
+
+      // Décrémenter le stock de l'inventaire source
+      const champsInv = await prisma.champInventaire.findMany({ where: { siteId: demande.siteId } })
+      const champQte = champsInv.find(c => ['QUANTITE', 'QTE', 'QUANTITY'].includes(normCode(c.code)))
+      if (champQte) {
+        const invItem = await prisma.inventaire.findFirst({ where: { siteId: demande.siteId, articleId: demande.articleId } })
+        if (invItem) {
+          const valQte = await prisma.valeurChampInventaire.findFirst({ where: { inventaireId: invItem.id, champId: champQte.id } })
+          if (valQte) {
+            const nouvQte = Math.max(0, (parseInt(valQte.valeur ?? '0') || 0) - (demande.quantite ?? 0))
+            await prisma.valeurChampInventaire.update({ where: { id: valQte.id }, data: { valeur: String(nouvQte) } })
+          }
+        }
+      }
     }
 
     const updated = await prisma.demandeTransfert.update({
@@ -435,11 +497,13 @@ export async function annulerDemande(req: Request, res: Response, next: any) {
       include: { lignes: true }
     })
     if (!demande) return res.status(404).json({ error: 'Demande introuvable' })
-    if (demande.statut !== 'EN_ATTENTE') return res.status(400).json({ error: 'Demande déjà traitée' })
+    if (demande.statut === 'ANNULEE') return res.status(400).json({ error: 'Demande déjà annulée' })
 
-    // Remettre les inventaires SN en statut Stock
+    // Remettre les inventaires SN en statut Stock (rôle 'estStock')
+    // — que la demande soit EN_ATTENTE ou VALIDEE (retour arrière)
     if (demande.type === 'SN' && demande.lignes.length > 0) {
-      const statutStock = await prisma.statut.findFirst({ where: { siteId: demande.siteId, estStock: true } })
+      const stockIds = await getStatutIdsByRole(demande.siteId, 'estStock')
+      const statutStock = stockIds.length > 0 ? await prisma.statut.findFirst({ where: { id: { in: stockIds } } }) : null
       if (statutStock) {
         await prisma.inventaire.updateMany({
           where: { id: { in: demande.lignes.map(l => l.inventaireId) } },
@@ -463,7 +527,7 @@ export async function getInventaireLabo(req: Request, res: Response, next: any) 
     const { siteId } = req.params
     const items = await prisma.inventaireLabo.findMany({
       where: { siteId: Number(siteId) },
-      include: { article: { include: { valeurs: true } } },
+      include: { article: { include: { valeurs: { include: { champ: true } } } } },
       orderBy: { updatedAt: 'desc' }
     })
     res.json(items)

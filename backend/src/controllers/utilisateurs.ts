@@ -13,14 +13,10 @@ const PAGES_DISPONIBLES = [
   { path: '/reception',          label: 'Logistique — Réception',             actions: ['view'] },
   { path: '/inventaire',         label: 'Logistique — Inventaire',            actions: ['view', 'edit', 'delete'] },
   { path: '/suivi',              label: 'Production — Suivi',                 actions: ['view'] },
-  { path: '/admin/articles',     label: 'Configuration — Structure articles', actions: ['view'] },
-  { path: '/admin/clients',      label: 'Configuration — Structure clients',  actions: ['view'] },
-  { path: '/admin/plateformes',  label: 'Configuration — Structure plateformes', actions: ['view'] },
-  { path: '/admin/inventaire',   label: 'Configuration — Structure inventaire', actions: ['view'] },
+  { path: '/admin/donnees',      label: 'Configuration — Données',            actions: ['view'] },
   { path: '/admin/attendus',     label: 'Configuration — Attendus',            actions: ['view'] },
   { path: '/admin/workflow',     label: 'Configuration — Workflow',           actions: ['view'] },
-  { path: '/admin/roles',        label: 'Configuration — Rôles',             actions: ['view'] },
-  { path: '/admin/utilisateurs', label: 'Configuration — Utilisateurs',      actions: ['view'] },
+  { path: '/admin/acces',        label: 'Configuration — Accès',              actions: ['view'] },
 ]
 
 function genererMotDePasse(): string {

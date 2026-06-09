@@ -1,0 +1,1 @@
+ALTER TABLE `ligneAttendue` ADD COLUMN `caisse` VARCHAR(191) NULL;

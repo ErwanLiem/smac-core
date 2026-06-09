@@ -10,6 +10,7 @@ body {
   -webkit-font-smoothing: antialiased;
   background-color: #0f1117;
   color: #e2e8f0;
+  font-size: 15px;
 }
 
 /* ─── Layout principal ──────────────────────────────────── */
@@ -43,7 +44,7 @@ body {
 }
 
 .sidebar-subtitle {
-  font-size: 11px;
+  font-size: 12px;
   color: #475569;
 }
 
@@ -62,7 +63,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 5px 8px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: #475569;
   text-transform: uppercase;
@@ -91,10 +92,10 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px;
+  padding: 8px 10px;
   color: #64748b;
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   border-radius: 6px;
   margin: 1px 0;
   transition: all 0.15s;
@@ -111,8 +112,8 @@ body {
 }
 
 .sidebar-user { margin-bottom: 10px; }
-.sidebar-user-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
-.sidebar-user-role { font-size: 11px; color: #475569; }
+.sidebar-user-name { font-size: 14px; font-weight: 600; color: #e2e8f0; }
+.sidebar-user-role { font-size: 12px; color: #475569; }
 
 .sidebar-logout-btn {
   display: flex;
@@ -123,7 +124,7 @@ body {
   background: none;
   border: none;
   color: #475569;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   transition: color 0.2s;
   border-radius: 6px;
@@ -144,6 +145,22 @@ body {
   flex-direction: column;
 }
 
+/* Pour les pages pleine hauteur (Inventaire, Planning, etc.) */
+.main-content.page-table > .page-fade {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-fade {
+  animation: page-fade-in 0.12s ease-out;
+}
+
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ─── Page header ───────────────────────────────────────── */
 .page-header {
   display: flex;
@@ -153,7 +170,7 @@ body {
 }
 
 .page-title {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: #f1f5f9;
   padding-left: 12px;
@@ -161,7 +178,7 @@ body {
   letter-spacing: -0.3px;
 }
 .page-subtitle {
-  font-size: 12px;
+  font-size: 13px;
   color: #475569;
   margin-top: 3px;
   padding-left: 12px;
@@ -176,17 +193,17 @@ body {
   margin-bottom: 16px;
 }
 
-.card-title { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 12px; }
+.card-title { font-size: 16px; font-weight: 600; color: #f1f5f9; margin-bottom: 12px; }
 
 /* ─── Buttons ───────────────────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
+  padding: 8px 15px;
   border: 1px solid transparent;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
@@ -211,15 +228,15 @@ body {
 .table { width: 100%; border-collapse: collapse; }
 .table thead { background: #141720; border-bottom: 1px solid #2d3148; }
 .table th {
-  padding: 9px 14px;
+  padding: 10px 14px;
   text-align: left;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #3b82f6;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.table td { padding: 9px 14px; border-top: 1px solid #1e2130; color: #cbd5e1; font-size: 13px; }
+.table td { padding: 10px 14px; border-top: 1px solid #1e2130; color: #cbd5e1; font-size: 14px; }
 .table tbody tr:hover td { background: #1e2130; color: #e2e8f0; }
 
 /* ─── Badge ─────────────────────────────────────────────── */
@@ -227,7 +244,7 @@ body {
   display: inline-block;
   padding: 3px 10px;
   border-radius: 9999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
 }
 .badge-success  { background: #1e3a1e; color: #4ade80; }
@@ -249,10 +266,10 @@ body {
 }
 .form-input, select.form-input {
   width: 100%;
-  padding: 7px 10px;
+  padding: 8px 11px;
   border: 1px solid #2d3148;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 14px;
   color: #e2e8f0;
   background: #141720;
   transition: all 0.2s;
@@ -280,7 +297,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); cur
 }
 .modal-content { background: #1a1d27; border: 1px solid #2d3148; border-radius: 12px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }
 .modal-header { padding: 16px; border-bottom: 1px solid #2d3148; }
-.modal-title { font-size: 16px; font-weight: 600; color: #f1f5f9; }
+.modal-title { font-size: 17px; font-weight: 600; color: #f1f5f9; }
 .modal-body { padding: 16px; }
 .modal-footer { padding: 12px 16px; border-top: 1px solid #2d3148; display: flex; gap: 8px; justify-content: flex-end; }
 
@@ -297,8 +314,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); cur
 
 /* ─── Empty state ───────────────────────────────────────── */
 .empty-state { text-align: center; padding: 60px 20px; }
-.empty-state-title { font-size: 16px; font-weight: 500; color: #475569; margin-bottom: 8px; }
-.empty-state-description { font-size: 14px; color: #334155; }
+.empty-state-title { font-size: 17px; font-weight: 500; color: #475569; margin-bottom: 8px; }
+.empty-state-description { font-size: 15px; color: #334155; }
 
 /* ─── Scrollbar ─────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

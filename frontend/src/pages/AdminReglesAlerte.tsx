@@ -40,10 +40,11 @@ const FORM_VIDE = {
   actif: true,
 }
 
-export default function AdminReglesAlerte() {
+export default function AdminReglesAlerte({ embedded }: { embedded?: boolean } = {}) {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
 
+  const [chargement, setChargement] = useState(true)
   const [regles, setRegles] = useState<RegleAlerte[]>([])
   const [champsDate, setChampsDate] = useState<ChampInv[]>([])
   const [tousChamps, setTousChamps] = useState<ChampInv[]>([])
@@ -69,6 +70,7 @@ export default function AdminReglesAlerte() {
     const actifs = c.filter(ch => ch.actif !== false)
     setTousChamps(actifs)
     setChampsDate(actifs.filter(ch => ch.type === 'DATE' || ch.type === 'DATE_TODAY'))
+    setChargement(false)
   }
 
   function openCreate() {
@@ -135,15 +137,24 @@ export default function AdminReglesAlerte() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Règles d'alerte date</h1>
-          <p className="page-subtitle">Colorez automatiquement les lignes d'inventaire selon des critères de date</p>
+      {embedded ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9' }}>Règles d'alerte date</h2>
+          <button className="btn btn-primary" onClick={openCreate}>
+            <Plus size={16} /> Nouvelle règle
+          </button>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>
-          <Plus size={16} /> Nouvelle règle
-        </button>
-      </div>
+      ) : (
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Règles d'alerte date</h1>
+            <p className="page-subtitle">Colorez automatiquement les lignes d'inventaire selon des critères de date</p>
+          </div>
+          <button className="btn btn-primary" onClick={openCreate}>
+            <Plus size={16} /> Nouvelle règle
+          </button>
+        </div>
+      )}
 
       {succes && (
         <div style={{ background: '#052e16', border: '1px solid #16a34a', borderRadius: '8px', padding: '10px 16px', color: '#4ade80', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -163,7 +174,9 @@ export default function AdminReglesAlerte() {
         </div>
       </div>
 
-      {regles.length === 0 ? (
+      {chargement ? (
+        <div className="loading-container"><div className="loading-spinner" /></div>
+      ) : regles.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
           <AlertTriangle size={32} style={{ color: '#6b7280', marginBottom: '12px' }} />
           <p style={{ fontWeight: 500 }}>Aucune règle configurée</p>

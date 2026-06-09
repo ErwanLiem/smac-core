@@ -13,9 +13,7 @@ export interface Statut {
   couleur: string
   icone?: string
   ordre: number
-  estFinal: boolean
-  estStock: boolean
-  estTransfert: boolean
+  roles: string[]   // ex. ['estStock'], ['estTransfert'], ['estFinal'], ['estReparation', ...] — libre
 }
 
 export interface Transition {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Plus, Pencil, Check, X } from 'lucide-react'
+import Tabs from '../components/Tabs'
 import { get, post, put, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
 
@@ -15,6 +16,7 @@ interface ChampAttenduConfig {
   visible: boolean
   obligatoire: boolean
   visibleListe: boolean
+  uniqueValeur?: boolean
 }
 
 interface ConfigAttendus {
@@ -49,6 +51,7 @@ export default function AdminAttendus() {
   const { isAdmin } = getPermissions()
 
   const defaultChampsAttendu: ChampAttenduConfig[] = []
+  const [chargement, setChargement] = useState(true)
   const [config, setConfig] = useState<ConfigAttendus>({ nomOnglet: 'Terminal Details', obligatoirePNcatalogue: true, statutCloture: null, champsAttendu: defaultChampsAttendu })
   const [mappings, setMappings] = useState<Mapping[]>([])
   const [champsInv, setChampsInv] = useState<ChampInv[]>([])
@@ -78,6 +81,7 @@ export default function AdminAttendus() {
     setChampsInv(data.champsInv)
     setStatuts(s)
     setConfigModifiee(false)
+    setChargement(false)
   }
 
   function updateChamp(code: string, changes: Partial<ChampAttenduConfig>) {
@@ -124,57 +128,21 @@ export default function AdminAttendus() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Configuration — Attendus</h1>
-          <p className="page-subtitle">Paramétrez l'import Excel et la clôture des attendus</p>
+          <h1 className="page-title">Attendus</h1>
+          <p className="page-subtitle">Paramétrez le formulaire de création, le mapping Excel et la clôture des attendus</p>
         </div>
       </div>
 
-      {/* Config globale */}
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#f1f5f9' }}>Paramètres généraux</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div className="form-group">
-            <label className="form-label">Nom de l'onglet Excel</label>
-            <input className="form-input" value={config.nomOnglet}
-              onChange={e => { setConfig(c => ({ ...c, nomOnglet: e.target.value })); setConfigModifiee(true) }}
-              placeholder="ex: Terminal Details" />
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Nom exact de l'onglet à lire dans le fichier Excel client</p>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Statut à la clôture</label>
-            <select className="form-input" value={config.statutCloture ?? ''}
-              onChange={e => { setConfig(c => ({ ...c, statutCloture: e.target.value || null })); setConfigModifiee(true) }}>
-              <option value="">— Recherche automatique (contient "STOCK") —</option>
-              {statuts.map(s => <option key={s.id} value={s.code}>{s.label} ({s.code})</option>)}
-            </select>
-            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Statut assigné aux lignes inventaire lors de la clôture</p>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <input type="checkbox" id="obligPN" checked={config.obligatoirePNcatalogue}
-              onChange={e => { setConfig(c => ({ ...c, obligatoirePNcatalogue: e.target.checked })); setConfigModifiee(true) }} />
-            <div>
-              <label htmlFor="obligPN" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>P/N obligatoire dans le catalogue</label>
-              <p style={{ fontSize: '11px', color: '#9ca3af', margin: '2px 0 0' }}>Si décoché, l'import est autorisé même si le P/N n'existe pas dans les articles</p>
-            </div>
-          </div>
-        </div>
-
-        {isAdmin && (
-          <div style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button className="btn btn-primary" onClick={handleSaveConfig} disabled={!configModifiee}>
-              Enregistrer les paramètres
-            </button>
-            {succes && <span style={{ color: '#16a34a', fontSize: '13px' }}>✓ Enregistré</span>}
-          </div>
-        )}
-      </div>
-
-      {/* Champs du formulaire de création */}
-      <div className="card" style={{ marginBottom: '20px' }}>
+      <Tabs tabs={[
+        { key: 'formulaire', label: 'Formulaire de création', content: (
+      <div className="card">
         <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#f1f5f9' }}>Champs du formulaire de création</h2>
         <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
           Sélectionnez les champs inventaire à remplir lors de la création d'un attendu. Ces valeurs seront automatiquement injectées dans l'inventaire à la clôture.
         </p>
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : (
         <table className="table">
           <thead>
             <tr>
@@ -182,11 +150,12 @@ export default function AdminAttendus() {
               <th style={{ color: '#9ca3af', fontWeight: 400, fontSize: '12px' }}>Code</th>
               <th style={{ textAlign: 'center' }}>Formulaire</th>
               <th style={{ textAlign: 'center' }}>Obligatoire</th>
-              <th style={{ textAlign: 'center' }}>Visible liste attendu</th>
+              <th style={{ textAlign: 'center' }}>Visible liste</th>
+              <th style={{ textAlign: 'center' }}>Valeur unique</th>
             </tr>
           </thead>
           <tbody>
-            {champsInv.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configuré</td></tr>}
+            {champsInv.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configuré</td></tr>}
             {champsInv.map(champ => {
               const cfg = config.champsAttendu?.find(c => c.code === champ.code) ?? { code: champ.code, visible: false, obligatoire: false, visibleListe: false }
               return (
@@ -202,11 +171,21 @@ export default function AdminAttendus() {
                   <td style={{ textAlign: 'center' }}>
                     <input type="checkbox" checked={cfg.visibleListe ?? false} disabled={!isAdmin} onChange={e => updateChamp(champ.code, { visibleListe: e.target.checked })} />
                   </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      title="Bloquer la création si cette valeur existe déjà dans un attendu non clôturé"
+                      checked={cfg.uniqueValeur ?? false}
+                      disabled={!isAdmin || !cfg.visible}
+                      onChange={e => updateChamp(champ.code, { uniqueValeur: e.target.checked })}
+                    />
+                  </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
+        )}
         {isAdmin && (
           <div style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
             <button className="btn btn-primary" onClick={handleSaveConfig} disabled={!configModifiee}>
@@ -216,14 +195,33 @@ export default function AdminAttendus() {
           </div>
         )}
       </div>
-
-      {/* Mapping colonnes Excel */}
+        ) },
+        { key: 'mapping', label: 'Mapping Excel', content: (
       <div className="card">
         <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#f1f5f9' }}>Mapping colonnes Excel → inventaire</h2>
         <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
           Définissez quelle colonne Excel correspond à quel champ inventaire. Les rôles <strong>SN</strong> et <strong>PN</strong> sont obligatoires pour identifier les numéros de série et les références produit.
         </p>
 
+        <div className="form-group" style={{ maxWidth: '340px', marginBottom: '20px' }}>
+          <label className="form-label">Nom de l'onglet Excel</label>
+          <input className="form-input" value={config.nomOnglet}
+            onChange={e => { setConfig(c => ({ ...c, nomOnglet: e.target.value })); setConfigModifiee(true) }}
+            placeholder="ex: Terminal Details" />
+          <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Nom exact de l'onglet à lire dans le fichier Excel client</p>
+          {isAdmin && (
+            <div style={{ marginTop: '10px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button className="btn btn-primary" onClick={handleSaveConfig} disabled={!configModifiee}>
+                Enregistrer
+              </button>
+              {succes && <span style={{ color: '#4ade80', fontSize: '13px' }}>✓ Enregistré</span>}
+            </div>
+          )}
+        </div>
+
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="table">
             <thead>
@@ -293,6 +291,7 @@ export default function AdminAttendus() {
             </tbody>
           </table>
         </div>
+        )}
 
         {isAdmin && (
           <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginTop: '16px' }}>
@@ -323,6 +322,41 @@ export default function AdminAttendus() {
           </div>
         )}
       </div>
+        ) },
+        { key: 'parametres', label: 'Paramètres généraux', content: (
+      <div className="card">
+        <h2 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '16px', color: '#f1f5f9' }}>Paramètres généraux</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div className="form-group">
+            <label className="form-label">Statut à la clôture</label>
+            <select className="form-input" value={config.statutCloture ?? ''}
+              onChange={e => { setConfig(c => ({ ...c, statutCloture: e.target.value || null })); setConfigModifiee(true) }}>
+              <option value="">— Recherche automatique (contient "STOCK") —</option>
+              {statuts.map(s => <option key={s.id} value={s.code}>{s.label} ({s.code})</option>)}
+            </select>
+            <p style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>Statut assigné aux lignes inventaire lors de la clôture</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <input type="checkbox" id="obligPN" checked={config.obligatoirePNcatalogue}
+              onChange={e => { setConfig(c => ({ ...c, obligatoirePNcatalogue: e.target.checked })); setConfigModifiee(true) }} />
+            <div>
+              <label htmlFor="obligPN" style={{ fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>P/N obligatoire dans le catalogue</label>
+              <p style={{ fontSize: '11px', color: '#9ca3af', margin: '2px 0 0' }}>Si décoché, l'import est autorisé même si le P/N n'existe pas dans les articles</p>
+            </div>
+          </div>
+        </div>
+
+        {isAdmin && (
+          <div style={{ marginTop: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button className="btn btn-primary" onClick={handleSaveConfig} disabled={!configModifiee}>
+              Enregistrer les paramètres
+            </button>
+            {succes && <span style={{ color: '#16a34a', fontSize: '13px' }}>✓ Enregistré</span>}
+          </div>
+        )}
+      </div>
+        ) },
+      ]} />
     </div>
   )
 }

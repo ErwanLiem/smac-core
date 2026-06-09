@@ -78,12 +78,14 @@ interface Props {
   sousTitre: string
   baseUrl: string   // ex: /clients ou /articles
   siteId: number
+  embedded?: boolean   // true = masque l'en-tête de page (utilisé dans un onglet)
 }
 
-export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) {
+export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId, embedded }: Props) {
   const { isAdmin } = getPermissions()
 
   const [champs, setChamps] = useState<Champ[]>([])
+  const [chargement, setChargement] = useState(true)
   const [form, setForm] = useState(emptyChamp)
   const [editId, setEditId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<Partial<Champ>>({})
@@ -94,6 +96,7 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
   async function reload() {
     const data = await get<Champ[]>(`${baseUrl}/${siteId}/champs`)
     setChamps(data)
+    setChargement(false)
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -122,15 +125,22 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">{titre}</h1>
-          <p className="page-subtitle">{sousTitre}</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">{titre}</h1>
+            <p className="page-subtitle">{sousTitre}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="card">
         <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Champs configurés</h2>
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}>
+            <div className="loading-spinner" />
+          </div>
+        ) : (
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -187,6 +197,7 @@ export default function BaseAdmin({ titre, sousTitre, baseUrl, siteId }: Props) 
             ))}
           </tbody>
         </table>
+        )}
 
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajouter un champ</p>

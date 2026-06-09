@@ -14,6 +14,7 @@ interface Ligne {
   snRecu: string | null
   accessoires: string | null
   notes: string | null
+  caisse: string | null
 }
 
 interface Attendu {
@@ -73,6 +74,7 @@ export default function AttendusDetail() {
   const [articlesAccessoires, setArticlesAccessoires] = useState<ArticleAccessoire[]>([])
   const [pnActif, setPnActif] = useState<string | null>(null)
   const [snSaisie, setSnSaisie] = useState('')
+  const [caisseActive, setCaisseActive] = useState('')
   const [dernierScan, setDernierScan] = useState<{ resultat: string; pn?: string; dejaEnInventaire?: boolean; sn?: string } | null>(null)
   const [alerteScan, setAlerteScan] = useState<{ type: 'DEJA_SCANNE' | 'DEJA_INVENTAIRE'; sn: string; pn?: string } | null>(null)
   const [accessoiresParLigne, setAccessoiresParLigne] = useState<Record<number, number[]>>({})
@@ -223,7 +225,7 @@ export default function AttendusDetail() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ sn: snSaisie.trim(), pn: pnActif, accessoires: [] })
+        body: JSON.stringify({ sn: snSaisie.trim(), pn: pnActif, accessoires: [], caisse: caisseActive || undefined })
       })
       const result = await res.json()
       const snScanne = snSaisie.trim()
@@ -234,7 +236,8 @@ export default function AttendusDetail() {
       if (result.resultat === 'DEJA_SCANNE') {
         jouerSonAlerte()
         setAlerteScan({ type: 'DEJA_SCANNE', sn: snScanne, pn: result.pn })
-      } else if (result.resultat === 'RECU' && result.dejaEnInventaire) {
+      } else if (result.dejaEnInventaire) {
+        // Alerte doublon inventaire quelle que soit la situation (RECU ou INATTENDU)
         jouerSonAlerte()
         setAlerteScan({ type: 'DEJA_INVENTAIRE', sn: snScanne, pn: result.pn })
       }
@@ -364,7 +367,7 @@ export default function AttendusDetail() {
   const doublonsInv = attendu.lignes.filter(l => l.statut === 'DOUBLON_INVENTAIRE')
   const groupes = groupParPN(lignesNormales)
   const totalAttendu = lignesNormales.length
-  const totalRecu = lignesNormales.filter(l => l.statut === 'RECU').length
+  const totalRecu = lignesNormales.filter(l => l.statut === 'RECU' || l.statut === 'INJECTE').length
   const lignesPNActif = pnActif ? (groupes[pnActif] || []) : []
 
   return (
@@ -421,7 +424,7 @@ export default function AttendusDetail() {
         {/* Colonne gauche — cartes PN */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {Object.entries(groupes).map(([pn, lignes]) => {
-            const recus = lignes.filter(l => l.statut === 'RECU').length
+            const recus = lignes.filter(l => l.statut === 'RECU' || l.statut === 'INJECTE').length
             const total = lignes.length
             const complet = recus === total
             const actif = pnActif === pn
@@ -533,7 +536,23 @@ export default function AttendusDetail() {
               {!isClos && (
                 <div className="card">
                   <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>Scanner un S/N</h3>
-                  <p style={{ fontSize: '12px', color: '#cbd5e1', marginBottom: '12px' }}>P/N actif : <code style={{ background: '#1e3a5f', color: '#2563eb', padding: '1px 6px', borderRadius: '4px' }}>{pnActif}</code></p>
+                  <p style={{ fontSize: '12px', color: '#cbd5e1', marginBottom: '10px' }}>P/N actif : <code style={{ background: '#1e3a5f', color: '#2563eb', padding: '1px 6px', borderRadius: '4px' }}>{pnActif}</code></p>
+
+                  {/* Caisse active */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '8px 12px', background: caisseActive ? '#1c2a1c' : '#1a1d27', border: `1px solid ${caisseActive ? '#4ade80' : '#374151'}`, borderRadius: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>📦 Caisse :</span>
+                    <input
+                      className="form-input"
+                      placeholder="Scanner ou saisir le n° de caisse..."
+                      value={caisseActive}
+                      onChange={e => setCaisseActive(e.target.value.trim())}
+                      style={{ flex: 1, padding: '4px 8px', fontSize: '13px', fontWeight: caisseActive ? 700 : 400, color: caisseActive ? '#4ade80' : '#9ca3af', background: 'transparent', border: 'none', outline: 'none' }}
+                    />
+                    {caisseActive && (
+                      <button type="button" onClick={() => setCaisseActive('')}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '16px', lineHeight: 1 }}>×</button>
+                    )}
+                  </div>
 
                   <form onSubmit={scannerSN}>
                     <input
@@ -599,6 +618,7 @@ export default function AttendusDetail() {
                   <thead>
                     <tr style={{ background: '#141720' }}>
                       <th style={{ padding: '6px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 600 }}>S/N</th>
+                      <th style={{ padding: '6px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 600 }}>Caisse</th>
                       <th style={{ padding: '6px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 600 }}>Garantie</th>
                       <th style={{ padding: '6px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 600 }}>Panne client</th>
                       {articlesAccessoires.length > 0 && articlesAccessoires.map(acc => (
@@ -613,6 +633,11 @@ export default function AttendusDetail() {
                       return (
                         <tr key={l.id} style={{ borderTop: '1px solid #1e2130', background: i % 2 === 0 ? '#1a1d27' : '#141720' }}>
                           <td style={{ padding: '6px 14px', fontFamily: 'monospace', fontWeight: l.statut === 'RECU' ? 600 : 400, color: l.statut === 'RECU' ? '#60a5fa' : '#94a3b8' }}>{l.sn}</td>
+                          <td style={{ padding: '6px 14px' }}>
+                            {l.caisse
+                              ? <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px', background: '#1c2a1c', color: '#4ade80', border: '1px solid #166534' }}>📦 {l.caisse}</span>
+                              : <span style={{ color: '#4b5563', fontSize: '12px' }}>—</span>}
+                          </td>
                           <td style={{ padding: '6px 14px', color: '#cbd5e1' }}>{l.garantie || '—'}</td>
                           <td style={{ padding: '6px 14px', color: '#cbd5e1', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.panneClient || '—'}</td>
                           {articlesAccessoires.length > 0 && articlesAccessoires.map(acc => (
@@ -628,7 +653,7 @@ export default function AttendusDetail() {
                             </td>
                           ))}
                           <td style={{ padding: '6px 14px', textAlign: 'center' }}>
-                            {l.statut === 'RECU' && <span style={{ color: '#16a34a', fontSize: '16px' }}>✓</span>}
+                            {(l.statut === 'RECU' || l.statut === 'INJECTE') && <span style={{ color: '#16a34a', fontSize: '16px' }}>✓</span>}
                             {l.statut === 'ATTENDU' && <span style={{ color: '#d1d5db', fontSize: '16px' }}>○</span>}
                             {l.statut === 'NON_RECU' && <span style={{ color: '#dc2626', fontSize: '16px' }}>✗</span>}
                           </td>

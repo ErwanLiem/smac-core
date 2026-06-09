@@ -74,9 +74,10 @@ function PermissionsEditor({ pages, value, onChange }: { pages: Page[]; value: P
   )
 }
 
-export default function AdminRoles() {
+export default function AdminRoles({ embedded }: { embedded?: boolean } = {}) {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
+  const [chargement, setChargement] = useState(true)
   const [roles, setRoles] = useState<Role[]>([])
   const [pages, setPages] = useState<Page[]>([])
   const [form, setForm] = useState({ code: '', label: '', permSet: {} as PermSet })
@@ -93,6 +94,7 @@ export default function AdminRoles() {
     ])
     setRoles(r)
     setPages(p)
+    setChargement(false)
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -116,14 +118,20 @@ export default function AdminRoles() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Rôles utilisateurs</h1>
-          <p className="page-subtitle">Définissez les rôles et leurs droits d'accès par page</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Rôles utilisateurs</h1>
+            <p className="page-subtitle">Définissez les rôles et leurs droits d'accès par page</p>
+          </div>
         </div>
-      </div>
+      )}
 
-      {roles.map(role => (
+      {chargement && (
+        <div className="loading-container"><div className="loading-spinner" /></div>
+      )}
+
+      {!chargement && roles.map(role => (
         <div key={role.id} className="card">
           {editId === role.id ? (
             <>

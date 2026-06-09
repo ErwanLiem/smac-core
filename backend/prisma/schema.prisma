@@ -218,6 +218,7 @@ model ligneAttendue {
   snRecu       String?  // SN réellement scanné si différent
   accessoires  String?  @db.LongText // JSON array des accessoires reçus
   notes        String?  // Info complémentaire (ex: RMA existant pour DOUBLON_INVENTAIRE)
+  caisse       String?  // Numéro de caisse physique assigné lors du scan
   createdAt    DateTime @default(now())
   attendu      attendu  @relation(fields: [attenduId], references: [id], onDelete: Cascade, map: "LigneAttendue_attenduId_fkey")
 
@@ -333,6 +334,7 @@ model configProduction {
   champTypeArticleCode String  @default("TYPE")  // code du champArticle contenant le type
   typesArticleQTE      String? @db.LongText      // JSON: ["PDA","TABLETTE"] — types éligibles transfert QTE
   champsAffichageQTE   String? @db.LongText      // JSON: ["PN","DESIGNATION","TYPE"] — champs à afficher dans la liste
+  colonnesLabo         String? @db.LongText      // JSON: [champArticleCode, ...] — colonnes visibles dans InventaireLabo
   site                 site    @relation(fields: [siteId], references: [id], map: "ConfigProduction_siteId_fkey")
 }
 
@@ -441,9 +443,7 @@ model statut {
   couleur                                    String             @default("#6b7280")
   icone                                      String?
   ordre                                      Int                @default(0)
-  estFinal                                   Boolean            @default(false)
-  estStock                                   Boolean            @default(false)
-  estTransfert                               Boolean            @default(false)
+  roles                                      String             @default("[]") @db.Text
   article                                    article[]
   inventaire                                 inventaire[]
   historiquestatut                           historiquestatut[]

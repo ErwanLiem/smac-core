@@ -40,6 +40,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   const peutSupprimer = isAdmin || permissions.includes(`${pagePath}:delete`)
   const peutCreer   = isAdmin || permissions.includes(`${pagePath}:edit`)
 
+  const [chargement, setChargement] = useState(true)
   const [champs, setChamps] = useState<Champ[]>([])
   const [colonnesOrdre, setColonnesOrdre] = useState<number[]>([])
   const [items, setItems] = useState<Item[]>([])
@@ -85,6 +86,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
     ]
     setColonnesOrdre(restored)
     setItems(i)
+    setChargement(false)
   }
 
   const champsOrdonnes = colonnesOrdre.map(id => champs.find(c => c.id === id)).filter(Boolean) as Champ[]
@@ -161,7 +163,9 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
         </div>
       </div>
 
-      {champs.length === 0 ? (
+      {chargement ? (
+        <div className="loading-container"><div className="loading-spinner" /></div>
+      ) : champs.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
           <p style={{ marginBottom: '8px', fontWeight: 500 }}>Aucun champ configuré</p>
           <p style={{ fontSize: '13px' }}>Configurez d'abord les champs dans la section Configuration.</p>

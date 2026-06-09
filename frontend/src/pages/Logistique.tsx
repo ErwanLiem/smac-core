@@ -77,6 +77,7 @@ function ArticleInfo({ article, champsAffichage, champsArticle }: {
 
 export default function Logistique() {
   const siteId = getSiteId()
+  const [chargement, setChargement] = useState(true)
   const [config, setConfig]   = useState<Config>({ labelPN: 'P/N', labelRMA: 'RMA', champsAffichageQTE: [] })
   const [demandes, setDemandes] = useState<Demande[]>([])
   const [articles, setArticles] = useState<Article[]>([])
@@ -101,6 +102,7 @@ export default function Logistique() {
     setDemandes(d)
     setArticles(arts)
     setChampsArticle(champs)
+    setChargement(false)
   }
 
   async function handleAction(id: number, action: 'valider' | 'annuler') {
@@ -124,6 +126,14 @@ export default function Logistique() {
     }
   }
 
+  function getCaissesDemande(d: Demande): string[] {
+    return [...new Set(
+      d.lignes
+        .map((l: any) => l.inventaire?.valeurs?.find((v: any) => v.champ?.code === 'CAISSE')?.valeur)
+        .filter(Boolean)
+    )] as string[]
+  }
+
   const demandesSN  = demandes.filter(d => d.type === 'SN')
   const demandesQTE = demandes.filter(d => d.type === 'QTE')
   const snAttente   = demandesSN.filter(d => d.statut === 'EN_ATTENTE')
@@ -144,7 +154,9 @@ export default function Logistique() {
   function TableDemandes({ liste, historique }: { liste: Demande[]; historique: Demande[] }) {
     return (
       <div>
-        {liste.length === 0 ? (
+        {chargement ? (
+          <div className="loading-container"><div className="loading-spinner" /></div>
+        ) : liste.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
             <Truck size={28} style={{ marginBottom: '10px', color: '#374151' }} />
             <p style={{ fontWeight: 500 }}>Aucun transfert en attente</p>
@@ -170,8 +182,15 @@ export default function Logistique() {
                     <td>
                       {d.type === 'SN' ? (
                         <div>
-                          <span style={{ fontWeight: 600, fontSize: '13px' }}>{d.pnValeur}</span>
-                          {d.rmaValeur && <span style={{ color: '#9ca3af', fontSize: '12px', marginLeft: '8px' }}>{config.labelRMA}: {d.rmaValeur}</span>}
+                          {d.rmaValeur && <div style={{ fontWeight: 700, fontSize: '14px', color: '#f1f5f9', lineHeight: 1.2 }}>{d.rmaValeur}</div>}
+                          {d.pnValeur && <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '1px' }}>{config.labelPN} : {d.pnValeur}</div>}
+                          {getCaissesDemande(d).length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
+                              {getCaissesDemande(d).map(c => (
+                                <span key={c} style={{ fontSize: '10px', padding: '1px 5px', borderRadius: '3px', background: '#1c2a1c', color: '#4ade80', border: '1px solid #166534' }}>📦 {c}</span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <ArticleInfo article={d.article} champsAffichage={config.champsAffichageQTE} champsArticle={champsArticle} />
@@ -207,7 +226,16 @@ export default function Logistique() {
                   {historique.map(d => (
                     <tr key={d.id} style={{ opacity: 0.7 }}>
                       <td style={{ fontSize: '12px', color: '#6b7280' }}>{new Date(d.datePlanifiee).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</td>
-                      <td style={{ fontSize: '12px', color: '#9ca3af' }}>{d.type === 'SN' ? d.pnValeur : <ArticleInfo article={d.article} champsAffichage={config.champsAffichageQTE} champsArticle={champsArticle} />}</td>
+                      <td>
+                        {d.type === 'SN' ? (
+                          <div>
+                            {d.rmaValeur && <div style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>{d.rmaValeur}</div>}
+                            {d.pnValeur && <div style={{ fontSize: '11px', color: '#6b7280' }}>{config.labelPN} : {d.pnValeur}</div>}
+                          </div>
+                        ) : (
+                          <ArticleInfo article={d.article} champsAffichage={config.champsAffichageQTE} champsArticle={champsArticle} />
+                        )}
+                      </td>
                       <td style={{ textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>{d.quantite}</td>
                       <td>{statutBadge(d.statut)}</td>
                     </tr>
@@ -300,13 +328,36 @@ export default function Logistique() {
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '24px', maxWidth: '360px', width: '100%' }}>
             <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '10px' }}>
-              {confirmAction.action === 'valider' ? 'Valider ce transfert ?' : 'Annuler cette demande ?'}
-            </h3>
-            <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px' }}>
               {confirmAction.action === 'valider'
-                ? 'Pour les demandes QTE, le stock labo sera incrémenté.'
-                : 'Les S/N associés seront remis en statut stock.'}
+                ? (() => { const d = demandes.find(d => d.id === confirmAction.id); return d?.type === 'SN' ? 'Transférer vers la production ?' : 'Valider ce transfert ?' })()
+                : 'Annuler cette demande ?'}
+            </h3>
+            <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '16px' }}>
+              {confirmAction.action === 'valider' ? (() => {
+                const d = demandes.find(d => d.id === confirmAction.id)
+                return d?.type === 'QTE'
+                  ? 'Le stock labo sera incrémenté et le stock inventaire décrémenté.'
+                  : 'Les articles seront transférés vers la production.'
+              })() : 'Les S/N associés seront remis en statut stock.'}
             </p>
+            {(() => {
+              const d = demandes.find(x => x.id === confirmAction.id)
+              if (d?.type !== 'SN') return null
+              const caisses = getCaissesDemande(d)
+              if (caisses.length === 0) return null
+              return (
+                <div style={{ background: '#1c2a1c', border: '1px solid #166534', borderRadius: '6px', padding: '8px 12px', marginBottom: '16px' }}>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '5px' }}>Caisses concernées</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {caisses.map(c => (
+                      <span key={c} style={{ fontSize: '12px', fontWeight: 600, padding: '2px 8px', borderRadius: '4px', background: '#052e16', color: '#4ade80', border: '1px solid #16a34a' }}>
+                        📦 {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setConfirmAction(null)}>Retour</button>
               <button className={`btn ${confirmAction.action === 'valider' ? 'btn-primary' : 'btn-danger'}`}

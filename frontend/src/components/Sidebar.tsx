@@ -11,7 +11,6 @@ import {
   Users,
   Building2,
   Package,
-  AlertTriangle,
   Truck,
 } from 'lucide-react'
 import type { Utilisateur } from '../types'
@@ -74,16 +73,11 @@ export default function Sidebar() {
     {
       title: 'CONFIGURATION',
       items: [
-        { name: 'Config. articles', path: '/admin/articles', icon: Database },
-        { name: 'Config. clients', path: '/admin/clients', icon: Users },
-        { name: 'Config. plateformes', path: '/admin/plateformes', icon: Building2 },
-        { name: 'Config. inventaire', path: '/admin/inventaire', icon: Database },
-        { name: 'Config. Attendus', path: '/admin/attendus', icon: Settings },
-        { name: 'Config. règles alerte', path: '/admin/regles-alerte', icon: AlertTriangle },
-        { name: 'Config. production', path: '/admin/production', icon: Settings },
-        { name: 'Config. workflow', path: '/admin/workflow', icon: Settings },
-        { name: 'Config. rôles', path: '/admin/roles', icon: Settings },
-        { name: 'Config. utilisateurs', path: '/admin/utilisateurs', icon: Users },
+        { name: 'Données', path: '/admin/donnees', icon: Database },
+        { name: 'Workflow', path: '/admin/workflow', icon: Settings },
+        { name: 'Production', path: '/admin/production', icon: Truck },
+        { name: 'Attendus', path: '/admin/attendus', icon: ClipboardList },
+        { name: 'Accès', path: '/admin/acces', icon: Users },
       ],
     },
   ].map(section => ({

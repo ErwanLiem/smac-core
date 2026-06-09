@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 
 const cards = [
   { to: '/suivi', icon: ClipboardList, color: '#2563eb', bg: '#dbeafe', label: 'Suivi articles', sub: 'Gérer le workflow' },
-  { to: '/admin/articles', icon: Database, color: '#0891b2', bg: '#cffafe', label: 'Base articles', sub: 'Configurer les champs' },
+  { to: '/admin/donnees', icon: Database, color: '#0891b2', bg: '#cffafe', label: 'Données', sub: 'Configurer les champs' },
   { to: '/admin/workflow', icon: Settings, color: '#6b7280', bg: '#f3f4f6', label: 'Admin workflow', sub: 'Statuts & transitions' },
 ]
 

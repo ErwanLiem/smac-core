@@ -83,9 +83,10 @@ const typeLabels: Record<ChampType, string> = {
 
 const emptyChamp = { code: '', label: '', type: 'TEXT' as ChampType, options: '', obligatoire: false, ordre: 0 }
 
-export default function AdminArticles() {
+export default function AdminArticles({ embedded }: { embedded?: boolean } = {}) {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
+  const [chargement, setChargement] = useState(true)
   const [champs, setChamps] = useState<Champ[]>([])
   const [form, setForm] = useState(emptyChamp)
   const [editId, setEditId] = useState<number | null>(null)
@@ -98,6 +99,7 @@ export default function AdminArticles() {
   async function reload() {
     const data = await get<Champ[]>(`/articles/${siteId}/champs`)
     setChamps(data)
+    setChargement(false)
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -131,15 +133,20 @@ export default function AdminArticles() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Admin Articles</h1>
-          <p className="page-subtitle">Configurez les champs de votre base articles</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Admin Articles</h1>
+            <p className="page-subtitle">Configurez les champs de votre base articles</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="card">
         <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Champs configurés</h2>
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : (
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -206,6 +213,7 @@ export default function AdminArticles() {
             ))}
           </tbody>
         </table>
+        )}
 
         {/* Formulaire ajout */}
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>

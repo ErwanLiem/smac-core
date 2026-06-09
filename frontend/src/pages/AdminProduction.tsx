@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Trash2, Plus, Check, X, Users, Settings } from 'lucide-react'
+import { Trash2, Plus, Check, X, Users } from 'lucide-react'
+import Tabs from '../components/Tabs'
 import { get, post, put, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
 
@@ -17,6 +18,7 @@ interface Config {
   champTypeArticleCode: string
   typesArticleQTE: string[]
   champsAffichageQTE: string[]
+  colonnesLabo: string[] | null  // null = toutes ; liste de codes champArticle
 }
 
 interface Technicien {
@@ -44,7 +46,8 @@ export default function AdminProduction() {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
 
-  const [config, setConfig]           = useState<Config>({ champPNCode: 'PN', champRMACode: 'BL', labelPN: 'P/N', labelRMA: 'RMA', champTypeArticleCode: 'TYPE', typesArticleQTE: [], champsAffichageQTE: [] })
+  const [chargement, setChargement] = useState(true)
+  const [config, setConfig]           = useState<Config>({ champPNCode: 'PN', champRMACode: 'BL', labelPN: 'P/N', labelRMA: 'RMA', champTypeArticleCode: 'TYPE', typesArticleQTE: [], champsAffichageQTE: [], colonnesLabo: null })
   const [champsArticle, setChampsArticle] = useState<ChampInv[]>([])
   const [articlesData, setArticlesData]   = useState<any[]>([])
   const [configModif, setConfigModif] = useState(false)
@@ -74,6 +77,7 @@ export default function AdminProduction() {
     setChampsArticle(champsArt.filter(c => c.actif !== false))
     setArticlesData(arts)
     setConfigModif(false)
+    setChargement(false)
   }
 
   // Valeurs distinctes du champ type dans les articles existants
@@ -125,8 +129,8 @@ export default function AdminProduction() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Config. production</h1>
-          <p className="page-subtitle">Paramétrez le module de transfert et planning de production</p>
+          <h1 className="page-title">Production</h1>
+          <p className="page-subtitle">Paramétrez la passerelle logistique → production et les techniciens</p>
         </div>
       </div>
 
@@ -136,12 +140,15 @@ export default function AdminProduction() {
         </div>
       )}
 
-      {/* Configuration */}
+      <Tabs tabs={[
+        { key: 'transfert', label: 'Transfert', content: (
       <div className="card" style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-          <Settings size={16} style={{ color: '#60a5fa' }} />
-          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9' }}>Paramètres</h2>
-        </div>
+        <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '16px' }}>
+          Définit comment les articles de l'inventaire logistique remontent vers le module production (planning S/N et demandes de quantité).
+        </p>
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : (
         <form onSubmit={saveConfig}>
           {/* Transfert SN */}
           <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>Transfert S/N (Planning)</p>
@@ -255,19 +262,22 @@ export default function AdminProduction() {
           </div>
 
           {configModif && (
-            <button type="submit" className="btn btn-primary"><Check size={14} /> Enregistrer</button>
+            <button type="submit" className="btn btn-primary" style={{ marginTop: '16px' }}><Check size={14} /> Enregistrer</button>
           )}
         </form>
+        )}
       </div>
-
-      {/* Techniciens */}
+        ) },
+        { key: 'techniciens', label: 'Techniciens & quotas', content: (
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
           <Users size={16} style={{ color: '#60a5fa' }} />
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9' }}>Techniciens de production</h2>
         </div>
 
-        {techniciens.length === 0 ? (
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : techniciens.length === 0 ? (
           <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>Aucun technicien configuré.</p>
         ) : (
           <table className="table" style={{ marginBottom: '20px' }}>
@@ -322,6 +332,8 @@ export default function AdminProduction() {
           </div>
         )}
       </div>
+        ) },
+      ]} />
 
       {/* Modal édition technicien */}
       {editTech && (

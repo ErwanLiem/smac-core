@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import ChangerMdpModal from './ChangerMdpModal'
 
@@ -11,12 +11,15 @@ function doitChangerMdp(): boolean {
 
 export default function Layout() {
   const [forcerChangement, setForcerChangement] = useState(doitChangerMdp())
+  const location = useLocation()
 
   return (
     <div className="app-container">
       <Sidebar />
       <main className="main-content">
-        <Outlet />
+        <div key={location.pathname} className="page-fade">
+          <Outlet />
+        </div>
       </main>
       {forcerChangement && (
         <ChangerMdpModal onSuccess={() => setForcerChangement(false)} />

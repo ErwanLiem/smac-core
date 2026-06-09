@@ -97,9 +97,10 @@ function Oui({ val }: { val: boolean }) {
   return val ? <span className="badge badge-success">✓</span> : <span style={{ color: '#d1d5db' }}>—</span>
 }
 
-export default function AdminInventaire() {
+export default function AdminInventaire({ embedded }: { embedded?: boolean } = {}) {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
+  const [chargement, setChargement] = useState(true)
   const [champs, setChamps] = useState<Champ[]>([])
   const [form, setForm] = useState(emptyChamp)
   const [editId, setEditId] = useState<number | null>(null)
@@ -112,6 +113,7 @@ export default function AdminInventaire() {
   async function reload() {
     const data = await inventaireApi.getChamps(siteId)
     setChamps(data)
+    setChargement(false)
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -150,15 +152,20 @@ export default function AdminInventaire() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Structure inventaire</h1>
-          <p className="page-subtitle">Configurez les champs de votre base inventaire</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Structure inventaire</h1>
+            <p className="page-subtitle">Configurez les champs de votre base inventaire</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="card">
         <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Champs configurés</h2>
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className="table" style={{ marginBottom: '20px', minWidth: 'max-content' }}>
             <thead>
@@ -221,6 +228,7 @@ export default function AdminInventaire() {
             </tbody>
           </table>
         </div>
+        )}
 
         {isAdmin && (
           <>

@@ -34,6 +34,7 @@ export default function Attendus() {
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [chargement, setChargement] = useState(true)
   const [attendus, setAttendus] = useState<Attendu[]>([])
   const [champsInv, setChampsInv] = useState<ChampInv[]>([])
   const [clients, setClients] = useState<any[]>([])
@@ -72,6 +73,7 @@ export default function Attendus() {
         setConfigChamps(parsed)
       } catch {}
     }
+    setChargement(false)
   }
 
   function getEntiteLabel(entite: any, champs: any[]): string {
@@ -135,7 +137,9 @@ export default function Attendus() {
         </button>
       </div>
 
-      {attendus.length === 0 ? (
+      {chargement ? (
+        <div className="loading-container"><div className="loading-spinner" /></div>
+      ) : attendus.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
           <FileText size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
           <p style={{ fontWeight: 500, marginBottom: '8px' }}>Aucun attendu</p>

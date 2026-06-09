@@ -15,7 +15,7 @@ export async function getChamps(req: Request, res: Response) {
   res.json(champs)
 }
 
-export async function createChamp(req: Request, res: Response, next) {
+export async function createChamp(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
     const { code, label, type, options, obligatoire, ordre, visibleReceptionSN, visibleReceptionQTE } = req.body
@@ -39,7 +39,7 @@ export async function createChamp(req: Request, res: Response, next) {
   }
 }
 
-export async function updateChamp(req: Request, res: Response, next) {
+export async function updateChamp(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
     const { label, type, options, obligatoire, ordre, actif, visibleReceptionSN, visibleReceptionQTE } = req.body
@@ -62,7 +62,7 @@ export async function updateChamp(req: Request, res: Response, next) {
   }
 }
 
-export async function deleteChamp(req: Request, res: Response, next) {
+export async function deleteChamp(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
     await prisma.champInventaire.delete({
@@ -100,7 +100,10 @@ export async function checkSN(req: Request, res: Response) {
 
   if (!existing) return res.json({ existe: false })
 
-  const estFinal = existing.inventaire?.statut?.estFinal ?? false
+  const estFinal = (() => {
+    const r = existing.inventaire?.statut?.roles
+    try { return r ? JSON.parse(r).includes('estFinal') : false } catch { return false }
+  })()
 
   // Chercher le RMA
   const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normCode(c.code)))
@@ -134,7 +137,7 @@ export async function getAll(req: Request, res: Response) {
   res.json(inventaires)
 }
 
-export async function create(req: Request, res: Response, next) {
+export async function create(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
     const { articleId, statutId, valeurs } = req.body
@@ -196,7 +199,7 @@ export async function create(req: Request, res: Response, next) {
   }
 }
 
-export async function update(req: Request, res: Response, next) {
+export async function update(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
     const { statutId, valeurs } = req.body
@@ -240,7 +243,7 @@ export async function update(req: Request, res: Response, next) {
   }
 }
 
-export async function remove(req: Request, res: Response, next) {
+export async function remove(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
     const inv = await prisma.inventaire.findUnique({ where: { id: Number(id) } })

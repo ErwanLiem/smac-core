@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X } from 'lucide-react'
+import Tabs from '../components/Tabs'
 import { workflowApi } from '../api/workflow'
 import type { Statut, Transition } from '../types'
 import { getPermissions } from '../utils/permissions'
@@ -45,16 +46,104 @@ function ColorSquare({ color }: { color: string }) {
   )
 }
 
+// ─── Rôles système prédéfinis (ont un comportement particulier dans le code) ──
+const ROLES_SYSTEME: Record<string, { label: string; couleur: string; fond: string; desc: string }> = {
+  estStock:     { label: 'Stock',     couleur: '#60a5fa', fond: '#1e3a5f', desc: '1er statut après réception d\'un article' },
+  estTransfert: { label: 'Transfert', couleur: '#fb923c', fond: '#1c1917', desc: 'Attente de transfert vers le labo (planning)' },
+  estFinal:     { label: 'Final',     couleur: '#4ade80', fond: '#052e16', desc: 'Statut de sortie définitif' },
+}
+
+function RoleTag({ code, onRemove }: { code: string; onRemove?: () => void }) {
+  const sys = ROLES_SYSTEME[code]
+  const couleur = sys?.couleur ?? '#94a3b8'
+  const fond    = sys?.fond    ?? '#1a1d27'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '4px',
+      fontSize: '11px', fontWeight: 600, background: fond, color: couleur, border: `1px solid ${couleur}44` }}>
+      {sys?.label ?? code}
+      {onRemove && (
+        <button type="button" onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: couleur, padding: '0', lineHeight: 1, fontSize: '12px' }}>×</button>
+      )}
+    </span>
+  )
+}
+
+function RolesEditor({
+  roles, onChange, disabled
+}: { roles: string[]; onChange: (r: string[]) => void; disabled?: boolean }) {
+  const [input, setInput] = useState('')
+
+  function addRole(code: string) {
+    const clean = code.trim().replace(/\s+/g, '_').toUpperCase()
+    // Normaliser les rôles système
+    const sys = Object.entries(ROLES_SYSTEME).find(([k]) => k.toUpperCase() === clean || ROLES_SYSTEME[k].label.toUpperCase() === clean)
+    const finalCode = sys ? sys[0] : clean
+    if (finalCode && !roles.includes(finalCode)) onChange([...roles, finalCode])
+    setInput('')
+  }
+
+  function removeRole(code: string) { onChange(roles.filter(r => r !== code)) }
+
+  function toggleSys(code: string) {
+    if (roles.includes(code)) removeRole(code)
+    else onChange([...roles, code])
+  }
+
+  return (
+    <div>
+      {/* Boutons rôles système */}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        {Object.entries(ROLES_SYSTEME).map(([code, info]) => {
+          const actif = roles.includes(code)
+          return (
+            <button key={code} type="button" disabled={disabled} onClick={() => toggleSys(code)} style={{
+              padding: '3px 10px', borderRadius: '4px', border: `1px solid ${actif ? info.couleur : info.couleur + '44'}`,
+              background: actif ? info.fond : 'transparent', color: actif ? info.couleur : '#6b7280',
+              fontSize: '11px', fontWeight: 600, cursor: disabled ? 'default' : 'pointer',
+              transition: 'all 0.15s', opacity: disabled ? 0.5 : 1
+            }} title={info.desc}>
+              {actif ? '✓' : '○'} {info.label}
+            </button>
+          )
+        })}
+      </div>
+      {/* Rôles personnalisés déjà ajoutés */}
+      {roles.filter(r => !ROLES_SYSTEME[r]).length > 0 && (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' }}>
+          {roles.filter(r => !ROLES_SYSTEME[r]).map(r => (
+            <RoleTag key={r} code={r} onRemove={disabled ? undefined : () => removeRole(r)} />
+          ))}
+        </div>
+      )}
+      {/* Champ pour ajouter un rôle custom */}
+      {!disabled && (
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input className="form-input" style={{ fontSize: '12px', flex: 1 }}
+            placeholder="Ajouter un rôle custom (ex: EST_REPARATION)…"
+            value={input} onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (input.trim()) addRole(input) } }}
+          />
+          <button type="button" className="btn btn-secondary" style={{ fontSize: '12px', padding: '4px 10px' }}
+            onClick={() => { if (input.trim()) addRole(input) }}>
+            Ajouter
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminWorkflow() {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
+  const [chargement, setChargement] = useState(true)
   const [statuts, setStatuts] = useState<Statut[]>([])
   const [transitions, setTransitions] = useState<Transition[]>([])
   const [modal, setModal] = useState<{ type: 'deleteStatut' | 'deleteTransition'; id: number } | null>(null)
   const [editStatut, setEditStatut] = useState<Statut | null>(null)
   const [editTransition, setEditTransition] = useState<Transition | null>(null)
 
-  const [newStatut, setNewStatut] = useState({ code: '', label: '', couleur: '#6b7280', ordre: 0, estFinal: false, estStock: false, estTransfert: false })
+  const [newStatut, setNewStatut] = useState({ code: '', label: '', couleur: '#6b7280', ordre: 0, roles: [] as string[] })
   const [newTransition, setNewTransition] = useState({ statutFromId: 0, statutToId: 0, labelBouton: '', couleurBouton: '#3b82f6' })
 
   useEffect(() => { reload() }, [siteId])
@@ -66,12 +155,13 @@ export default function AdminWorkflow() {
     ])
     setStatuts(s)
     setTransitions(t)
+    setChargement(false)
   }
 
   async function ajouterStatut(e: React.FormEvent) {
     e.preventDefault()
     await workflowApi.createStatut(siteId, newStatut)
-    setNewStatut({ code: '', label: '', couleur: '#6b7280', ordre: 0, estFinal: false, estStock: false, estTransfert: false })
+    setNewStatut({ code: '', label: '', couleur: '#6b7280', ordre: 0, roles: [] })
     reload()
   }
 
@@ -101,9 +191,7 @@ export default function AdminWorkflow() {
       label: editStatut.label,
       couleur: editStatut.couleur,
       ordre: editStatut.ordre,
-      estFinal: editStatut.estFinal,
-      estStock: editStatut.estStock,
-      estTransfert: editStatut.estTransfert,
+      roles: editStatut.roles,
     })
     setEditStatut(null)
     reload()
@@ -131,14 +219,17 @@ export default function AdminWorkflow() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Admin — Workflow</h1>
+          <h1 className="page-title">Workflow</h1>
           <p className="page-subtitle">Configurez les statuts et transitions de votre site</p>
         </div>
       </div>
 
-      {/* STATUTS */}
+      <Tabs tabs={[
+        { key: 'statuts', label: 'Statuts', content: (
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Statuts</h2>
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : (
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -158,10 +249,10 @@ export default function AdminWorkflow() {
                 <td><StatutBadge statut={s} /></td>
                 <td style={{ textAlign: 'center' }}><ColorSquare color={s.couleur} /></td>
                 <td style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {s.estStock     && <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', background: '#1e3a5f', color: '#60a5fa', border: '1px solid #2563eb' }}>Stock</span>}
-                  {s.estTransfert && <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', background: '#1c1917', color: '#fb923c', border: '1px solid #ea580c' }}>Transfert</span>}
-                  {s.estFinal     && <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px', background: '#052e16', color: '#4ade80', border: '1px solid #16a34a' }}>Final</span>}
-                  {!s.estStock && !s.estTransfert && !s.estFinal && <span style={{ color: '#4b5563' }}>—</span>}
+                  {(s.roles ?? []).length > 0
+                    ? (s.roles ?? []).map(r => <RoleTag key={r} code={r} />)
+                    : <span style={{ color: '#4b5563' }}>—</span>
+                  }
                 </td>
                 <td style={{ width: '80px', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                   {isAdmin && (<>
@@ -177,6 +268,30 @@ export default function AdminWorkflow() {
             ))}
           </tbody>
         </table>
+        )}
+
+        {/* Alertes rôles manquants */}
+        {!chargement && isAdmin && (() => {
+          const manquants: { label: string; couleur: string; fond: string; desc: string }[] = []
+          if (!statuts.some(s => (s.roles ?? []).includes('estStock')))
+            manquants.push({ label: 'Stock', couleur: '#60a5fa', fond: '#1e3a5f', desc: 'Statut attribué lors de la réception d\'un article' })
+          if (!statuts.some(s => (s.roles ?? []).includes('estTransfert')))
+            manquants.push({ label: 'Transfert', couleur: '#fb923c', fond: '#1c1917', desc: 'Statut des articles en attente de transfert vers le labo' })
+          if (!statuts.some(s => (s.roles ?? []).includes('estFinal')))
+            manquants.push({ label: 'Final', couleur: '#4ade80', fond: '#052e16', desc: 'Statut de sortie définitif' })
+          if (manquants.length === 0) return null
+          return (
+            <div style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {manquants.map(m => (
+                <div key={m.label} style={{ background: m.fond, border: `1px solid ${m.couleur}44`, borderRadius: '6px', padding: '8px 12px', fontSize: '12px', color: m.couleur, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700 }}>⚠️ Rôle manquant :</span>
+                  <span style={{ background: m.couleur + '22', border: `1px solid ${m.couleur}55`, borderRadius: '4px', padding: '1px 7px', fontWeight: 600 }}>{m.label}</span>
+                  <span style={{ color: '#9ca3af' }}>— {m.desc}. Éditez un statut et cochez ce rôle.</span>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* Formulaire ajout statut */}
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
@@ -205,27 +320,19 @@ export default function AdminWorkflow() {
               </div>
               {isAdmin && <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>+ Ajouter</button>}
             </div>
-            <div style={{ display: 'flex', gap: '20px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
-                <input type="checkbox" checked={newStatut.estStock} onChange={e => setNewStatut(f => ({ ...f, estStock: e.target.checked }))} />
-                Rôle Stock <span style={{ fontSize: '11px', color: '#60a5fa' }}>(1er statut après réception)</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
-                <input type="checkbox" checked={newStatut.estTransfert} onChange={e => setNewStatut(f => ({ ...f, estTransfert: e.target.checked }))} />
-                Rôle Transfert <span style={{ fontSize: '11px', color: '#fb923c' }}>(attente transfert production)</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
-                <input type="checkbox" checked={newStatut.estFinal} onChange={e => setNewStatut(f => ({ ...f, estFinal: e.target.checked }))} />
-                Rôle Final <span style={{ fontSize: '11px', color: '#4ade80' }}>(statut de sortie)</span>
-              </label>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Rôles</label>
+              <RolesEditor roles={newStatut.roles} onChange={roles => setNewStatut(f => ({ ...f, roles }))} disabled={!isAdmin} />
             </div>
           </form>
         </div>
       </div>
-
-      {/* TRANSITIONS */}
+        ) },
+        { key: 'transitions', label: 'Transitions', content: (
       <div className="card">
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '16px' }}>Transitions</h2>
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : (
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -268,6 +375,7 @@ export default function AdminWorkflow() {
             ))}
           </tbody>
         </table>
+        )}
 
         {/* Formulaire ajout transition */}
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
@@ -303,6 +411,8 @@ export default function AdminWorkflow() {
           </form>
         </div>
       </div>
+        ) },
+      ]} />
 
       {/* Modal édition statut */}
       {editStatut && (
@@ -332,20 +442,11 @@ export default function AdminWorkflow() {
               </div>
               <div className="form-group">
                 <label className="form-label">Rôles</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
-                    <input type="checkbox" checked={editStatut.estStock} onChange={e => setEditStatut(s => s ? { ...s, estStock: e.target.checked } : s)} />
-                    <span>Stock</span><span style={{ fontSize: '11px', color: '#60a5fa' }}>— 1er statut après réception</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
-                    <input type="checkbox" checked={editStatut.estTransfert} onChange={e => setEditStatut(s => s ? { ...s, estTransfert: e.target.checked } : s)} />
-                    <span>Transfert</span><span style={{ fontSize: '11px', color: '#fb923c' }}>— attente transfert production</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
-                    <input type="checkbox" checked={editStatut.estFinal} onChange={e => setEditStatut(s => s ? { ...s, estFinal: e.target.checked } : s)} />
-                    <span>Final</span><span style={{ fontSize: '11px', color: '#4ade80' }}>— statut de sortie</span>
-                  </label>
-                </div>
+                <RolesEditor
+                  roles={editStatut.roles ?? []}
+                  onChange={roles => setEditStatut(s => s ? { ...s, roles } : s)}
+                  disabled={!isAdmin}
+                />
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setEditStatut(null)}>Annuler</button>

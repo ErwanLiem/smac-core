@@ -50,7 +50,10 @@ export async function verifierReglesAlerte(
     }
   })
 
-  const entreeFinale = existants.find(e => e.inventaire?.statut?.estFinal)
+  const entreeFinale = existants.find(e => {
+    const r = e.inventaire?.statut?.roles
+    try { return r ? JSON.parse(r).includes('estFinal') : false } catch { return false }
+  })
   if (!entreeFinale) return null
 
   // Construire le map des données de cette entrée existante (statut final)

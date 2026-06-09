@@ -56,6 +56,7 @@ export default function Inventaire() {
   const peutSupprimer = isAdmin
   const peutCreer = isAdmin
 
+  const [chargement, setChargement] = useState(true)
   const [champs, setChamps] = useState<Champ[]>([])
   const [colonnesOrdre, setColonnesOrdre] = useState<number[]>([])
   const [articles, setArticles] = useState<any[]>([])
@@ -100,6 +101,7 @@ export default function Inventaire() {
     setArticles(a)
     setStatuts(s)
     setInventaires(i)
+    setChargement(false)
   }
 
   function getValeur(item: Inventaire, champId: number) {
@@ -258,7 +260,9 @@ export default function Inventaire() {
         </div>
       </div>
 
-      {champs.length === 0 ? (
+      {chargement ? (
+        <div className="loading-container"><div className="loading-spinner" /></div>
+      ) : champs.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
           <p style={{ marginBottom: '8px', fontWeight: 500 }}>Aucun champ configuré</p>
           <p style={{ fontSize: '13px' }}>Configurez d'abord les champs dans Configuration → Structure inventaire.</p>

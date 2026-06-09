@@ -12,9 +12,10 @@ function getSiteId(): number {
 interface Role { id: number; code: string; label: string }
 interface Utilisateur { id: number; nom: string; prenom: string; login: string; actif: boolean; doitChangerMdp: boolean; role: Role }
 
-export default function AdminUtilisateurs() {
+export default function AdminUtilisateurs({ embedded }: { embedded?: boolean } = {}) {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
+  const [chargement, setChargement] = useState(true)
   const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [form, setForm] = useState({ nom: '', prenom: '', login: '', roleId: 0 })
@@ -31,6 +32,7 @@ export default function AdminUtilisateurs() {
     ])
     setUtilisateurs(u)
     setRoles(r)
+    setChargement(false)
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -69,14 +71,19 @@ export default function AdminUtilisateurs() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Utilisateurs</h1>
-          <p className="page-subtitle">{utilisateurs.length} utilisateur{utilisateurs.length !== 1 ? 's' : ''}</p>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Utilisateurs</h1>
+            <p className="page-subtitle">{utilisateurs.length} utilisateur{utilisateurs.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="card">
+        {chargement ? (
+          <div className="loading-container" style={{ minHeight: '160px' }}><div className="loading-spinner" /></div>
+        ) : (
         <table className="table" style={{ marginBottom: '20px' }}>
           <thead>
             <tr>
@@ -136,6 +143,7 @@ export default function AdminUtilisateurs() {
             ))}
           </tbody>
         </table>
+        )}
 
         {/* Formulaire création */}
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
