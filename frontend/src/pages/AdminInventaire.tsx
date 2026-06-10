@@ -174,10 +174,10 @@ export default function AdminInventaire({ embedded }: { embedded?: boolean } = {
                 <th>Code</th>
                 <th>Label</th>
                 <th>Type</th>
-                <th>Obligatoire</th>
-                <th>Actif</th>
-                <th title="Visible pour les réceptions S/N">Visible S/N</th>
-                <th title="Visible pour les réceptions quantité">Visible QTE</th>
+                <th title="Rend le champ requis (*) dans les formulaires d'ajout/édition de l'inventaire">Obligatoire</th>
+                <th title="Désactive le champ sans supprimer les données : il disparaît des colonnes et formulaires de l'inventaire">Actif</th>
+                <th title="Visible pour les réceptions S/N">Réception S/N</th>
+                <th title="Visible pour les réceptions quantité">Réception QTE</th>
                 <th></th>
               </tr>
             </thead>
@@ -263,10 +263,10 @@ export default function AdminInventaire({ embedded }: { embedded?: boolean } = {
                   <input type="checkbox" checked={form.obligatoire} onChange={e => setForm({ ...form, obligatoire: e.target.checked })} /> Obligatoire
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
-                  <input type="checkbox" checked={form.visibleReceptionSN} onChange={e => setForm({ ...form, visibleReceptionSN: e.target.checked })} /> Visible S/N
+                  <input type="checkbox" checked={form.visibleReceptionSN} onChange={e => setForm({ ...form, visibleReceptionSN: e.target.checked })} /> Réception S/N
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#e2e8f0' }}>
-                  <input type="checkbox" checked={form.visibleReceptionQTE} onChange={e => setForm({ ...form, visibleReceptionQTE: e.target.checked })} /> Visible QTE
+                  <input type="checkbox" checked={form.visibleReceptionQTE} onChange={e => setForm({ ...form, visibleReceptionQTE: e.target.checked })} /> Réception QTE
                 </label>
               </div>
               <button type="submit" className="btn btn-primary">+ Ajouter</button>

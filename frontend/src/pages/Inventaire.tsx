@@ -1,8 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
-import { Trash2, Plus, Pencil, X } from 'lucide-react'
+import { Trash2, Plus, Pencil, X, History } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get, del } from '../api/client'
 import { getPermissions } from '../utils/permissions'
+import ColonnesToggle from '../components/ColonnesToggle'
+import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
+
+const LABELS_TYPE_HISTORIQUE: Record<string, string> = {
+  RECEPTION: 'Réception',
+  TRANSFERT: 'Transfert',
+  MODIFICATION: 'Modification',
+  SUPPRESSION: 'Suppression',
+  CREATION: 'Création',
+  TRANSITION_STATUT: 'Changement de statut'
+}
+
+interface HistoriqueEntry {
+  id: number
+  type: string
+  createdAt: string
+  details: Record<string, any> | null
+  operateur: { id: number; login: string; nom: string; prenom: string } | null
+}
 
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
@@ -59,6 +78,7 @@ export default function Inventaire() {
   const [chargement, setChargement] = useState(true)
   const [champs, setChamps] = useState<Champ[]>([])
   const [colonnesOrdre, setColonnesOrdre] = useState<number[]>([])
+  const [colonnesCachees, setColonnesCachees] = useState<Set<number>>(new Set())
   const [articles, setArticles] = useState<any[]>([])
   const [statuts, setStatuts] = useState<Statut[]>([])
   const [inventaires, setInventaires] = useState<Inventaire[]>([])
@@ -72,6 +92,8 @@ export default function Inventaire() {
   const [modalMasse, setModalMasse] = useState(false)
   const [selection, setSelection] = useState<Set<number>>(new Set())
   const [editItem, setEditItem] = useState<{ id: number; articleId: number; statutId: number | null; valeurs: Record<number, string> } | null>(null)
+  const [historique, setHistorique] = useState<HistoriqueEntry[] | null>(null)
+  const [historiqueLoading, setHistoriqueLoading] = useState(false)
 
   useEffect(() => {
     document.querySelector('.main-content')?.classList.add('page-table')
@@ -79,6 +101,20 @@ export default function Inventaire() {
   }, [])
 
   useEffect(() => { reload() }, [siteId])
+
+  // Recharger les données quand l'utilisateur revient sur la page (ex: après validation
+  // d'un transfert dans Logistique, la quantité en stock peut avoir changé)
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') reload()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [siteId])
 
   async function reload() {
     const [c, a, s, i] = await Promise.all([
@@ -98,6 +134,8 @@ export default function Inventaire() {
       ...ids.filter(id => !savedOrdre.includes(id))
     ]
     setColonnesOrdre(restored)
+    const savedCachees = JSON.parse(localStorage.getItem(`inventaire_colonnes_cachees_${login}`) || '[]') as number[]
+    setColonnesCachees(new Set(savedCachees.filter(id => ids.includes(id))))
     setArticles(a)
     setStatuts(s)
     setInventaires(i)
@@ -110,6 +148,30 @@ export default function Inventaire() {
 
   // Colonnes triées selon l'ordre drag & drop
   const champsOrdonnes = colonnesOrdre.map(id => champs.find(c => c.id === id)).filter(Boolean) as Champ[]
+  // Colonnes effectivement affichées (hors colonnes masquées par l'utilisateur)
+  const champsAffiches = champsOrdonnes.filter(c => !colonnesCachees.has(c.id))
+
+  // Colonnes proposées pour l'export Excel (toutes les colonnes disponibles, indépendamment de leur visibilité à l'écran)
+  const colonnesExport: ExportColumn[] = [
+    { key: 'statut', label: 'Statut' },
+    ...champsOrdonnes.map(c => ({ key: String(c.id), label: c.label }))
+  ]
+
+  function valeurExport(item: Inventaire, key: string): string {
+    if (key === 'statut') return item.statut?.label ?? ''
+    const champId = Number(key)
+    return item.valeurs.find(v => v.champId === champId)?.valeur ?? ''
+  }
+
+  function toggleColonne(champId: number) {
+    setColonnesCachees(prev => {
+      const next = new Set(prev)
+      next.has(champId) ? next.delete(champId) : next.add(champId)
+      const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
+      localStorage.setItem(`inventaire_colonnes_cachees_${login}`, JSON.stringify(Array.from(next)))
+      return next
+    })
+  }
 
   function onDragStart(champId: number) {
     dragColonne.current = champId
@@ -141,6 +203,19 @@ export default function Inventaire() {
       setSelection(new Set())
     } else {
       setSelection(new Set(filteredInventaires.map(i => i.id)))
+    }
+  }
+
+  async function ouvrirHistorique() {
+    const id = Array.from(selection)[0]
+    if (!id) return
+    setHistorique([])
+    setHistoriqueLoading(true)
+    try {
+      const data = await inventaireApi.getHistorique(id)
+      setHistorique(data as HistoriqueEntry[])
+    } finally {
+      setHistoriqueLoading(false)
     }
   }
 
@@ -242,6 +317,11 @@ export default function Inventaire() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          {selection.size === 1 && (
+            <button className="btn btn-secondary" onClick={ouvrirHistorique}>
+              <History size={14} /> Détail
+            </button>
+          )}
           {selection.size > 0 && peutSupprimer && (
             <button className="btn btn-danger" style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }} onClick={() => setModalMasse(true)}>
               <Trash2 size={14} /> Supprimer ({selection.size})
@@ -251,6 +331,18 @@ export default function Inventaire() {
             <button className="btn btn-secondary" onClick={resetFiltres}>
               <X size={14} /> Effacer filtres
             </button>
+          )}
+          {champsOrdonnes.length > 0 && (
+            <ColonnesToggle champs={champsOrdonnes} colonnesCachees={colonnesCachees} onToggle={toggleColonne} />
+          )}
+          {colonnesExport.length > 0 && (
+            <ExportExcelButton
+              columns={colonnesExport}
+              rows={filteredInventaires}
+              getValue={valeurExport}
+              filename={`inventaire_${new Date().toISOString().slice(0, 10)}.xlsx`}
+              sheetName="Inventaire"
+            />
           )}
           {false && (
             <button className="btn btn-primary" onClick={() => setShowForm(true)}>
@@ -281,7 +373,7 @@ export default function Inventaire() {
                   />
                 </th>
                 <th>Statut</th>
-                {champsOrdonnes.map(c => (
+                {champsAffiches.map(c => (
                   <th key={c.id}
                     draggable
                     onDragStart={() => onDragStart(c.id)}
@@ -303,7 +395,7 @@ export default function Inventaire() {
                     onChange={e => setFiltres(f => ({ ...f, statut: e.target.value }))}
                     style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
                 </td>
-                {champsOrdonnes.map(c => (
+                {champsAffiches.map(c => (
                   <td key={c.id} style={{ padding: '4px 8px' }}>
                     <input className="form-input" placeholder="Filtrer..."
                       value={filtres[String(c.id)] ?? ''}
@@ -316,7 +408,7 @@ export default function Inventaire() {
             </thead>
             <tbody>
               {filteredInventaires.length === 0 && (
-                <tr><td colSpan={champs.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
+                <tr><td colSpan={champsAffiches.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
                   {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
@@ -337,7 +429,7 @@ export default function Inventaire() {
                     />
                   </td>
                   <td style={{ padding: '4px 10px' }}><StatutBadge statut={item.statut} /></td>
-                  {champsOrdonnes.map(c => (
+                  {champsAffiches.map(c => (
                     <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
                   <td style={{ padding: '4px 8px', display: 'flex', gap: '6px' }}>
@@ -477,6 +569,42 @@ export default function Inventaire() {
                 Supprimer {selection.size} ligne{selection.size > 1 ? 's' : ''}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal historique / détail */}
+      {historique !== null && (
+        <div className="modal-overlay">
+          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Historique de la ligne</h3>
+              <button className="btn btn-secondary btn-icon" onClick={() => setHistorique(null)}><X size={14} /></button>
+            </div>
+            {historiqueLoading ? (
+              <div className="loading-container"><div className="loading-spinner" /></div>
+            ) : historique.length === 0 ? (
+              <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center', padding: '24px' }}>Aucun mouvement enregistré pour cette ligne.</p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Date / heure</th>
+                    <th>Opération</th>
+                    <th>Opérateur</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historique.map(h => (
+                    <tr key={h.id}>
+                      <td>{new Date(h.createdAt).toLocaleString('fr-FR')}</td>
+                      <td>{LABELS_TYPE_HISTORIQUE[h.type] ?? h.type}</td>
+                      <td>{h.operateur ? h.operateur.login : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

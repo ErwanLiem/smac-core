@@ -4,7 +4,6 @@ import AdminClients from './AdminClients'
 import AdminPlateformes from './AdminPlateformes'
 import AdminInventaire from './AdminInventaire'
 import AdminReglesAlerte from './AdminReglesAlerte'
-import AdminColonnesLabo from './AdminColonnesLabo'
 
 export default function AdminDonnees() {
   return (
@@ -29,10 +28,6 @@ export default function AdminDonnees() {
                 <AdminInventaire embedded />
                 <div style={{ marginTop: '20px' }}>
                   <AdminReglesAlerte embedded />
-                </div>
-                <div className="card" style={{ marginTop: '20px' }}>
-                  <p className="card-title" style={{ marginBottom: '12px' }}>Colonnes Inventaire Labo</p>
-                  <AdminColonnesLabo embedded />
                 </div>
               </div>
             ),

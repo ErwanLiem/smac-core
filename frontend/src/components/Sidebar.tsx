@@ -12,6 +12,7 @@ import {
   Building2,
   Package,
   Truck,
+  PackageCheck,
 } from 'lucide-react'
 import type { Utilisateur } from '../types'
 
@@ -58,7 +59,7 @@ export default function Sidebar() {
       items: [
         { name: 'Suivi', path: '/suivi', icon: ClipboardList },
         { name: 'Planning', path: '/planning', icon: ClipboardList },
-        { name: 'Inventaire labo', path: '/inventaire-labo', icon: Package },
+        { name: 'Suivi PDA Labo', path: '/suivi-pda-labo', icon: Package },
       ],
     },
     {
@@ -68,6 +69,8 @@ export default function Sidebar() {
         { name: 'Réception', path: '/reception', icon: Package },
         { name: 'Inventaire', path: '/inventaire', icon: Warehouse },
         { name: 'Attente transfert', path: '/logistique', icon: Truck },
+        { name: 'Suivi PDA', path: '/suivi-pda', icon: Package },
+        { name: 'Expéditions', path: '/expeditions', icon: PackageCheck },
       ],
     },
     {

@@ -152,6 +152,7 @@ model inventaire {
   regleAlerte      regleAlerte?       @relation(fields: [regleAlerteId], references: [id], map: "Inventaire_regleAlerteId_fkey")
   valeurs          valeurChampInventaire[]
   lignesTransfert  ligneDemandeTransfert[]
+  ligneMasterBox   ligneMasterBox?
 
   @@index([siteId], map: "Inventaire_siteId_fkey")
   @@index([articleId], map: "Inventaire_articleId_fkey")
@@ -319,6 +320,7 @@ model site {
   technicienProduction technicienProduction[]
   demandeTransfert     demandeTransfert[]
   inventaireLabo       inventaireLabo[]
+  masterBox            masterBox[]
 }
 
 // ─── Module Production ───────────────────────────────────────────────────────
@@ -334,7 +336,6 @@ model configProduction {
   champTypeArticleCode String  @default("TYPE")  // code du champArticle contenant le type
   typesArticleQTE      String? @db.LongText      // JSON: ["PDA","TABLETTE"] — types éligibles transfert QTE
   champsAffichageQTE   String? @db.LongText      // JSON: ["PN","DESIGNATION","TYPE"] — champs à afficher dans la liste
-  colonnesLabo         String? @db.LongText      // JSON: [champArticleCode, ...] — colonnes visibles dans InventaireLabo
   site                 site    @relation(fields: [siteId], references: [id], map: "ConfigProduction_siteId_fkey")
 }
 
@@ -400,6 +401,35 @@ model ligneDemandeTransfert {
   @@unique([demandeTransfertId, inventaireId], map: "LigneDemandeTransfert_demandeId_inventaireId_key")
   @@index([demandeTransfertId], map: "LigneDemandeTransfert_demandeId_fkey")
   @@index([inventaireId], map: "LigneDemandeTransfert_inventaireId_fkey")
+}
+
+// Master Box : carton collectif regroupant des articles "Emballé" prêts à être expédiés
+model masterBox {
+  id           Int              @id @default(autoincrement())
+  siteId       Int
+  numero       String
+  clientValeur String?
+  statut       String           @default("EN_ATTENTE") // EN_ATTENTE | EXPEDIEE
+  userId       Int?
+  createdAt    DateTime         @default(now())
+  site         site             @relation(fields: [siteId], references: [id], map: "MasterBox_siteId_fkey")
+  lignes       ligneMasterBox[]
+
+  @@unique([siteId, numero], map: "MasterBox_siteId_numero_key")
+  @@index([siteId], map: "MasterBox_siteId_fkey")
+}
+
+// Lignes d'une Master Box : pointe vers les inventaires emballés qu'elle contient
+model ligneMasterBox {
+  id           Int        @id @default(autoincrement())
+  masterBoxId  Int
+  inventaireId Int
+  masterBox    masterBox  @relation(fields: [masterBoxId], references: [id], onDelete: Cascade, map: "LigneMasterBox_masterBoxId_fkey")
+  inventaire   inventaire @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "LigneMasterBox_inventaireId_fkey")
+
+  @@unique([inventaireId], map: "LigneMasterBox_inventaireId_key")
+  @@index([masterBoxId], map: "LigneMasterBox_masterBoxId_fkey")
+  @@index([inventaireId], map: "LigneMasterBox_inventaireId_fkey")
 }
 
 // Inventaire labo (articles à la quantité, ex: PDAs)

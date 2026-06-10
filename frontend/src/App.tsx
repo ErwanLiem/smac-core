@@ -15,7 +15,9 @@ import AdminAttendus from './pages/AdminAttendus'
 import AdminProduction from './pages/AdminProduction'
 import Planning from './pages/Planning'
 import Logistique from './pages/Logistique'
-import InventaireLabo from './pages/InventaireLabo'
+import SuiviPDA from './pages/SuiviPDA'
+import SuiviPDALabo from './pages/SuiviPDALabo'
+import Expeditions from './pages/Expeditions'
 import AttendusDetail from './pages/AttendusDetail'
 import Layout from './components/Layout'
 
@@ -49,7 +51,9 @@ function App() {
             <Route path="/admin/production" element={<AdminProduction />} />
             <Route path="/planning" element={<Planning />} />
             <Route path="/logistique" element={<Logistique />} />
-            <Route path="/inventaire-labo" element={<InventaireLabo />} />
+            <Route path="/suivi-pda" element={<SuiviPDA />} />
+            <Route path="/suivi-pda-labo" element={<SuiviPDALabo />} />
+            <Route path="/expeditions" element={<Expeditions />} />
             <Route path="/attendus/:id" element={<AttendusDetail />} />
             <Route path="/admin/acces" element={<AdminAcces />} />
           </Route>

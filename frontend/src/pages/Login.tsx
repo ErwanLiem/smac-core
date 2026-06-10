@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Warehouse } from 'lucide-react'
+import { Warehouse, Eye, EyeOff } from 'lucide-react'
 import { post } from '../api/client'
 
 const SITE_SLUG = 'smac-vallery'
@@ -9,6 +9,7 @@ export default function Login() {
   const navigate = useNavigate()
   const [login, setLogin] = useState('')
   const [motDePasse, setMotDePasse] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -70,14 +71,29 @@ export default function Login() {
 
             <div className="form-group">
               <label className="form-label">Mot de passe</label>
-              <input
-                type="password"
-                value={motDePasse}
-                onChange={e => setMotDePasse(e.target.value)}
-                className="form-input"
-                placeholder="••••••••"
-                required
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={motDePasse}
+                  onChange={e => setMotDePasse(e.target.value)}
+                  className="form-input"
+                  placeholder="••••••••"
+                  required
+                  style={{ paddingRight: '40px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  style={{
+                    position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', color: '#6b7280', padding: '4px'
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {error && (

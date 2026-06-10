@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { logActivite } from '../utils/historique'
 import { verifierReglesAlerte } from '../utils/reglesAlerte'
+import { enregistrerOperation } from '../utils/operations'
 
 const prisma = new PrismaClient()
 
@@ -180,12 +181,12 @@ export async function create(req: Request, res: Response, next: any) {
       }
     })
 
-    await logActivite({
+    await enregistrerOperation({
       siteId: Number(siteId),
+      inventaireId: inventaire.id,
+      champCode: 'OPE.RECEPTION',
       userId: (req as any).user?.id,
       type: 'RECEPTION',
-      entite: 'inventaire',
-      entiteId: inventaire.id,
       details: {
         articleId: Number(articleId),
         statutId: statutId ? Number(statutId) : null,
@@ -238,6 +239,93 @@ export async function update(req: Request, res: Response, next: any) {
     })
 
     res.json(inventaire)
+  } catch (e) {
+    next(e)
+  }
+}
+
+// Réception d'une quantité supplémentaire sur une ligne existante (suivi QTE)
+// Incrémente le champ et trace l'opération (type RECEPTION) pour le suivi des entrées mensuelles
+export async function receptionQte(req: Request, res: Response, next: any) {
+  try {
+    const { id } = req.params
+    const { champId, quantite } = req.body
+    const inventaireId = Number(id)
+    const qte = Number(quantite)
+
+    const valeurActuelle = await prisma.valeurChampInventaire.findUnique({
+      where: { inventaireId_champId: { inventaireId, champId: Number(champId) } }
+    })
+    const nouvelleValeur = (parseInt(valeurActuelle?.valeur ?? '0') || 0) + qte
+
+    await prisma.valeurChampInventaire.upsert({
+      where: { inventaireId_champId: { inventaireId, champId: Number(champId) } },
+      create: { inventaireId, champId: Number(champId), valeur: String(nouvelleValeur) },
+      update: { valeur: String(nouvelleValeur) }
+    })
+
+    const inventaire = await prisma.inventaire.findUnique({
+      where: { id: inventaireId },
+      include: { article: true, statut: true, valeurs: { include: { champ: true } } }
+    })
+    if (!inventaire) return res.status(404).json({ error: 'Inventaire introuvable' })
+
+    await enregistrerOperation({
+      siteId: inventaire.siteId,
+      inventaireId,
+      champCode: 'OPE.RECEPTION',
+      userId: (req as any).user?.id,
+      type: 'RECEPTION',
+      details: { champId: Number(champId), quantiteRecue: qte }
+    })
+
+    res.json(inventaire)
+  } catch (e) {
+    next(e)
+  }
+}
+
+// Mise à jour d'un champ unique d'une ligne d'inventaire (ex : colonne Transfert du Suivi PDA)
+export async function updateValeurChamp(req: Request, res: Response, next: any) {
+  try {
+    const { id, champId } = req.params
+    const { valeur } = req.body
+    const inventaireId = Number(id)
+
+    const valeurChamp = await prisma.valeurChampInventaire.upsert({
+      where: { inventaireId_champId: { inventaireId, champId: Number(champId) } },
+      create: { inventaireId, champId: Number(champId), valeur: valeur != null ? String(valeur) : null },
+      update: { valeur: valeur != null ? String(valeur) : null }
+    })
+
+    res.json(valeurChamp)
+  } catch (e) {
+    next(e)
+  }
+}
+
+// Historique d'une ligne d'inventaire (horodatage + opérateur)
+export async function getHistorique(req: Request, res: Response, next: any) {
+  try {
+    const { id } = req.params
+    const entrees = await prisma.historiqueActivite.findMany({
+      where: { entite: 'inventaire', entiteId: Number(id) },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    const userIds = [...new Set(entrees.map(e => e.userId).filter((id): id is number => id != null))]
+    const utilisateurs = userIds.length > 0
+      ? await prisma.utilisateur.findMany({ where: { id: { in: userIds } }, select: { id: true, login: true, nom: true, prenom: true } })
+      : []
+    const utilisateursMap = new Map(utilisateurs.map(u => [u.id, u]))
+
+    res.json(entrees.map(e => ({
+      id: e.id,
+      type: e.type,
+      createdAt: e.createdAt,
+      details: e.details ? JSON.parse(e.details) : null,
+      operateur: e.userId != null ? utilisateursMap.get(e.userId) ?? null : null
+    })))
   } catch (e) {
     next(e)
   }

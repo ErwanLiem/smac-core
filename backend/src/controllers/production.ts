@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { hasRole, serializeRoles } from '../utils/roles'
+import { enregistrerOperation } from '../utils/operations'
 
 const prisma = new PrismaClient()
 
@@ -30,7 +31,6 @@ export async function getConfig(req: Request, res: Response, next: any) {
       ...config,
       typesArticleQTE:    config.typesArticleQTE    ? JSON.parse(config.typesArticleQTE)    : [],
       champsAffichageQTE: config.champsAffichageQTE ? JSON.parse(config.champsAffichageQTE) : [],
-      colonnesLabo:       config.colonnesLabo       ? JSON.parse(config.colonnesLabo)       : null,
     })
   } catch (e) { next(e) }
 }
@@ -38,13 +38,12 @@ export async function getConfig(req: Request, res: Response, next: any) {
 export async function updateConfig(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { champPNCode, champRMACode, labelPN, labelRMA, champTypeArticleCode, typesArticleQTE, champsAffichageQTE, colonnesLabo } = req.body
+    const { champPNCode, champRMACode, labelPN, labelRMA, champTypeArticleCode, typesArticleQTE, champsAffichageQTE } = req.body
     const data = {
       champPNCode, champRMACode, labelPN, labelRMA,
       champTypeArticleCode: champTypeArticleCode ?? 'TYPE',
       typesArticleQTE: typesArticleQTE !== undefined ? JSON.stringify(typesArticleQTE) : undefined,
       champsAffichageQTE: champsAffichageQTE !== undefined ? JSON.stringify(champsAffichageQTE) : undefined,
-      colonnesLabo: colonnesLabo !== undefined ? JSON.stringify(colonnesLabo) : undefined,
     }
     const config = await prisma.configProduction.upsert({
       where: { siteId: Number(siteId) },
@@ -56,7 +55,6 @@ export async function updateConfig(req: Request, res: Response, next: any) {
       ...config,
       typesArticleQTE: config.typesArticleQTE ? JSON.parse(config.typesArticleQTE) : [],
       champsAffichageQTE: config.champsAffichageQTE ? JSON.parse(config.champsAffichageQTE) : [],
-      colonnesLabo: config.colonnesLabo ? JSON.parse(config.colonnesLabo) : null,
     })
   } catch (e) { next(e) }
 }
@@ -451,10 +449,41 @@ export async function validerDemande(req: Request, res: Response, next: any) {
       const invIds = demande.lignes.map(l => l.inventaireId)
       const premierInv = await prisma.inventaire.findFirst({ where: { id: { in: invIds } }, select: { statutId: true } })
       if (premierInv?.statutId) {
-        const transition = await prisma.transition.findFirst({ where: { siteId: demande.siteId, statutFromId: premierInv.statutId } })
+        const transition = await prisma.transition.findFirst({
+          where: { siteId: demande.siteId, statutFromId: premierInv.statutId },
+          include: { statutTo: true }
+        })
         if (transition) {
           await prisma.inventaire.updateMany({ where: { id: { in: invIds } }, data: { statutId: transition.statutToId } })
+
+          // Transition vers Attente réparation : horodater le passage au lavage (DATE LAV)
+          if (hasRole(transition.statutTo.roles, 'ATTENTE_RÉPARATION')) {
+            const champsInv = await prisma.champInventaire.findMany({ where: { siteId: demande.siteId } })
+            const champDateLav = champsInv.find(c => normCode(c.code) === 'DATE_LAV')
+            if (champDateLav) {
+              const dateAujourdhui = new Date().toISOString().split('T')[0]
+              for (const inventaireId of invIds) {
+                await prisma.valeurChampInventaire.upsert({
+                  where: { inventaireId_champId: { inventaireId, champId: champDateLav.id } },
+                  create: { inventaireId, champId: champDateLav.id, valeur: dateAujourdhui },
+                  update: { valeur: dateAujourdhui }
+                })
+              }
+            }
+          }
         }
+      }
+
+      // Tracer l'opérateur ayant validé le transfert
+      for (const inventaireId of invIds) {
+        await enregistrerOperation({
+          siteId: demande.siteId,
+          inventaireId,
+          champCode: 'OPE.TRANSFERT',
+          userId: req.user?.id,
+          type: 'TRANSFERT',
+          details: { demandeId: demande.id }
+        })
       }
     }
 
@@ -520,16 +549,3 @@ export async function annulerDemande(req: Request, res: Response, next: any) {
   } catch (e) { next(e) }
 }
 
-// ─── INVENTAIRE LABO ─────────────────────────────────────────────────────────
-
-export async function getInventaireLabo(req: Request, res: Response, next: any) {
-  try {
-    const { siteId } = req.params
-    const items = await prisma.inventaireLabo.findMany({
-      where: { siteId: Number(siteId) },
-      include: { article: { include: { valeurs: { include: { champ: true } } } } },
-      orderBy: { updatedAt: 'desc' }
-    })
-    res.json(items)
-  } catch (e) { next(e) }
-}

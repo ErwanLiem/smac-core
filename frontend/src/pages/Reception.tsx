@@ -292,12 +292,7 @@ export default function Reception() {
         if (lot.modesuivi === 'QTE') {
           const ligneExistante = inventaireExistant.find(inv => inv.articleId === lot.articleId)
           if (ligneExistante) {
-            const qteActuelle = Number(ligneExistante.valeurs.find((v: any) => v.champId === idQte)?.valeur ?? 0)
-            const valeurs = [
-              ...ligneExistante.valeurs.filter((v: any) => v.champId !== idQte).map((v: any) => ({ champId: v.champId, valeur: v.valeur ?? '' })),
-              ...(idQte ? [{ champId: idQte, valeur: String(qteActuelle + lot.quantite) }] : [])
-            ]
-            await inventaireApi.update(ligneExistante.id, { statutId: ligneExistante.statutId, valeurs })
+            if (idQte) await inventaireApi.receptionQte(ligneExistante.id, { champId: idQte, quantite: lot.quantite })
           } else {
             const valeurs = [...valeursCommunes, ...(idQte ? [{ champId: idQte, valeur: String(lot.quantite) }] : [])]
             await inventaireApi.create(siteId, { articleId: lot.articleId, statutId: lot.statutId, valeurs })

@@ -2,10 +2,12 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+export type HistoriqueType = 'RECEPTION' | 'MODIFICATION' | 'SUPPRESSION' | 'TRANSITION_STATUT' | 'CREATION' | 'TRANSFERT' | 'EMBALLAGE' | 'MASTERBOX'
+
 interface LogParams {
   siteId: number
   userId?: number
-  type: 'RECEPTION' | 'MODIFICATION' | 'SUPPRESSION' | 'TRANSITION_STATUT' | 'CREATION'
+  type: HistoriqueType
   entite: 'inventaire' | 'article' | 'client' | 'plateforme' | 'statut'
   entiteId?: number
   details?: Record<string, any>

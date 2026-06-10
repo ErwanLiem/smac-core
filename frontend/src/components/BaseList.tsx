@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Trash2, Plus, X, Check, Pencil } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
+import ColonnesToggle from './ColonnesToggle'
 
 interface Champ {
   id: number
@@ -43,6 +44,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   const [chargement, setChargement] = useState(true)
   const [champs, setChamps] = useState<Champ[]>([])
   const [colonnesOrdre, setColonnesOrdre] = useState<number[]>([])
+  const [colonnesCachees, setColonnesCachees] = useState<Set<number>>(new Set())
   const [items, setItems] = useState<Item[]>([])
   const [filtres, setFiltres] = useState<Record<string, string>>({})
   const dragColonne = useRef<number | null>(null)
@@ -85,11 +87,24 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
       ...ids.filter(id => !savedOrdre.includes(id))
     ]
     setColonnesOrdre(restored)
+    const savedCachees = JSON.parse(localStorage.getItem(`${baseUrl}_colonnes_cachees_${login}`) || '[]') as number[]
+    setColonnesCachees(new Set(savedCachees.filter(id => ids.includes(id))))
     setItems(i)
     setChargement(false)
   }
 
   const champsOrdonnes = colonnesOrdre.map(id => champs.find(c => c.id === id)).filter(Boolean) as Champ[]
+  const champsAffiches = champsOrdonnes.filter(c => !colonnesCachees.has(c.id))
+
+  function toggleColonne(champId: number) {
+    setColonnesCachees(prev => {
+      const next = new Set(prev)
+      next.has(champId) ? next.delete(champId) : next.add(champId)
+      const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
+      localStorage.setItem(`${baseUrl}_colonnes_cachees_${login}`, JSON.stringify(Array.from(next)))
+      return next
+    })
+  }
 
   function onDragStart(champId: number) {
     dragColonne.current = champId
@@ -155,6 +170,9 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
               <X size={14} /> Effacer filtres
             </button>
           )}
+          {champsOrdonnes.length > 0 && (
+            <ColonnesToggle champs={champsOrdonnes} colonnesCachees={colonnesCachees} onToggle={toggleColonne} />
+          )}
           {peutCreer && (
             <button className="btn btn-primary" onClick={() => setShowForm(true)}>
               <Plus size={16} /> Ajouter
@@ -176,7 +194,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
           <table className="table" style={{ minWidth: 'max-content' }}>
             <thead>
               <tr>
-                {champsOrdonnes.map(c => (
+                {champsAffiches.map(c => (
                   <th key={c.id}
                     draggable
                     onDragStart={() => onDragStart(c.id)}
@@ -192,7 +210,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                 <th></th>
               </tr>
               <tr style={{ background: '#141720' }}>
-                {champsOrdonnes.map(c => (
+                {champsAffiches.map(c => (
                   <td key={c.id} style={{ padding: '4px 8px' }}>
                     <input className="form-input" placeholder="Filtrer..."
                       value={filtres[String(c.id)] ?? ''}
@@ -206,13 +224,13 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
             </thead>
             <tbody>
               {filteredItems.length === 0 && (
-                <tr><td colSpan={champsOrdonnes.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
+                <tr><td colSpan={champsAffiches.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
                   {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
               {filteredItems.map((item, idx) => (
                 <tr key={item.id} style={{ background: idx % 2 === 0 ? '#1a1d27' : '#141720' }}>
-                  {champsOrdonnes.map(c => (
+                  {champsAffiches.map(c => (
                     <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>

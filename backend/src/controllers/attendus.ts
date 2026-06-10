@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import * as fs from 'fs'
 import { verifierReglesAlerte } from '../utils/reglesAlerte'
 import { hasRole } from '../utils/roles'
+import { enregistrerOperation } from '../utils/operations'
 
 const prisma = new PrismaClient()
 
@@ -73,8 +74,9 @@ async function creerEntreeInventaire(params: {
   champsArticle: any[]
   statutStockId: number | null
   dateAujourdhui: string
+  userId?: number
 }) {
-  const { siteId, ligne, attendu, article, champsInv, champsArticle, statutStockId, dateAujourdhui } = params
+  const { siteId, ligne, attendu, article, champsInv, champsArticle, statutStockId, dateAujourdhui, userId } = params
   const findChampId = makeChampFinder(champsInv)
 
   const idSN          = findChampId(['SN', 'NUMERO_SERIE', 'NUMERO DE SERIE'])
@@ -147,7 +149,7 @@ async function creerEntreeInventaire(params: {
 
   const valeursDedupliquees = Array.from(valeursMap.entries()).map(([champId, valeur]) => ({ champId, valeur }))
 
-  await prisma.inventaire.create({
+  const inventaireCree = await prisma.inventaire.create({
     data: {
       siteId,
       articleId: article?.id ?? null,
@@ -156,6 +158,15 @@ async function creerEntreeInventaire(params: {
       regleAlerteId: alerte?.regleAlerteId ?? null,
       valeurs: { create: valeursDedupliquees }
     }
+  })
+
+  await enregistrerOperation({
+    siteId,
+    inventaireId: inventaireCree.id,
+    champCode: 'OPE.RECEPTION',
+    userId,
+    type: 'RECEPTION',
+    details: { attenduId: attendu.id, sn: ligne.sn }
   })
 }
 
@@ -521,7 +532,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
         continue
       }
       const article = trouverParPN(ligne.pn)
-      await creerEntreeInventaire({ siteId: attendu.siteId, ligne, attendu, article, champsInv, champsArticle, statutStockId: statutStock?.id ?? null, dateAujourdhui })
+      await creerEntreeInventaire({ siteId: attendu.siteId, ligne, attendu, article, champsInv, champsArticle, statutStockId: statutStock?.id ?? null, dateAujourdhui, userId: req.user?.id })
       await prisma.ligneAttendue.update({ where: { id: ligne.id }, data: { statut: 'INJECTE' } })
       lignesInjectees++
     }

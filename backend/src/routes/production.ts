@@ -1,5 +1,7 @@
 import { Router } from 'express'
 import * as ctrl from '../controllers/production'
+import * as suiviPdaCtrl from '../controllers/suiviPda'
+import * as suiviPdaLaboCtrl from '../controllers/suiviPdaLabo'
 
 const router = Router({ mergeParams: true })
 
@@ -34,7 +36,10 @@ router.post('/demandes/:siteId/qte',  ctrl.createDemandeQTE)
 router.put('/demandes/:id/valider',   ctrl.validerDemande)
 router.put('/demandes/:id/annuler',   ctrl.annulerDemande)
 
-// Inventaire labo
-router.get('/inventaire-labo/:siteId', ctrl.getInventaireLabo)
+// Suivi PDA
+router.get('/suivi-pda/:siteId', suiviPdaCtrl.getSuiviPDA)
+
+// Suivi PDA Labo
+router.get('/suivi-pda-labo/:siteId', suiviPdaLaboCtrl.getSuiviPDALabo)
 
 export default router

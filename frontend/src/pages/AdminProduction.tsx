@@ -18,7 +18,6 @@ interface Config {
   champTypeArticleCode: string
   typesArticleQTE: string[]
   champsAffichageQTE: string[]
-  colonnesLabo: string[] | null  // null = toutes ; liste de codes champArticle
 }
 
 interface Technicien {
@@ -47,7 +46,7 @@ export default function AdminProduction() {
   const { isAdmin } = getPermissions()
 
   const [chargement, setChargement] = useState(true)
-  const [config, setConfig]           = useState<Config>({ champPNCode: 'PN', champRMACode: 'BL', labelPN: 'P/N', labelRMA: 'RMA', champTypeArticleCode: 'TYPE', typesArticleQTE: [], champsAffichageQTE: [], colonnesLabo: null })
+  const [config, setConfig]           = useState<Config>({ champPNCode: 'PN', champRMACode: 'BL', labelPN: 'P/N', labelRMA: 'RMA', champTypeArticleCode: 'TYPE', typesArticleQTE: [], champsAffichageQTE: [] })
   const [champsArticle, setChampsArticle] = useState<ChampInv[]>([])
   const [articlesData, setArticlesData]   = useState<any[]>([])
   const [configModif, setConfigModif] = useState(false)
