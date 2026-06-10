@@ -28,6 +28,7 @@ interface Carte {
   pnValeur: string
   rmaValeur: string
   designationValeur: string
+  clientValeur: string
   quantite: number
   ids: number[]
   caisses: Array<{ numero: string; quantite: number }>
@@ -55,6 +56,28 @@ interface Demande {
   pnValeur: string | null
   rmaValeur: string | null
   lignes: any[]
+}
+
+/**
+ * Calcule la quantité maximum transférable sans découper une caisse physique.
+ * Les caisses dont la quantité dépasse la capacité disponible ne sont pas comptées ;
+ * les articles hors caisse peuvent être pris à l'unité.
+ */
+function qteMaxSansDecoupe(carte: Carte, capaciteMax: number, caisseFiltre: string): number {
+  if (caisseFiltre) {
+    const c = carte.caisses.find(x => x.numero === caisseFiltre)
+    return Math.min(c?.quantite ?? carte.quantite, capaciteMax)
+  }
+  if (carte.caisses.length === 0) return Math.min(carte.quantite, capaciteMax)
+  const totalEnCaisses = carte.caisses.reduce((s, c) => s + c.quantite, 0)
+  const sansCaisse = carte.quantite - totalEnCaisses
+  let restant = capaciteMax
+  let total = 0
+  for (const c of carte.caisses) {
+    if (c.quantite <= restant) { total += c.quantite; restant -= c.quantite }
+  }
+  total += Math.min(Math.max(0, sansCaisse), restant)
+  return total
 }
 
 function getDemandeCaisses(d: Demande): string[] {
@@ -90,6 +113,7 @@ export default function Planning() {
   const [confirmAnnuler, setConfirmAnnuler] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [erreur, setErreur]   = useState('')
+  const [info, setInfo]       = useState('')
   const [quotaPartielInput, setQuotaPartielInput] = useState(0)
   const [showSamedi, setShowSamedi] = useState(false)
 
@@ -141,11 +165,12 @@ export default function Planning() {
       setDragCarte(null)
       return
     }
-    setModalQte(Math.min(dragCarte.quantite, restant))
+    setModalQte(qteMaxSansDecoupe(dragCarte, restant, ''))
     setModalCaisseFiltre('')
     setModalDrop({ carte: dragCarte, jour })
     setDragCarte(null)
     setErreur('')
+    setInfo('')
   }
 
   async function confirmerTransfert() {
@@ -159,16 +184,21 @@ export default function Planning() {
     }
     setLoading(true)
     setErreur('')
+    setInfo('')
     try {
-      await post(`/production/demandes/${siteId}/sn`, {
+      const result = await post<any>(`/production/demandes/${siteId}/sn`, {
         datePlanifiee: modalDrop.jour,
         quantite: modalQte,
         pnValeur: modalDrop.carte.pnValeur,
         rmaValeur: modalDrop.carte.rmaValeur,
+        clientValeur: modalDrop.carte.clientValeur,
         ...(modalCaisseFiltre ? { caisseValeur: modalCaisseFiltre } : {})
       })
       setModalDrop(null)
       setModalCaisseFiltre('')
+      if (result?.quantite < result?.quantiteDemandee) {
+        setInfo(`${result.quantite} article(s) planifié(s) sur ${result.quantiteDemandee} demandé(s) : une caisse ne peut pas être scindée, seules les caisses entièrement transférables ont été retenues.`)
+      }
       reload()
     } catch (e: any) {
       setErreur(e?.message ?? 'Erreur lors de la création de la demande')
@@ -277,6 +307,18 @@ export default function Planning() {
         </div>
       )}
 
+      {/* Bannière d'information (hors modal) */}
+      {info && (
+        <div style={{ background: '#0c1e2e', border: '1px solid #3b82f6', borderRadius: '6px', padding: '10px 14px', color: '#93c5fd', fontSize: '14px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            ℹ️ {info}
+          </div>
+          <button onClick={() => setInfo('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px', lineHeight: 1 }}>
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {chargement ? (
         <div className="loading-container" style={{ flex: 1 }}><div className="loading-spinner" /></div>
       ) : (
@@ -308,6 +350,14 @@ export default function Planning() {
                 transition: 'all 0.1s'
               }}
             >
+              {/* Client */}
+              {carte.clientValeur && (
+                <div style={{ marginBottom: '3px' }}>
+                  <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '3px', background: '#1e293b', color: '#93c5fd', border: '1px solid #334155', fontWeight: 600 }}>
+                    {carte.clientValeur}
+                  </span>
+                </div>
+              )}
               {/* RMA */}
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '3px' }}>
                 <span style={{ fontSize: '11px', color: '#6b7280', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{config.labelRMA}</span>
@@ -429,7 +479,7 @@ export default function Planning() {
                 {getDemandesJour(ds).map(d => {
                   const validee = d.statut === 'VALIDEE'
                   return (
-                    <div key={d.id} style={{ background: '#1a1d27', borderRadius: '6px', padding: '6px 8px', border: `1px solid ${validee ? '#1a3a1a' : '#2d3748'}`, position: 'relative', opacity: validee ? 0.7 : 1 }}>
+                    <div key={d.id} style={{ background: validee ? '#0f2415' : '#1a1d27', borderRadius: '6px', padding: '6px 8px', border: `1px solid ${validee ? '#16a34a' : '#2d3748'}`, position: 'relative' }}>
                       {validee && (
                         <div style={{ position: 'absolute', top: '4px', right: '20px', color: '#4ade80', lineHeight: 1 }}>
                           <Check size={12} />
@@ -474,7 +524,12 @@ export default function Planning() {
       )}
 
       {/* ── Modal confirmation transfert ── */}
-      {modalDrop && (
+      {modalDrop && (() => {
+        const restant = Math.max(0, (capacite[modalDrop.jour]?.capacite ?? 0) - getChargeJour(modalDrop.jour))
+        const maxQte = modalCaisseFiltre
+          ? (modalDrop.carte.caisses.find(c => c.numero === modalCaisseFiltre)?.quantite ?? modalDrop.carte.quantite)
+          : qteMaxSansDecoupe(modalDrop.carte, restant, '')
+        return (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '420px', width: '100%' }}>
             <h3 style={{ fontSize: '17px', fontWeight: 600, marginBottom: '16px' }}>Planifier le transfert</h3>
@@ -512,16 +567,23 @@ export default function Planning() {
             <div className="form-group">
               <label className="form-label">
                 Quantité à transférer
-                <span style={{ color: '#6b7280' }}> (max : {modalCaisseFiltre ? (modalDrop.carte.caisses.find(c => c.numero === modalCaisseFiltre)?.quantite ?? modalDrop.carte.quantite) : modalDrop.carte.quantite})</span>
+                <span style={{ color: '#6b7280' }}> (max : {maxQte})</span>
               </label>
               <input type="number" min={1}
-                max={modalCaisseFiltre ? (modalDrop.carte.caisses.find(c => c.numero === modalCaisseFiltre)?.quantite ?? modalDrop.carte.quantite) : modalDrop.carte.quantite}
+                max={maxQte}
                 required className="form-input"
                 value={modalQte}
-                onChange={e => {
-                  const maxQte = modalCaisseFiltre ? (modalDrop.carte.caisses.find(c => c.numero === modalCaisseFiltre)?.quantite ?? modalDrop.carte.quantite) : modalDrop.carte.quantite
-                  setModalQte(Math.min(maxQte, Math.max(1, Number(e.target.value))))
-                }} />
+                onChange={e => setModalQte(Math.min(Math.max(1, maxQte), Math.max(1, Number(e.target.value))))} />
+              {!modalCaisseFiltre && modalDrop.carte.caisses.length > 0 && (
+                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                  ℹ️ Une caisse physique ne peut pas être scindée : seules les caisses entièrement transférables sont prises en compte.
+                </p>
+              )}
+              {maxQte === 0 && (
+                <p style={{ fontSize: '12px', color: '#f87171', marginTop: '4px' }}>
+                  ⚠️ Aucune caisse complète ne tient dans la capacité restante ({restant}). Choisissez une caisse spécifique ou un autre jour.
+                </p>
+              )}
             </div>
             {erreur && (
               <div style={{ background: '#1f0a0a', border: '1px solid #dc2626', borderRadius: '6px', padding: '8px 12px', color: '#ef4444', fontSize: '14px', marginBottom: '12px', display: 'flex', gap: '6px' }}>
@@ -530,13 +592,14 @@ export default function Planning() {
             )}
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
               <button className="btn btn-secondary" onClick={() => setModalDrop(null)}>Annuler</button>
-              <button className="btn btn-primary" onClick={confirmerTransfert} disabled={loading}>
+              <button className="btn btn-primary" onClick={confirmerTransfert} disabled={loading || maxQte === 0}>
                 {loading ? 'En cours...' : 'Confirmer le transfert'}
               </button>
             </div>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {/* ── Modal gestion des présences (liste complète) ── */}
       {modalPresences && (() => {

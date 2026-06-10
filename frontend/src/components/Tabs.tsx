@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export interface TabDef {
   key: string
@@ -9,17 +9,24 @@ export interface TabDef {
 interface Props {
   tabs: TabDef[]
   defaultTab?: string
+  active?: string
+  onChange?: (key: string) => void
 }
 
-export default function Tabs({ tabs, defaultTab }: Props) {
+export default function Tabs({ tabs, defaultTab, active: activeProp, onChange }: Props) {
   const initial = defaultTab ?? tabs[0]?.key
-  const [active, setActive] = useState(initial)
-  const [visites, setVisites] = useState<string[]>([initial])
+  const [activeState, setActiveState] = useState(initial)
+  const active = activeProp ?? activeState
+  const [visites, setVisites] = useState<string[]>([active])
   const current = tabs.find(t => t.key === active) ?? tabs[0]
 
+  useEffect(() => {
+    setVisites(prev => prev.includes(active) ? prev : [...prev, active])
+  }, [active])
+
   function selectionner(key: string) {
-    setActive(key)
-    setVisites(prev => prev.includes(key) ? prev : [...prev, key])
+    if (onChange) onChange(key)
+    else setActiveState(key)
   }
 
   return (

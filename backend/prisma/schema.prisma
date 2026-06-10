@@ -379,6 +379,7 @@ model demandeTransfert {
   // Champs SN
   pnValeur        String?                 // valeur P/N du groupe
   rmaValeur       String?                 // valeur RMA/BL du groupe
+  clientValeur    String?                 // valeur client du groupe (isole les demandes par client)
   // Champs QTE
   articleId       Int?
   createdAt       DateTime                @default(now())
@@ -409,13 +410,13 @@ model masterBox {
   siteId       Int
   numero       String
   clientValeur String?
-  statut       String           @default("EN_ATTENTE") // EN_ATTENTE | EXPEDIEE
+  statut       String           @default("EN_ATTENTE") // OUVERTE (en cours de remplissage) | EN_ATTENTE (enregistrée, prête à expédier) | EXPEDIEE
   userId       Int?
   createdAt    DateTime         @default(now())
   site         site             @relation(fields: [siteId], references: [id], map: "MasterBox_siteId_fkey")
   lignes       ligneMasterBox[]
 
-  @@unique([siteId, numero], map: "MasterBox_siteId_numero_key")
+  @@unique([siteId, clientValeur, numero], map: "MasterBox_siteId_clientValeur_numero_key")
   @@index([siteId], map: "MasterBox_siteId_fkey")
 }
 

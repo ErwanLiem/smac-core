@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-export type HistoriqueType = 'RECEPTION' | 'MODIFICATION' | 'SUPPRESSION' | 'TRANSITION_STATUT' | 'CREATION' | 'TRANSFERT' | 'EMBALLAGE' | 'MASTERBOX'
+export type HistoriqueType = 'RECEPTION' | 'MODIFICATION' | 'SUPPRESSION' | 'TRANSITION_STATUT' | 'CREATION' | 'TRANSFERT' | 'EMBALLAGE' | 'MASTERBOX' | 'EXPEDITION'
 
 interface LogParams {
   siteId: number

@@ -251,6 +251,7 @@ export async function getCartes(req: Request, res: Response, next: any) {
 
     const champCAISSE      = champsInv.find(c => normCode(c.code) === 'CAISSE')
     const champDESIGNATION = champsInv.find(c => normCode(c.code) === 'DESIGNATION')
+    const champCLIENT      = champsInv.find(c => normCode(c.code) === 'CLIENT')
 
     // Récupérer tous les inventaires avec statut rôle 'estStock'
     const stockIds = await getStatutIdsByRole(Number(siteId), 'estStock')
@@ -262,17 +263,18 @@ export async function getCartes(req: Request, res: Response, next: any) {
       include: { valeurs: true }
     })
 
-    // Grouper par P/N × RMA
-    const groupes = new Map<string, { pnValeur: string; rmaValeur: string; designationValeur: string; ids: number[]; quantite: number; caisseMap: Map<string, number> }>()
+    // Grouper par P/N × RMA × Client
+    const groupes = new Map<string, { pnValeur: string; rmaValeur: string; designationValeur: string; clientValeur: string; ids: number[]; quantite: number; caisseMap: Map<string, number> }>()
 
     for (const inv of inventaires) {
       const pnVal     = inv.valeurs.find(v => v.champId === champPN.id)?.valeur    ?? ''
       const rmaVal    = inv.valeurs.find(v => v.champId === champRMA.id)?.valeur   ?? ''
       const caisseVal = champCAISSE      ? (inv.valeurs.find(v => v.champId === champCAISSE.id)?.valeur      ?? '') : ''
       const desgVal   = champDESIGNATION ? (inv.valeurs.find(v => v.champId === champDESIGNATION.id)?.valeur ?? '') : ''
-      const key = `${pnVal}__${rmaVal}`
+      const clientVal = champCLIENT      ? (inv.valeurs.find(v => v.champId === champCLIENT.id)?.valeur      ?? '') : ''
+      const key = `${pnVal}__${rmaVal}__${clientVal}`
       if (!groupes.has(key)) {
-        groupes.set(key, { pnValeur: pnVal, rmaValeur: rmaVal, designationValeur: desgVal, ids: [], quantite: 0, caisseMap: new Map() })
+        groupes.set(key, { pnValeur: pnVal, rmaValeur: rmaVal, designationValeur: desgVal, clientValeur: clientVal, ids: [], quantite: 0, caisseMap: new Map() })
       }
       const g = groupes.get(key)!
       g.ids.push(inv.id)
@@ -284,6 +286,7 @@ export async function getCartes(req: Request, res: Response, next: any) {
       pnValeur: g.pnValeur,
       rmaValeur: g.rmaValeur,
       designationValeur: g.designationValeur,
+      clientValeur: g.clientValeur,
       ids: g.ids,
       quantite: g.quantite,
       caisses: Array.from(g.caisseMap.entries()).map(([numero, quantite]) => ({ numero, quantite }))
@@ -317,7 +320,7 @@ export async function getDemandes(req: Request, res: Response, next: any) {
 export async function createDemandeSN(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { datePlanifiee, quantite, pnValeur, rmaValeur, caisseValeur } = req.body
+    const { datePlanifiee, quantite, pnValeur, rmaValeur, clientValeur, caisseValeur } = req.body
 
     const config = await prisma.configProduction.findUnique({ where: { siteId: Number(siteId) } })
     const champPNCode  = config?.champPNCode  ?? 'PN'
@@ -327,19 +330,24 @@ export async function createDemandeSN(req: Request, res: Response, next: any) {
     const champPN     = champsInv.find(c => normCode(c.code) === normCode(champPNCode))
     const champRMA    = champsInv.find(c => normCode(c.code) === normCode(champRMACode))
     const champCAISSE = champsInv.find(c => normCode(c.code) === 'CAISSE')
+    const champCLIENT = champsInv.find(c => normCode(c.code) === 'CLIENT')
 
     if (!champPN || !champRMA) return res.status(400).json({ error: 'Champs P/N ou RMA non configurés' })
 
-    // Trouver les inventaires rôle 'estStock' pour ce P/N × RMA (+ caisse si fournie)
+    // Trouver les inventaires rôle 'estStock' pour ce P/N × RMA × Client (+ caisse si fournie)
     const stockIds2 = await getStatutIdsByRole(Number(siteId), 'estStock')
     const candidats = await prisma.inventaire.findMany({
       where: { siteId: Number(siteId), statutId: stockIds2.length > 0 ? { in: stockIds2 } : undefined },
       include: { valeurs: true }
     })
     const matches = candidats.filter(inv => {
-      const pn  = inv.valeurs.find(v => v.champId === champPN!.id)?.valeur  ?? ''
-      const rma = inv.valeurs.find(v => v.champId === champRMA!.id)?.valeur ?? ''
+      const pn     = inv.valeurs.find(v => v.champId === champPN!.id)?.valeur  ?? ''
+      const rma    = inv.valeurs.find(v => v.champId === champRMA!.id)?.valeur ?? ''
       if (pn !== pnValeur || rma !== rmaValeur) return false
+      if (champCLIENT) {
+        const client = inv.valeurs.find(v => v.champId === champCLIENT.id)?.valeur ?? ''
+        if (client !== (clientValeur ?? '')) return false
+      }
       if (caisseValeur) {
         const caisse = champCAISSE ? (inv.valeurs.find(v => v.champId === champCAISSE.id)?.valeur ?? '') : ''
         return caisse === caisseValeur
@@ -347,10 +355,49 @@ export async function createDemandeSN(req: Request, res: Response, next: any) {
       return true
     })
 
-    const qte = Math.min(Number(quantite), matches.length)
-    if (qte === 0) return res.status(400).json({ error: 'Aucun article disponible pour ce P/N × RMA' })
+    const qteDemandee = Math.min(Number(quantite), matches.length)
+    if (qteDemandee === 0) return res.status(400).json({ error: 'Aucun article disponible pour ce P/N × RMA' })
 
-    const selectionnes = matches.slice(0, qte)
+    let selectionnes: typeof matches = []
+    if (caisseValeur) {
+      // Caisse explicitement choisie : on prélève dans cette caisse
+      selectionnes = matches.slice(0, qteDemandee)
+    } else {
+      // Pas de caisse choisie : ne jamais découper une caisse physique.
+      // On ne dispatche que les caisses entièrement transférables dans la quantité demandée,
+      // les articles sans caisse peuvent être pris à l'unité.
+      const groupesCaisses = new Map<string, typeof matches>()
+      const sansCaisse: typeof matches = []
+      for (const inv of matches) {
+        const caisse = champCAISSE ? (inv.valeurs.find(v => v.champId === champCAISSE.id)?.valeur ?? '') : ''
+        if (caisse) {
+          if (!groupesCaisses.has(caisse)) groupesCaisses.set(caisse, [])
+          groupesCaisses.get(caisse)!.push(inv)
+        } else {
+          sansCaisse.push(inv)
+        }
+      }
+      let restant = qteDemandee
+      for (const items of groupesCaisses.values()) {
+        if (items.length <= restant) {
+          selectionnes.push(...items)
+          restant -= items.length
+        }
+      }
+      for (const inv of sansCaisse) {
+        if (restant <= 0) break
+        selectionnes.push(inv)
+        restant--
+      }
+
+      if (selectionnes.length === 0) {
+        return res.status(400).json({
+          error: `Impossible de planifier : la capacité disponible (${qteDemandee}) ne permet de transférer aucune caisse complète et une caisse ne peut pas être scindée.`
+        })
+      }
+    }
+
+    const qte = selectionnes.length
 
     // Trouver le statut avec rôle 'estTransfert'
     const transfertIds = await getStatutIdsByRole(Number(siteId), 'estTransfert')
@@ -368,6 +415,7 @@ export async function createDemandeSN(req: Request, res: Response, next: any) {
         quantite: qte,
         pnValeur,
         rmaValeur,
+        clientValeur: clientValeur ?? null,
         lignes: { create: selectionnes.map(inv => ({ inventaireId: inv.id })) }
       },
       include: { lignes: true }
@@ -379,7 +427,7 @@ export async function createDemandeSN(req: Request, res: Response, next: any) {
       data: { statutId: statutTransfert.id }
     })
 
-    res.json(demande)
+    res.json({ ...demande, quantiteDemandee: qteDemandee })
   } catch (e) { next(e) }
 }
 

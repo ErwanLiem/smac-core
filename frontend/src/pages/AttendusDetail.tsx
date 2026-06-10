@@ -68,6 +68,8 @@ export default function AttendusDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const snInputRef = useRef<HTMLInputElement>(null)
+  const caisseInputRef = useRef<HTMLInputElement>(null)
+  const okAlerteRef = useRef<HTMLButtonElement>(null)
   const siteId = getSiteId()
 
   const [attendu, setAttendu] = useState<Attendu | null>(null)
@@ -81,7 +83,7 @@ export default function AttendusDetail() {
   const [showRapport, setShowRapport] = useState(false)
   const [rapport, setRapport] = useState<Rapport | null>(null)
   const [showCloturer, setShowCloturer] = useState(false)
-  const [erreurCloture, setErreurCloture] = useState<{ message: string; snsEnDoublon: string[] } | null>(null)
+  const [erreurCloture, setErreurCloture] = useState<{ message: string; snsEnDoublon: string[]; champsManquants?: string[] } | null>(null)
   const [showValider, setShowValider] = useState(false)
   const [validerOk, setValiderOk] = useState<{ lignesInjectees: number; snDoublons?: string[] } | null>(null)
   const [copie, setCopie] = useState(false)
@@ -95,6 +97,7 @@ export default function AttendusDetail() {
   const [champsPlateformes, setChampsPlateformes] = useState<any[]>([])
 
   useEffect(() => { reload() }, [id])
+  useEffect(() => { if (alerteScan) okAlerteRef.current?.focus() }, [alerteScan])
 
 
   async function reload() {
@@ -218,6 +221,7 @@ export default function AttendusDetail() {
   async function scannerSN(e: React.FormEvent) {
     e.preventDefault()
     if (!snSaisie.trim() || !pnActif) return
+    if (!caisseActive.trim() || alerteScan) return
     try {
       const res = await fetch(`/api/attendus/${id}/scanner`, {
         method: 'POST',
@@ -293,7 +297,7 @@ export default function AttendusDetail() {
     } catch (e: any) {
       try {
         const parsed = JSON.parse(e.message)
-        setErreurCloture({ message: parsed.error, snsEnDoublon: parsed.snsEnDoublon || [] })
+        setErreurCloture({ message: parsed.error, snsEnDoublon: parsed.snsEnDoublon || [], champsManquants: parsed.champsManquants })
         setShowCloturer(false)
       } catch {
         alert('Erreur : ' + e.message)
@@ -310,7 +314,8 @@ export default function AttendusDetail() {
   function texteRapportEmail(): string {
     if (!rapport || !attendu) return ''
     const rmaName = attendu.rma || 'N/A'
-    const clientName = attendu.client || 'N/A'
+    const champClient = champsInv.find(c => CODES_CLIENT.includes(c.code.toUpperCase()))
+    const clientName = (champClient && editDonnees[champClient.code]) || 'N/A'
     const hasEcarts = rapport.nonRecus.length > 0 || rapport.inattendus.length > 0 || (rapport.doublonsInventaire?.length ?? 0) > 0
 
     const lines: string[] = []
@@ -539,20 +544,28 @@ export default function AttendusDetail() {
                   <p style={{ fontSize: '12px', color: '#cbd5e1', marginBottom: '10px' }}>P/N actif : <code style={{ background: '#1e3a5f', color: '#2563eb', padding: '1px 6px', borderRadius: '4px' }}>{pnActif}</code></p>
 
                   {/* Caisse active */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '8px 12px', background: caisseActive ? '#1c2a1c' : '#1a1d27', border: `1px solid ${caisseActive ? '#4ade80' : '#374151'}`, borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', padding: '8px 12px', background: caisseActive ? '#1c2a1c' : '#1a1d27', border: `1px solid ${caisseActive ? '#4ade80' : '#374151'}`, borderRadius: '8px' }}>
                     <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>📦 Caisse :</span>
                     <input
+                      ref={caisseInputRef}
                       className="form-input"
                       placeholder="Scanner ou saisir le n° de caisse..."
                       value={caisseActive}
                       onChange={e => setCaisseActive(e.target.value.trim())}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); snInputRef.current?.focus() } }}
                       style={{ flex: 1, padding: '4px 8px', fontSize: '13px', fontWeight: caisseActive ? 700 : 400, color: caisseActive ? '#4ade80' : '#9ca3af', background: 'transparent', border: 'none', outline: 'none' }}
                     />
                     {caisseActive && (
-                      <button type="button" onClick={() => setCaisseActive('')}
+                      <button type="button" onClick={() => { setCaisseActive(''); caisseInputRef.current?.focus() }}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '16px', lineHeight: 1 }}>×</button>
                     )}
                   </div>
+
+                  {!caisseActive && (
+                    <p style={{ fontSize: '12px', color: '#f59e0b', marginTop: '6px', marginBottom: '10px' }}>
+                      ⚠️ Renseignez le numéro de caisse avant de scanner des S/N.
+                    </p>
+                  )}
 
                   <form onSubmit={scannerSN}>
                     <input
@@ -562,10 +575,11 @@ export default function AttendusDetail() {
                       placeholder="Scanner ou saisir un S/N..."
                       value={snSaisie}
                       onChange={e => setSnSaisie(e.target.value)}
-                      style={{ marginBottom: '10px' }}
+                      disabled={!caisseActive.trim() || !!alerteScan}
+                      style={{ marginTop: '10px', marginBottom: '10px' }}
                     />
 
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!snSaisie.trim()}>
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!snSaisie.trim() || !caisseActive.trim() || !!alerteScan}>
                       Valider le scan
                     </button>
                   </form>
@@ -780,11 +794,10 @@ export default function AttendusDetail() {
         </div>
       )}
 
-      {/* Modal alerte scan */}
+      {/* Modal alerte scan — bloquant, doit être fermé via le bouton OK */}
       {alerteScan && (
-        <div className="modal-overlay" onClick={() => { setAlerteScan(null); snInputRef.current?.focus() }}>
-          <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '32px', maxWidth: '420px', width: '100%', textAlign: 'center', border: '3px solid #dc2626' }}
-            onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay">
+          <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '32px', maxWidth: '420px', width: '100%', textAlign: 'center', border: '3px solid #dc2626' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
             {alerteScan.type === 'DEJA_SCANNE' && (
               <>
@@ -802,7 +815,7 @@ export default function AttendusDetail() {
               {alerteScan.sn}
             </code>
             {alerteScan.pn && <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px' }}>P/N : {alerteScan.pn}</p>}
-            <button className="btn btn-primary" style={{ width: '100%' }}
+            <button ref={okAlerteRef} className="btn btn-primary" style={{ width: '100%' }}
               onClick={() => { setAlerteScan(null); snInputRef.current?.focus() }}>
               OK — Continuer le scan
             </button>
@@ -824,10 +837,23 @@ export default function AttendusDetail() {
                 ))}
               </div>
             )}
+            {erreurCloture.champsManquants && erreurCloture.champsManquants.length > 0 && (
+              <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#dc2626', marginBottom: '6px' }}>Champs manquants :</div>
+                {erreurCloture.champsManquants.map(label => (
+                  <div key={label} style={{ fontSize: '12px', color: '#dc2626' }}>· {label}</div>
+                ))}
+              </div>
+            )}
             <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '20px' }}>
-              Supprimez ces S/N de l'inventaire ou contactez un administrateur avant de clôturer.
+              {erreurCloture.champsManquants && erreurCloture.champsManquants.length > 0
+                ? 'Complétez ces informations via "Modifier infos" avant de clôturer.'
+                : 'Supprimez ces S/N de l\'inventaire ou contactez un administrateur avant de clôturer.'}
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              {erreurCloture.champsManquants && erreurCloture.champsManquants.length > 0 && (
+                <button className="btn btn-primary" onClick={() => { setErreurCloture(null); setEditInfos(true) }}>Modifier infos</button>
+              )}
               <button className="btn btn-secondary" onClick={() => setErreurCloture(null)}>Fermer</button>
             </div>
           </div>

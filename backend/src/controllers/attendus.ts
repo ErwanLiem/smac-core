@@ -473,6 +473,24 @@ export async function cloturer(req: Request, res: Response, next: any) {
     const attendu = await prisma.attendu.findUnique({ where: { id: Number(id) }, include: { lignes: true } })
     if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
 
+    // Vérifier que les champs obligatoires de "Modifier les informations" sont renseignés
+    const configChampsCheck = await prisma.configAttendus.findUnique({ where: { siteId: attendu.siteId } })
+    if (configChampsCheck?.champsAttendu) {
+      const champsConfig: any[] = typeof configChampsCheck.champsAttendu === 'string' ? JSON.parse(configChampsCheck.champsAttendu) : (configChampsCheck.champsAttendu as any)
+      let donnees: Record<string, string> = {}
+      if (attendu.donneesCommunes) { try { donnees = JSON.parse(attendu.donneesCommunes) } catch {} }
+      const champsObligatoires = champsConfig.filter((c: any) => c.visible && c.obligatoire)
+      const manquants = champsObligatoires.filter((c: any) => !String(donnees[c.code] ?? '').trim())
+      if (manquants.length > 0) {
+        const champsInvLabels = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
+        const labels = manquants.map((c: any) => champsInvLabels.find(ci => ci.code === c.code)?.label ?? c.code)
+        return res.status(400).json({
+          error: `Clôture impossible : complétez d'abord les champs obligatoires suivants via "Modifier infos" : ${labels.join(', ')}`,
+          champsManquants: labels
+        })
+      }
+    }
+
     // Vérifier doublons actifs (statut non final)
     const champsInvCheck = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
     const idsSNCheck = getIdsSN(champsInvCheck)

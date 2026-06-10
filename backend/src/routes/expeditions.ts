@@ -8,9 +8,11 @@ router.post('/:siteId/emballage/scan', ctrl.scanEmballage)
 router.get('/:siteId/emballage', ctrl.getEmballages)
 
 // Master Box
-router.get('/:siteId/masterbox/disponibles', ctrl.getDisponiblesMasterBox)
-router.post('/:siteId/masterbox', ctrl.createMasterBox)
+router.post('/:siteId/masterbox/scan', ctrl.scanMasterBox)
+router.post('/:siteId/masterbox/envoyer', ctrl.envoyerMasterBoxes)
+router.post('/:siteId/masterbox/:id/enregistrer', ctrl.enregistrerMasterBox)
+router.get('/:siteId/masterbox/en-cours', ctrl.getMasterBoxesEnCours)
+router.get('/:siteId/masterbox/enregistrees', ctrl.getMasterBoxesEnregistrees)
 router.get('/:siteId/masterbox/:id', ctrl.getMasterBoxDetail)
-router.get('/:siteId/masterbox', ctrl.getMasterBoxes)
 
 export default router

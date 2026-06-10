@@ -6,6 +6,27 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [0.7.0] - 2026-06-10
+
+### Ajouté
+- **Attendus** : blocage du scan tant que le "numéro de caisse" n'est pas renseigné, validation de la caisse à la touche Entrée, modal bloquant si le S/N scanné est déjà présent, et impossibilité de clôturer un attendu si les champs obligatoires de "Modifier les informations" sont vides
+- **Planning de production** :
+  - les cartes en attente de dispatch affichent désormais le client associé
+  - le dispatch (drag & drop) ne découpe plus jamais une caisse physique : seules les caisses entièrement transférables (+ articles hors caisse) sont proposées, avec indication de la quantité maximale et message si aucune caisse complète ne tient dans la capacité restante
+  - les cartes de demande de transfert validée s'affichent dans une couleur distincte (vert)
+- **Expéditions** :
+  - onglet **Emballage** : sous-onglets regroupant les cartes d'articles emballés par client
+  - onglet **Master Box** : la numérotation `MB-XXXX` (et le numéro de "Box" sur les étiquettes) est désormais une séquence propre à chaque client ; dans la fenêtre de détail d'un client, cliquer sur une Master Box affiche en dessous le détail de son contenu (liste des S/N)
+  - onglet **Envoi** entièrement refondu : cartes par client (récapitulatif P/N × RMA) ouvrant une fenêtre de détail listant les Master Box prêtes à expédier (avec détail au clic, comme dans l'onglet Master Box) et le bouton d'envoi ; la confirmation d'envoi utilise désormais une fenêtre modale de l'application (au lieu de la boîte de dialogue du navigateur)
+  - le passage au statut "Emballé" renseigne automatiquement les champs inventaire `DATE_PACK` et `DATE_CLS` avec la date du jour (s'ils sont configurés) ; le passage au statut "Expédié" renseigne `DATE_SHP`
+
+### Modifié
+- **Master Box** : le champ "Model" affiché sur les étiquettes et dans le détail provient désormais du champ `MODEL` du catalogue Article (et non plus du champ `TYPE` de l'inventaire)
+- **Master Box** : les Master Box enregistrées ("en attente d'envoi") n'apparaissent plus dans l'onglet Master Box — leur récapitulatif est désormais dans l'onglet Envoi
+- Rapport d'erreur des Attendus : correction de l'affichage "N/A" pour le nom du client
+
+---
+
 ## [0.6.0] - 2026-06-10
 
 ### Ajouté
@@ -22,13 +43,17 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - **Export Excel** sur les pages Inventaire, Suivi PDA et Suivi PDA Labo : bouton "Exporter" avec sélection des colonnes à inclure (toutes par défaut, ou seulement certaines), génération d'un fichier `.xlsx` côté navigateur à partir des données affichées (avec filtres/période en cours)
 - **Page "Expéditions"** (Logistique), avec onglets Emballage / Master Box / Envoi :
   - Onglet **Emballage** : zone de scan de S/N en sortie de contrôle qualité — chaque scan vérifie que l'article est bien au statut "Contrôle qualité" (rôle `CONTROL`), applique la transition de workflow vers "Emballé" déjà configurée, et trace l'opérateur dans le champ `OPE.EMBALLAGE`. Les articles emballés sont affichés en cartes regroupées par RMA × P/N, avec le client associé et la liste des S/N
-  - Onglet **Master Box** : regroupement des articles "Emballé" en cartons collectifs (Master Box), par client. Sélection des articles disponibles (cartes par RMA × P/N, cases à cocher individuelles ou par groupe) puis génération d'une Master Box numérotée automatiquement (MB-0001, MB-0002...) — les terminaux restent au statut "Emballé". Pour la zone client **Adyen**, une Master Box ne peut contenir que des articles d'une même RMA (vérifié à la création). Génère une vue imprimable avec une **étiquette au format Castles Technology**, dont la mise en page dépend de la zone du client (champ `ZONE` configuré sur les clients) :
+  - Onglet **Master Box** : zone de scan de S/N "Emballé" — chaque scan ajoute le terminal à la **Master Box "en cours" de remplissage** (créée à la volée si besoin, numérotée automatiquement MB-0001, MB-0002...) ; le statut de l'article reste "Emballé", seule l'affectation au carton change. Pour la zone client **A3F**, les S/N et les RMA peuvent être mélangés librement dans un même carton. Pour la zone **Adyen**, un carton ne peut contenir qu'un seul couple P/N × RMA : dès qu'un S/N d'un autre P/N ou d'une autre RMA est scanné, un nouveau carton est créé automatiquement. Chaque "Master Box en cours" est affichée en carte (contenu détaillé par P/N × RMA, liste des S/N) avec deux actions :
+    - **Imprimer** : génère l'étiquette du carton (voir gabarit ci-dessous) sans clôturer le scan
+    - **Enregistrer** : clôture le carton (il devient "enregistré", prêt à expédier) et regroupe l'ensemble des cartons enregistrés dans une carte par client (nombre de cartons + quantité totale). Un clic sur cette carte ouvre une fenêtre de détail listant les Master Box déjà enregistrées du client (numéro / quantité / date, avec réimpression) et un récapitulatif par P/N × RMA pour contrôler la correspondance avec le contenu physique
+
+    Étiquette au format Castles Technology, dont la mise en page dépend de la zone du client (champ `ZONE` configuré sur les clients) :
     - **Zone A3F** : "Box / Customer", quantité totale, tableau Serial Number (N° / Model / P/N / S/N / Barcode) — les P/N peuvent être mélangés dans un même carton
     - **Zone Adyen** : "Box", section "Part Number" (Model / P/N / Barcode), bandeau "RMA_xxx", quantité totale, tableau Serial Number (N° / Model / S/N / Barcode, sans colonne P/N)
     - Les codes-barres sont rendus en police "Libre Barcode 39" (`*valeur*`)
 
-    suivie d'une **liste des terminaux** prêts à expédier ; historique des Master Box générées avec réimpression
-  - Onglet **Envoi** : à venir
+    suivie d'une **liste des terminaux** prêts à expédier
+  - Onglet **Envoi** : pour chaque client ayant des Master Box enregistrées, récapitulatif (liste des cartons + répartition par P/N × RMA) permettant de vérifier la correspondance avec le contenu physique avant envoi. Bouton "Envoyer les articles" : applique la transition de workflow "Emballé → Expédié" (déjà configurée) à tous les terminaux des Master Box du client, trace l'opérateur dans `OPE.EXPEDITION`, et passe les Master Box au statut "Expédiée"
 
 ### Modifié
 - Renommage des colonnes "Visible S/N" / "Visible QTE" en "Réception S/N" / "Réception QTE" dans la configuration de l'inventaire (nom plus explicite sur leur usage)

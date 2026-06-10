@@ -372,6 +372,7 @@ export default function Inventaire() {
                     style={{ cursor: 'pointer' }}
                   />
                 </th>
+                <th></th>
                 <th>Statut</th>
                 {champsAffiches.map(c => (
                   <th key={c.id}
@@ -385,9 +386,9 @@ export default function Inventaire() {
                     {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>⠿</span>
                   </th>
                 ))}
-                <th></th>
               </tr>
               <tr style={{ background: '#141720' }}>
+                <td style={{ padding: '4px 8px' }}></td>
                 <td style={{ padding: '4px 8px' }}></td>
                 <td style={{ padding: '4px 8px' }}>
                   <input className="form-input" placeholder="Filtrer..."
@@ -403,7 +404,6 @@ export default function Inventaire() {
                       style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
                   </td>
                 ))}
-                <td style={{ padding: '4px 8px' }}></td>
               </tr>
             </thead>
             <tbody>
@@ -428,10 +428,6 @@ export default function Inventaire() {
                       style={{ cursor: 'pointer' }}
                     />
                   </td>
-                  <td style={{ padding: '4px 10px' }}><StatutBadge statut={item.statut} /></td>
-                  {champsAffiches.map(c => (
-                    <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
-                  ))}
                   <td style={{ padding: '4px 8px', display: 'flex', gap: '6px' }}>
                     {peutEditer && (
                       <button className="btn btn-secondary btn-icon" onClick={() => openEdit(item)}>
@@ -444,6 +440,10 @@ export default function Inventaire() {
                       </button>
                     )}
                   </td>
+                  <td style={{ padding: '4px 10px' }}><StatutBadge statut={item.statut} /></td>
+                  {champsAffiches.map(c => (
+                    <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  ))}
                 </tr>
               ))}
             </tbody>
