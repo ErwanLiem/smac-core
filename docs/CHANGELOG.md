@@ -24,6 +24,10 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - **Mise à jour d'une ligne d'inventaire** : si la requête ne transmet pas la liste des valeurs de champs, les valeurs existantes ne sont plus effacées par erreur.
 - **Demande de transfert (quantité)** : la ligne de stock source utilisée pour décrémenter le stock magasin est désormais choisie de manière déterministe (la plus ancienne), au lieu d'un choix arbitraire de la base de données.
 
+### Sécurité
+- **`/api/gestion` (utilisateurs, rôles) et `/api/sites`** : ces routes nécessitent désormais le rôle ADMIN (middleware `requireAdmin`), et plus seulement d'être connecté.
+- **Permissions par rôle vérifiées côté API** (middleware `requirePermission`) sur les actions de modification/suppression des pages Articles, Clients, Plateformes et Inventaire (création/édition/suppression d'articles, clients, plateformes, lignes d'inventaire et de leurs champs configurables) : un rôle sans la permission `:edit`/`:delete` correspondante reçoit désormais une erreur 403, même via un appel API direct.
+
 ### Technique
 - Factorisation de `getSiteId()` (lecture du site de l'utilisateur connecté) dans `utils/permissions.ts`, remplaçant 24 copies locales identiques.
 - Factorisation des sons d'alerte/succès (`jouerSonAlerte`, `jouerSonSucces`) dans `utils/sons.ts`, remplaçant les copies de Réception, Expéditions et Attendus.

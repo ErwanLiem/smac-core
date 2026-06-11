@@ -14,7 +14,7 @@ import reglesAlerteRouter from './routes/reglesAlerte'
 import productionRouter from './routes/production'
 import expeditionsRouter from './routes/expeditions'
 import dashboardRouter from './routes/dashboard'
-import { requireAuth } from './middleware/auth'
+import { requireAuth, requireAdmin } from './middleware/auth'
 import { Prisma } from '@prisma/client'
 
 const app = express()
@@ -35,7 +35,7 @@ app.use(express.json())
 app.use('/api/auth', authRouter)
 
 // Toutes les autres routes nécessitent un token valide
-app.use('/api/sites', requireAuth, sitesRouter)
+app.use('/api/sites', requireAuth, requireAdmin, sitesRouter)
 app.use('/api/workflow', requireAuth, workflowRouter)
 app.use('/api/articles', requireAuth, articlesRouter)
 app.use('/api/clients', requireAuth, clientsRouter)
@@ -47,7 +47,7 @@ app.use('/api/regles-alerte', requireAuth, reglesAlerteRouter)
 app.use('/api/production', requireAuth, productionRouter)
 app.use('/api/expeditions', requireAuth, expeditionsRouter)
 app.use('/api/dashboard', requireAuth, dashboardRouter)
-app.use('/api/gestion', requireAuth, utilisateursRouter)
+app.use('/api/gestion', requireAuth, requireAdmin, utilisateursRouter)
 
 // Middleware global de gestion des erreurs
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
