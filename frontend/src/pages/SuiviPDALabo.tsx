@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Package, Plus, Check } from 'lucide-react'
 import { get, post } from '../api/client'
+import { inventaireApi } from '../api/inventaire'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getSiteId } from '../utils/permissions'
 
 const CODES_DESIG = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE']
 const CODES_PN = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO']
@@ -45,6 +41,7 @@ interface SuiviPDALaboData {
   mois: number
   estMoisCourant: boolean
   semaines: Semaine[]
+  champEmplacementLaboId: number | null
   rows: LignePDALabo[]
 }
 
@@ -63,6 +60,8 @@ export default function SuiviPDALabo() {
   const [showQTE, setShowQTE] = useState(false)
   const [formQTE, setFormQTE] = useState({ articleId: 0, quantite: 1, datePlanifiee: new Date().toISOString().split('T')[0] })
   const [erreurQTE, setErreurQTE] = useState('')
+  const [emplacements, setEmplacements] = useState<Record<number, string>>({})
+  const [emplacementsEnregistres, setEmplacementsEnregistres] = useState<Record<number, string>>({})
 
   useEffect(() => { reload() }, [siteId, periode])
 
@@ -70,9 +69,27 @@ export default function SuiviPDALabo() {
 
   async function reload() {
     setChargement(true)
-    const d = await get<SuiviPDALaboData>(`/production/suivi-pda-labo/${siteId}?annee=${periode.annee}&mois=${periode.mois}`)
-    setData(d)
-    setChargement(false)
+    try {
+      const d = await get<SuiviPDALaboData>(`/production/suivi-pda-labo/${siteId}?annee=${periode.annee}&mois=${periode.mois}`)
+      setData(d)
+      const initEmpl: Record<number, string> = {}
+      for (const row of d.rows) if (row.inventaireId) initEmpl[row.inventaireId] = row.location
+      setEmplacements(initEmpl)
+      setEmplacementsEnregistres(initEmpl)
+    } finally {
+      setChargement(false)
+    }
+  }
+
+  async function validerEmplacement(inventaireId: number) {
+    if (!data || !data.champEmplacementLaboId) return
+    const valeur = emplacements[inventaireId] ?? ''
+    await inventaireApi.updateValeurChamp(inventaireId, data.champEmplacementLaboId, valeur)
+    setEmplacementsEnregistres(f => ({ ...f, [inventaireId]: valeur }))
+  }
+
+  function annulerEmplacement(inventaireId: number) {
+    setEmplacements(f => ({ ...f, [inventaireId]: emplacementsEnregistres[inventaireId] ?? '' }))
   }
 
   async function reloadStockLogistique() {
@@ -134,7 +151,7 @@ export default function SuiviPDALabo() {
     }
     switch (key) {
       case 'reference': return row.reference
-      case 'location': return row.location
+      case 'location': return row.inventaireId ? (emplacements[row.inventaireId] ?? row.location) : row.location
       case 'additionalReference': return row.additionalReference
       case 'wording': return row.wording
       case 'range': return row.range
@@ -205,7 +222,47 @@ export default function SuiviPDALabo() {
               {data.rows.map(row => (
                 <tr key={row.articleId}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{row.reference || '—'}</td>
-                  <td>{row.location || '—'}</td>
+                  <td>
+                    {row.inventaireId && data.champEmplacementLaboId ? (() => {
+                      const id = row.inventaireId!
+                      const valeur = emplacements[id] ?? ''
+                      const modifie = valeur !== (emplacementsEnregistres[id] ?? '')
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <input
+                            type="text"
+                            className="form-input"
+                            style={{ minWidth: '90px', padding: '4px 6px' }}
+                            value={valeur}
+                            onChange={e => setEmplacements(f => ({ ...f, [id]: e.target.value }))}
+                            onKeyDown={async e => {
+                              if (e.key === 'Enter') {
+                                const target = e.target as HTMLInputElement
+                                await validerEmplacement(id)
+                                target.blur()
+                              } else if (e.key === 'Escape') {
+                                annulerEmplacement(id)
+                                ;(e.target as HTMLInputElement).blur()
+                              }
+                            }}
+                            onBlur={() => annulerEmplacement(id)}
+                          />
+                          {modifie && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-icon"
+                              title="Valider l'emplacement"
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => validerEmplacement(id)}
+                              style={{ padding: '4px', flexShrink: 0 }}
+                            >
+                              <Check size={14} />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })() : (row.location || '—')}
+                  </td>
                   <td>{row.additionalReference || '—'}</td>
                   <td>{row.wording || '—'}</td>
                   <td>{row.range || '—'}</td>

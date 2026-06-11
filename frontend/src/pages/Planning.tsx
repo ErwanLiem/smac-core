@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, X, AlertTriangle, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, AlertTriangle, Check, Lock, Unlock } from 'lucide-react'
 import { get, post, put } from '../api/client'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getSiteId } from '../utils/permissions'
 
 function dateStr(d: Date) {
   // Utiliser les composantes locales (pas UTC) pour éviter le décalage de timezone
@@ -36,6 +31,7 @@ interface Carte {
 
 interface CapaciteJour {
   capacite: number
+  actif: boolean
   techniciens: Array<{
     id: number
     utilisateur: { id: number; nom: string; prenom: string }
@@ -147,6 +143,11 @@ export default function Planning() {
     setCapacite(cap)
     setDemandes(d)
     setChargement(false)
+  }
+
+  async function toggleJourCapacite(ds: string) {
+    await post(`/production/capacite/${siteId}/toggle-jour`, { date: ds })
+    reload()
   }
 
   function getDemandesJour(jour: string) {
@@ -435,11 +436,23 @@ export default function Planning() {
                 {/* Header jour */}
                 <div style={{ borderBottom: '1px solid #1f2937', paddingBottom: '8px', marginBottom: '4px' }}>
                   {/* Jour + date sur une ligne */}
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: 700, color: isToday ? '#60a5fa' : isPast ? '#94a3b8' : '#e2e8f0' }}>{JOURS[idx]}</span>
-                    <span style={{ fontSize: '14px', fontWeight: 500, color: isPast ? '#6b7280' : '#cbd5e1' }}>
-                      {jour.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '5px', marginBottom: '8px' }}>
+                    <span style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+                      <span style={{ fontSize: '15px', fontWeight: 700, color: isToday ? '#60a5fa' : isPast ? '#94a3b8' : '#e2e8f0' }}>{JOURS[idx]}</span>
+                      <span style={{ fontSize: '14px', fontWeight: 500, color: isPast ? '#6b7280' : '#cbd5e1' }}>
+                        {jour.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                      </span>
                     </span>
+                    {idx === 5 && (
+                      <button
+                        onClick={() => toggleJourCapacite(ds)}
+                        title={cap?.actif ? 'Désactiver la capacité de ce samedi' : 'Activer la capacité de ce samedi'}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', border: `1px solid ${cap?.actif ? '#16a34a' : '#374151'}`, background: cap?.actif ? '#052e16' : '#1f2937', color: cap?.actif ? '#4ade80' : '#6b7280', cursor: 'pointer' }}
+                      >
+                        {cap?.actif ? <Unlock size={11} /> : <Lock size={11} />}
+                        {cap?.actif ? 'Actif' : 'Inactif'}
+                      </button>
+                    )}
                   </div>
                   {/* Capacité — 3 lignes séparées */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>

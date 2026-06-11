@@ -38,12 +38,13 @@ export async function getConfig(req: Request, res: Response, next: any) {
 export async function updateConfig(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { champPNCode, champRMACode, labelPN, labelRMA, champTypeArticleCode, typesArticleQTE, champsAffichageQTE } = req.body
+    const { champPNCode, champRMACode, labelPN, labelRMA, champTypeArticleCode, typesArticleQTE, champsAffichageQTE, quotaSamediActif } = req.body
     const data = {
       champPNCode, champRMACode, labelPN, labelRMA,
       champTypeArticleCode: champTypeArticleCode ?? 'TYPE',
       typesArticleQTE: typesArticleQTE !== undefined ? JSON.stringify(typesArticleQTE) : undefined,
       champsAffichageQTE: champsAffichageQTE !== undefined ? JSON.stringify(champsAffichageQTE) : undefined,
+      quotaSamediActif: quotaSamediActif !== undefined ? Boolean(quotaSamediActif) : undefined,
     }
     const config = await prisma.configProduction.upsert({
       where: { siteId: Number(siteId) },
@@ -188,31 +189,42 @@ export async function getCapacite(req: Request, res: Response, next: any) {
     const { siteId } = req.params
     const { debut, fin } = req.query
 
-    const techniciens = await prisma.technicienProduction.findMany({
-      where: { siteId: Number(siteId), actif: true },
-      include: {
-        utilisateur: { select: { id: true, nom: true, prenom: true } },
-        absences: debut && fin
-          ? { where: { date: { gte: new Date(String(debut)), lte: new Date(String(fin)) } } }
-          : {}
-      }
-    })
+    const [techniciens, config, exceptions] = await Promise.all([
+      prisma.technicienProduction.findMany({
+        where: { siteId: Number(siteId), actif: true },
+        include: {
+          utilisateur: { select: { id: true, nom: true, prenom: true } },
+          absences: debut && fin
+            ? { where: { date: { gte: new Date(String(debut)), lte: new Date(String(fin)) } } }
+            : {}
+        }
+      }),
+      prisma.configProduction.findUnique({ where: { siteId: Number(siteId) } }),
+      debut && fin
+        ? prisma.exceptionCapaciteJour.findMany({
+            where: { siteId: Number(siteId), date: { gte: new Date(String(debut)), lte: new Date(String(fin)) } }
+          })
+        : Promise.resolve([])
+    ])
+    const quotaSamediActif = config?.quotaSamediActif ?? false
 
     // Pour chaque jour de la période, calculer la capacité
     const dateDebut = new Date(String(debut))
     const dateFin = new Date(String(fin))
-    const jours: Record<string, { capacite: number; techniciens: any[] }> = {}
+    const jours: Record<string, { capacite: number; techniciens: any[]; actif: boolean }> = {}
 
     for (let d = new Date(dateDebut); d <= dateFin; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0]
+      const exception = exceptions.find(e => e.date.toISOString().split('T')[0] === dateStr)
+      const jourActif = exception ? exception.actif : (d.getDay() === 6 ? quotaSamediActif : true)
       let capaciteJour = 0
       const techJour: any[] = []
 
       for (const tech of techniciens) {
         const absence = tech.absences.find((a: any) => a.date.toISOString().split('T')[0] === dateStr)
-        const quota = absence
+        const quota = !jourActif ? 0 : (absence
           ? (absence.quotaOverride !== null ? absence.quotaOverride : 0)
-          : tech.quotaJournalier
+          : tech.quotaJournalier)
         capaciteJour += quota
         techJour.push({
           id: tech.id,
@@ -224,10 +236,41 @@ export async function getCapacite(req: Request, res: Response, next: any) {
           absenceMotif: absence?.motif ?? null,
         })
       }
-      jours[dateStr] = { capacite: capaciteJour, techniciens: techJour }
+      jours[dateStr] = { capacite: capaciteJour, techniciens: techJour, actif: jourActif }
     }
 
     res.json(jours)
+  } catch (e) { next(e) }
+}
+
+export async function toggleJourCapacite(req: Request, res: Response, next: any) {
+  try {
+    const { siteId } = req.params
+    const { date } = req.body
+    if (!date) return res.status(400).json({ error: 'date requise' })
+
+    const dateObj = new Date(String(date))
+    const config = await prisma.configProduction.findUnique({ where: { siteId: Number(siteId) } })
+    const defautActif = dateObj.getDay() === 6 ? (config?.quotaSamediActif ?? false) : true
+
+    const existante = await prisma.exceptionCapaciteJour.findUnique({
+      where: { siteId_date: { siteId: Number(siteId), date: dateObj } }
+    })
+    const actifActuel = existante ? existante.actif : defautActif
+    const nouvelActif = !actifActuel
+
+    if (nouvelActif === defautActif) {
+      // Retour au comportement par défaut : suppression de l'exception si elle existe
+      if (existante) await prisma.exceptionCapaciteJour.delete({ where: { id: existante.id } })
+    } else {
+      await prisma.exceptionCapaciteJour.upsert({
+        where: { siteId_date: { siteId: Number(siteId), date: dateObj } },
+        create: { siteId: Number(siteId), date: dateObj, actif: nouvelActif },
+        update: { actif: nouvelActif }
+      })
+    }
+
+    res.json({ ok: true, actif: nouvelActif })
   } catch (e) { next(e) }
 }
 
@@ -548,7 +591,7 @@ export async function validerDemande(req: Request, res: Response, next: any) {
       const champsInv = await prisma.champInventaire.findMany({ where: { siteId: demande.siteId } })
       const champQte = champsInv.find(c => ['QUANTITE', 'QTE', 'QUANTITY'].includes(normCode(c.code)))
       if (champQte) {
-        const invItem = await prisma.inventaire.findFirst({ where: { siteId: demande.siteId, articleId: demande.articleId } })
+        const invItem = await prisma.inventaire.findFirst({ where: { siteId: demande.siteId, articleId: demande.articleId }, orderBy: { id: 'asc' } })
         if (invItem) {
           const valQte = await prisma.valeurChampInventaire.findFirst({ where: { inventaireId: invItem.id, champId: champQte.id } })
           if (valQte) {

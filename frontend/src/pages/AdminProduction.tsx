@@ -2,13 +2,7 @@ import { useEffect, useState } from 'react'
 import { Trash2, Plus, Check, X, Users } from 'lucide-react'
 import Tabs from '../components/Tabs'
 import { get, post, put, del } from '../api/client'
-import { getPermissions } from '../utils/permissions'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getPermissions, getSiteId } from '../utils/permissions'
 
 interface Config {
   champPNCode: string
@@ -18,6 +12,7 @@ interface Config {
   champTypeArticleCode: string
   typesArticleQTE: string[]
   champsAffichageQTE: string[]
+  quotaSamediActif: boolean
 }
 
 interface Technicien {
@@ -46,7 +41,7 @@ export default function AdminProduction() {
   const { isAdmin } = getPermissions()
 
   const [chargement, setChargement] = useState(true)
-  const [config, setConfig]           = useState<Config>({ champPNCode: 'PN', champRMACode: 'BL', labelPN: 'P/N', labelRMA: 'RMA', champTypeArticleCode: 'TYPE', typesArticleQTE: [], champsAffichageQTE: [] })
+  const [config, setConfig]           = useState<Config>({ champPNCode: 'PN', champRMACode: 'BL', labelPN: 'P/N', labelRMA: 'RMA', champTypeArticleCode: 'TYPE', typesArticleQTE: [], champsAffichageQTE: [], quotaSamediActif: false })
   const [champsArticle, setChampsArticle] = useState<ChampInv[]>([])
   const [articlesData, setArticlesData]   = useState<any[]>([])
   const [configModif, setConfigModif] = useState(false)
@@ -95,6 +90,14 @@ export default function AdminProduction() {
     e.preventDefault()
     await put(`/production/config/${siteId}`, config)
     setConfigModif(false)
+    setSucces('Configuration sauvegardée.')
+    setTimeout(() => setSucces(''), 2000)
+  }
+
+  async function toggleQuotaSamedi(checked: boolean) {
+    const updated = { ...config, quotaSamediActif: checked }
+    setConfig(updated)
+    await put(`/production/config/${siteId}`, updated)
     setSucces('Configuration sauvegardée.')
     setTimeout(() => setSucces(''), 2000)
   }
@@ -272,6 +275,19 @@ export default function AdminProduction() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
           <Users size={16} style={{ color: '#60a5fa' }} />
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9' }}>Techniciens de production</h2>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={config.quotaSamediActif} onChange={e => toggleQuotaSamedi(e.target.checked)} style={{ marginTop: '3px' }} />
+            <span>
+              <span className="form-label" style={{ margin: 0 }}>Activer le quota de production le samedi par défaut</span>
+              <span style={{ display: 'block', fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                Si désactivé (par défaut), la capacité de chaque samedi est de 0 dans le planning, quels que soient les quotas des techniciens.
+                Un samedi en particulier peut ensuite être activé ou désactivé ponctuellement directement depuis le Planning (bouton sur la colonne du samedi).
+              </span>
+            </span>
+          </label>
         </div>
 
         {chargement ? (

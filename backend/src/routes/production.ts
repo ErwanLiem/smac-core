@@ -22,6 +22,7 @@ router.delete('/absences/:id',        ctrl.deleteAbsence)
 
 // Capacité journalière
 router.get('/capacite/:siteId',       ctrl.getCapacite)
+router.post('/capacite/:siteId/toggle-jour', ctrl.toggleJourCapacite)
 
 // Cartes (groupes P/N × RMA en stock)
 router.get('/cartes/:siteId',         ctrl.getCartes)

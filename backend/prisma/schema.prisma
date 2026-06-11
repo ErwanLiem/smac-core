@@ -321,6 +321,7 @@ model site {
   demandeTransfert     demandeTransfert[]
   inventaireLabo       inventaireLabo[]
   masterBox            masterBox[]
+  exceptionCapaciteJour exceptionCapaciteJour[]
 }
 
 // ─── Module Production ───────────────────────────────────────────────────────
@@ -336,6 +337,7 @@ model configProduction {
   champTypeArticleCode String  @default("TYPE")  // code du champArticle contenant le type
   typesArticleQTE      String? @db.LongText      // JSON: ["PDA","TABLETTE"] — types éligibles transfert QTE
   champsAffichageQTE   String? @db.LongText      // JSON: ["PN","DESIGNATION","TYPE"] — champs à afficher dans la liste
+  quotaSamediActif     Boolean @default(false)   // si false, la capacité du samedi est forcée à 0
   site                 site    @relation(fields: [siteId], references: [id], map: "ConfigProduction_siteId_fkey")
 }
 
@@ -366,6 +368,18 @@ model absenceTechnicien {
 
   @@unique([technicienId, date], map: "AbsenceTechnicien_technicienId_date_key")
   @@index([technicienId], map: "AbsenceTechnicien_technicienId_fkey")
+}
+
+// Exception ponctuelle au réglage par défaut d'un jour normalement inactif (ex: samedi travaillé)
+model exceptionCapaciteJour {
+  id      Int      @id @default(autoincrement())
+  siteId  Int
+  date    DateTime @db.Date
+  actif   Boolean  // true = capacité activée pour ce jour malgré le réglage par défaut
+  site    site     @relation(fields: [siteId], references: [id], map: "ExceptionCapaciteJour_siteId_fkey")
+
+  @@unique([siteId, date], map: "ExceptionCapaciteJour_siteId_date_key")
+  @@index([siteId], map: "ExceptionCapaciteJour_siteId_idx")
 }
 
 // Demande de transfert vers la production (SN ou QTE)

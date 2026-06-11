@@ -68,7 +68,7 @@ export async function getSuiviPDA(req: Request, res: Response, next: any) {
     }
 
     if (typesAutorises.length === 0 || !champType) {
-      return res.json({ semaines: [], champTransferId: champTransfer.id, rows: [] })
+      return res.json({ semaines: [], champTransferId: champTransfer.id, champEmplacementId: champEmplacement?.id ?? null, rows: [] })
     }
 
     // Articles dont le type fait partie des types suivis en quantité
@@ -179,6 +179,7 @@ export async function getSuiviPDA(req: Request, res: Response, next: any) {
       estMoisCourant,
       semaines: semaines.map(s => ({ numero: s, label: `S${s}` })),
       champTransferId: champTransfer.id,
+      champEmplacementId: champEmplacement?.id ?? null,
       rows
     })
   } catch (e) { next(e) }

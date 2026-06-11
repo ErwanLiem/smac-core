@@ -58,7 +58,7 @@ export async function getSuiviPDALabo(req: Request, res: Response, next: any) {
     const champDesignation     = champsInv.find(c => normCode(c.code) === 'DESIGNATION')
 
     if (typesAutorises.length === 0 || !champType) {
-      return res.json({ semaines: [], rows: [] })
+      return res.json({ semaines: [], champEmplacementLaboId: champEmplacementLabo?.id ?? null, rows: [] })
     }
 
     // Articles dont le type fait partie des types suivis en quantité
@@ -147,6 +147,7 @@ export async function getSuiviPDALabo(req: Request, res: Response, next: any) {
       mois: mois + 1,
       estMoisCourant,
       semaines: semaines.map(s => ({ numero: s, label: `S${s}` })),
+      champEmplacementLaboId: champEmplacementLabo?.id ?? null,
       rows
     })
   } catch (e) { next(e) }
