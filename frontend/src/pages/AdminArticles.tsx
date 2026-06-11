@@ -110,7 +110,7 @@ export default function AdminArticles({ embedded }: { embedded?: boolean } = {})
       setForm(emptyChamp)
       reload()
     } catch (e: any) {
-      try { setErreur(JSON.parse(e.message)?.error ?? 'Erreur inconnue') } catch { setErreur('Erreur inconnue') }
+      setErreur(e.data?.error ?? e.message ?? 'Erreur inconnue')
     }
   }
 
@@ -168,7 +168,7 @@ export default function AdminArticles({ embedded }: { embedded?: boolean } = {})
                 {editId === champ.id ? (
                   <>
                     <td><input type="number" value={editForm.ordre} onChange={e => setEditForm(f => ({ ...f, ordre: Number(e.target.value) }))} className="form-input" style={{ width: '60px' }} /></td>
-                    <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{champ.code}</code></td>
+                    <td><code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{champ.code}</code></td>
                     <td><input value={editForm.label} onChange={e => setEditForm(f => ({ ...f, label: e.target.value }))} className="form-input" style={{ width: '160px' }} /></td>
                     <td>
                       <select value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value as ChampType }))} className="form-input" style={{ width: '140px' }}>
@@ -190,7 +190,7 @@ export default function AdminArticles({ embedded }: { embedded?: boolean } = {})
                 ) : (
                   <>
                     <td style={{ color: '#9ca3af' }}>{champ.ordre}</td>
-                    <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{champ.code}</code></td>
+                    <td><code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{champ.code}</code></td>
                     <td style={{ fontWeight: 500 }}>{champ.label}</td>
                     <td><span className="badge badge-default">{typeLabels[champ.type]}</span></td>
                     <td>{champ.obligatoire ? <span className="badge badge-info">Oui</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
@@ -216,7 +216,7 @@ export default function AdminArticles({ embedded }: { embedded?: boolean } = {})
         )}
 
         {/* Formulaire ajout */}
-        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+        <div style={{ borderTop: '1px solid #1f2937', paddingTop: '16px' }}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajouter un champ</p>
           <form onSubmit={handleCreate} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div className="form-group" style={{ margin: 0 }}>

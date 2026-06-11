@@ -17,6 +17,7 @@ interface ChampAttenduConfig {
   obligatoire: boolean
   visibleListe: boolean
   uniqueValeur?: boolean
+  obligatoireCloture?: boolean
 }
 
 interface ConfigAttendus {
@@ -150,12 +151,13 @@ export default function AdminAttendus() {
               <th style={{ color: '#9ca3af', fontWeight: 400, fontSize: '12px' }}>Code</th>
               <th style={{ textAlign: 'center' }}>Formulaire</th>
               <th style={{ textAlign: 'center' }}>Obligatoire</th>
+              <th style={{ textAlign: 'center' }}>Requis pour clôture</th>
               <th style={{ textAlign: 'center' }}>Visible liste</th>
               <th style={{ textAlign: 'center' }}>Valeur unique</th>
             </tr>
           </thead>
           <tbody>
-            {champsInv.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configuré</td></tr>}
+            {champsInv.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configuré</td></tr>}
             {champsInv.map(champ => {
               const cfg = config.champsAttendu?.find(c => c.code === champ.code) ?? { code: champ.code, visible: false, obligatoire: false, visibleListe: false }
               return (
@@ -167,6 +169,15 @@ export default function AdminAttendus() {
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <input type="checkbox" checked={cfg.obligatoire} disabled={!cfg.visible || !isAdmin} onChange={e => updateChamp(champ.code, { obligatoire: e.target.checked })} />
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      title="Bloquer la clôture de l'attendu tant que ce champ n'est pas renseigné via 'Modifier infos'"
+                      checked={cfg.obligatoireCloture ?? false}
+                      disabled={!cfg.visible || !isAdmin}
+                      onChange={e => updateChamp(champ.code, { obligatoireCloture: e.target.checked })}
+                    />
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <input type="checkbox" checked={cfg.visibleListe ?? false} disabled={!isAdmin} onChange={e => updateChamp(champ.code, { visibleListe: e.target.checked })} />
@@ -265,7 +276,7 @@ export default function AdminAttendus() {
                 <tr key={m.id}>
                   <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{m.colonneExcel}</td>
                   <td>
-                    <code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{m.champInventaireCode}</code>
+                    <code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{m.champInventaireCode}</code>
                     <span style={{ fontSize: '12px', color: '#9ca3af', marginLeft: '6px' }}>{champsInv.find(c => c.code === m.champInventaireCode)?.label}</span>
                   </td>
                   <td>
@@ -294,7 +305,7 @@ export default function AdminAttendus() {
         )}
 
         {isAdmin && (
-          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginTop: '16px' }}>
+          <div style={{ borderTop: '1px solid #1f2937', paddingTop: '16px', marginTop: '16px' }}>
             <p style={{ fontSize: '13px', fontWeight: 600, color: '#64748b', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajouter un mapping</p>
             <form onSubmit={handleAddMapping} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '200px' }}>

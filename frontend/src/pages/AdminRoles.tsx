@@ -52,14 +52,14 @@ function PermissionsEditor({ pages, value, onChange }: { pages: Page[]; value: P
       {pages.map(p => {
         const pageActive = (value[p.path]?.length ?? 0) > 0
         return (
-          <div key={p.path} style={{ border: `1px solid ${pageActive ? '#bfdbfe' : '#e5e7eb'}`, borderRadius: '8px', padding: '10px 14px', background: pageActive ? '#f0f7ff' : 'white' }}>
+          <div key={p.path} style={{ border: `1px solid ${pageActive ? '#2563eb' : '#1f2937'}`, borderRadius: '8px', padding: '10px 14px', background: pageActive ? '#1e3a5f' : '#141720' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', fontWeight: 500, color: '#e2e8f0' }}>{p.label}</span>
               <div style={{ display: 'flex', gap: '12px' }}>
                 {p.actions.map(action => {
                   const checked = value[p.path]?.includes(action) ?? false
                   return (
-                    <label key={action} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: checked ? '#2563eb' : '#6b7280', cursor: 'pointer' }}>
+                    <label key={action} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: checked ? '#60a5fa' : '#6b7280', cursor: 'pointer' }}>
                       <input type="checkbox" checked={checked} onChange={() => onChange(toggleAction(value, p.path, action))} />
                       {ACTION_LABELS[action] ?? action}
                     </label>
@@ -136,7 +136,7 @@ export default function AdminRoles({ embedded }: { embedded?: boolean } = {}) {
           {editId === role.id ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', color: '#475569' }}>{role.code}</code>
+                <code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 8px', borderRadius: '4px', color: '#60a5fa' }}>{role.code}</code>
                 <input value={editForm.label} onChange={e => setEditForm(f => ({ ...f, label: e.target.value }))} className="form-input" style={{ width: '200px' }} />
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
                   <button className="btn btn-primary btn-icon" onClick={() => handleUpdate(role.id)}><Check size={14} /></button>
@@ -148,7 +148,7 @@ export default function AdminRoles({ embedded }: { embedded?: boolean } = {}) {
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                <code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', color: '#475569' }}>{role.code}</code>
+                <code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 8px', borderRadius: '4px', color: '#60a5fa' }}>{role.code}</code>
                 <span style={{ fontWeight: 600, fontSize: '15px' }}>{role.label}</span>
                 <span className="badge badge-default">{role.permissions.length} permission{role.permissions.length !== 1 ? 's' : ''}</span>
                 {isAdmin && (

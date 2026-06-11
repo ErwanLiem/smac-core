@@ -12,6 +12,11 @@ function normCode(s: string) {
   return s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '_').trim()
 }
 
+/** Normalise un libellé en ne gardant que les lettres/chiffres (ex: "Bon D'envoi" -> "BONDENVOI") */
+function normAlnum(s: string) {
+  return s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '')
+}
+
 const CODES_SN = ['SN', 'S_N', 'NUMERO_SERIE', 'NUMERO DE SERIE', 'SERIAL']
 
 function normCodeBrut(s: string) {
@@ -40,6 +45,17 @@ async function renseignerDateChamp(siteId: number, champsInv: { id: number; code
     where: { inventaireId_champId: { inventaireId, champId: champ.id } },
     create: { inventaireId, champId: champ.id, valeur: dateValeur },
     update: { valeur: dateValeur }
+  })
+}
+
+/** Renseigne une valeur libre dans le champ inventaire dont le code (normAlnum) correspond (s'il est configuré) */
+async function renseignerValeurChamp(champsInv: { id: number; code: string }[], inventaireId: number, codeAlnum: string, valeur: string) {
+  const champ = champsInv.find(c => normAlnum(c.code) === codeAlnum)
+  if (!champ) return
+  await prisma.valeurChampInventaire.upsert({
+    where: { inventaireId_champId: { inventaireId, champId: champ.id } },
+    create: { inventaireId, champId: champ.id, valeur },
+    update: { valeur }
   })
 }
 
@@ -78,9 +94,13 @@ async function getChampsAffichage(siteId: number) {
   return { champsInv, champPN, champRMA, champDesignation, champClient, champModelArticle, champSN }
 }
 
-/** Génère le prochain numéro de Master Box pour un client donné (ex: MB-0001, MB-0002... — séquence propre à chaque client) */
+/**
+ * Génère le prochain numéro de Master Box pour un client donné (ex: MB-0001, MB-0002... — séquence propre à chaque client).
+ * Les Master Box déjà "EXPEDIEE" ne comptent pas : une fois toutes les Master Box d'un client expédiées,
+ * la numérotation repart de MB-0001 au tour suivant.
+ */
 async function genererNumeroMasterBox(siteId: number, clientValeur: string | null): Promise<string> {
-  const boxes = await prisma.masterBox.findMany({ where: { siteId, clientValeur }, select: { numero: true } })
+  const boxes = await prisma.masterBox.findMany({ where: { siteId, clientValeur, statut: { not: 'EXPEDIEE' } }, select: { numero: true } })
   let max = 0
   for (const b of boxes) {
     const m = b.numero.match(/^MB-(\d+)$/)
@@ -438,6 +458,43 @@ export async function getMasterBoxesEnregistrees(req: Request, res: Response, ne
 }
 
 /**
+ * Retire un article d'une Master Box pas encore expédiée (cas d'erreur détectée
+ * lors du contrôle après validation de la Master Box). Si la Master Box devient
+ * vide, elle est supprimée.
+ */
+export async function retirerLigneMasterBox(req: Request, res: Response, next: any) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const inventaireId = Number(req.body?.inventaireId)
+    if (!inventaireId) return res.status(400).json({ error: 'inventaireId requis' })
+
+    const ligne = await prisma.ligneMasterBox.findUnique({
+      where: { inventaireId },
+      include: { masterBox: true }
+    })
+    if (!ligne || ligne.masterBox.siteId !== siteId) {
+      return res.status(404).json({ error: 'Cet article n\'est affecté à aucune Master Box' })
+    }
+    if (ligne.masterBox.statut === 'EXPEDIEE') {
+      return res.status(400).json({ error: 'Cette Master Box a déjà été expédiée' })
+    }
+
+    await prisma.ligneMasterBox.delete({ where: { inventaireId } })
+
+    const restantes = await prisma.ligneMasterBox.count({ where: { masterBoxId: ligne.masterBoxId } })
+    let masterBoxSupprimee = false
+    if (restantes === 0) {
+      await prisma.masterBox.delete({ where: { id: ligne.masterBoxId } })
+      masterBoxSupprimee = true
+    }
+
+    await logActivite({ siteId, userId: req.user?.id, type: 'MASTERBOX', entite: 'inventaire', entiteId: inventaireId, details: { numero: ligne.masterBox.numero, action: 'retrait' } })
+
+    res.json({ ok: true, masterBoxSupprimee })
+  } catch (e) { next(e) }
+}
+
+/**
  * Expédie toutes les Master Box "EN_ATTENTE" d'un client : applique la transition
  * "Emballé -> Expédié" à tous les articles concernés (tracée via OPE.EXPEDITION) et
  * passe les Master Box au statut "EXPEDIEE".
@@ -447,6 +504,8 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
     const siteId = Number(req.params.siteId)
     const raw = req.body?.clientValeur
     const clientValeur = (raw === null || raw === undefined || raw === '') ? null : String(raw)
+    const bonEnvoiRaw = req.body?.bonEnvoi
+    const bonEnvoi = (bonEnvoiRaw === null || bonEnvoiRaw === undefined) ? '' : String(bonEnvoiRaw).trim()
 
     const expedition = await getTransitionExpedition(siteId)
     if (!expedition) {
@@ -473,6 +532,9 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
           data: { statutId: expedition.transition.statutToId }
         })
         await renseignerDateChamp(siteId, champsInv, ligne.inventaireId, 'DATE_SHP', dateAujourdhui)
+        if (bonEnvoi) {
+          await renseignerValeurChamp(champsInv, ligne.inventaireId, 'BONDENVOI', bonEnvoi)
+        }
         await enregistrerOperation({
           siteId,
           inventaireId: ligne.inventaireId,
@@ -486,6 +548,33 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
     }
 
     res.json({ ok: true, nbBoxes: boxes.length, nbArticles })
+  } catch (e) { next(e) }
+}
+
+/**
+ * Liste des champs inventaire et des articles (avec leurs valeurs) contenus dans
+ * les Master Box "EN_ATTENTE" d'un client — utilisé pour l'export Excel de l'onglet Envoi.
+ */
+export async function getArticlesMasterBoxEnregistrees(req: Request, res: Response, next: any) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const raw = req.query.clientValeur
+    const clientValeur = (raw === undefined || raw === null || raw === '' || raw === 'Sans client') ? null : String(raw)
+
+    const champs = await prisma.champInventaire.findMany({ where: { siteId, actif: true }, orderBy: { ordre: 'asc' } })
+
+    const lignes = await prisma.ligneMasterBox.findMany({
+      where: { masterBox: { siteId, statut: 'EN_ATTENTE', clientValeur } },
+      include: { inventaire: { include: { valeurs: true, statut: true } } }
+    })
+
+    const articles = lignes.map(l => ({
+      id: l.inventaire.id,
+      statut: l.inventaire.statut ? { label: l.inventaire.statut.label } : null,
+      valeurs: l.inventaire.valeurs.map(v => ({ champId: v.champId, valeur: v.valeur }))
+    }))
+
+    res.json({ champs, articles })
   } catch (e) { next(e) }
 }
 

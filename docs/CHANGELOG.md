@@ -6,6 +6,19 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [0.8.0] - 2026-06-11
+
+### Ajouté
+- **Expéditions — onglet Envoi** :
+  - possibilité de **retirer un article d'une Master Box** déjà enregistrée (statut "en attente d'envoi") mais pas encore expédiée, pour corriger une erreur détectée lors du contrôle ; la Master Box est supprimée automatiquement si elle devient vide, et l'article redevient disponible pour un nouvel emballage
+  - **bouton "Exporter"** (avec sélection des colonnes, comme sur l'Inventaire) dans la fenêtre de détail d'un client : exporte les données d'inventaire des articles des Master Box en attente d'envoi
+  - **champ "Bon d'envoi" (n° de transport)** dans la fenêtre de confirmation d'expédition : si renseigné, la valeur est écrite dans le champ inventaire "Bon D'envoi" de chaque article expédié
+
+### Modifié
+- Pages de configuration (Articles, Inventaire, Attendus, Rôles, Utilisateurs, Workflow, Clients, Plateformes) : remplacement du fond blanc des badges/codes et bordures de séparation, peu lisibles sur le thème sombre, par un style cohérent avec le reste de l'interface
+
+---
+
 ## [0.7.0] - 2026-06-10
 
 ### Ajouté

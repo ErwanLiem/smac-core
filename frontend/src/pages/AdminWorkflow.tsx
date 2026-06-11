@@ -245,7 +245,7 @@ export default function AdminWorkflow() {
             {statuts.map(s => (
               <tr key={s.id}>
                 <td style={{ textAlign: 'center', color: '#9ca3af' }}>{s.ordre}</td>
-                <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{s.code}</code></td>
+                <td><code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{s.code}</code></td>
                 <td><StatutBadge statut={s} /></td>
                 <td style={{ textAlign: 'center' }}><ColorSquare color={s.couleur} /></td>
                 <td style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -294,7 +294,7 @@ export default function AdminWorkflow() {
         })()}
 
         {/* Formulaire ajout statut */}
-        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+        <div style={{ borderTop: '1px solid #1f2937', paddingTop: '16px' }}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajouter un statut</p>
           <form onSubmit={ajouterStatut}>
             <div style={{ display: 'grid', gridTemplateColumns: '140px 180px 120px 60px auto', gap: '10px', alignItems: 'flex-end', marginBottom: '10px' }}>
@@ -378,7 +378,7 @@ export default function AdminWorkflow() {
         )}
 
         {/* Formulaire ajout transition */}
-        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+        <div style={{ borderTop: '1px solid #1f2937', paddingTop: '16px' }}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ajouter une transition</p>
           <form onSubmit={ajouterTransition} style={{ display: 'grid', gridTemplateColumns: '160px 160px 200px 120px auto', gap: '10px', alignItems: 'flex-end' }}>
             <div className="form-group" style={{ margin: 0 }}>
@@ -422,7 +422,7 @@ export default function AdminWorkflow() {
             <form onSubmit={sauvegarderStatut}>
               <div className="form-group">
                 <label className="form-label">Code</label>
-                <input className="form-input" value={editStatut.code} disabled style={{ background: '#f1f5f9', color: '#9ca3af' }} />
+                <input className="form-input" value={editStatut.code} disabled style={{ background: '#141720', color: '#6b7280' }} />
               </div>
               <div className="form-group">
                 <label className="form-label">Label</label>

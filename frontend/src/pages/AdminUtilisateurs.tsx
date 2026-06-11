@@ -124,7 +124,7 @@ export default function AdminUtilisateurs({ embedded }: { embedded?: boolean } =
                   <>
                     <td style={{ fontWeight: 500 }}>{u.nom}</td>
                     <td>{u.prenom}</td>
-                    <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', color: '#475569' }}>{u.login}</code></td>
+                    <td><code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{u.login}</code></td>
                     <td><span className="badge badge-default">{u.role?.label ?? '—'}</span></td>
                     <td><span className={`badge ${u.actif ? 'badge-success' : 'badge-danger'}`}>{u.actif ? 'Actif' : 'Inactif'}</span></td>
                     <td>{u.doitChangerMdp ? <span className="badge badge-warning">À changer</span> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
@@ -146,7 +146,7 @@ export default function AdminUtilisateurs({ embedded }: { embedded?: boolean } =
         )}
 
         {/* Formulaire création */}
-        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+        <div style={{ borderTop: '1px solid #1f2937', paddingTop: '16px' }}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Créer un utilisateur</p>
           <form onSubmit={handleCreate} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div className="form-group" style={{ margin: 0 }}>

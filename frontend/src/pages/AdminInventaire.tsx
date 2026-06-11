@@ -124,7 +124,7 @@ export default function AdminInventaire({ embedded }: { embedded?: boolean } = {
       setForm(emptyChamp)
       reload()
     } catch (e: any) {
-      try { setErreur(JSON.parse(e.message)?.error ?? 'Erreur inconnue') } catch { setErreur('Erreur inconnue') }
+      setErreur(e.data?.error ?? e.message ?? 'Erreur inconnue')
     }
   }
 
@@ -186,7 +186,7 @@ export default function AdminInventaire({ embedded }: { embedded?: boolean } = {
               {champs.map(c => editId === c.id ? (
                 <tr key={c.id}>
                   <td><input type="number" className="form-input" style={{ width: '60px' }} value={editForm.ordre ?? 0} onChange={e => setEditForm({ ...editForm, ordre: Number(e.target.value) })} /></td>
-                  <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{c.code}</code></td>
+                  <td><code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{c.code}</code></td>
                   <td><input className="form-input" value={editForm.label ?? ''} onChange={e => setEditForm({ ...editForm, label: e.target.value })} /></td>
                   <td>
                     <select className="form-input" style={{ fontSize: '13px' }} value={editForm.type ?? c.type} onChange={e => setEditForm({ ...editForm, type: e.target.value as ChampType })}>
@@ -208,7 +208,7 @@ export default function AdminInventaire({ embedded }: { embedded?: boolean } = {
               ) : (
                 <tr key={c.id}>
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>{c.ordre}</td>
-                  <td><code style={{ fontSize: '12px', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{c.code}</code></td>
+                  <td><code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{c.code}</code></td>
                   <td>{c.label}</td>
                   <td><span style={{ fontSize: '13px', color: '#6b7280' }}>{typeLabels[c.type as ChampType]}</span></td>
                   <td style={{ textAlign: 'center' }}><Oui val={c.obligatoire} /></td>

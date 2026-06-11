@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ScanLine, PackageCheck, AlertTriangle, Boxes, Truck, Printer, ArrowLeft, Send, Save, X } from 'lucide-react'
+import { ScanLine, PackageCheck, AlertTriangle, Boxes, Truck, Printer, ArrowLeft, Send, Save, X, Trash2 } from 'lucide-react'
 import { get, post } from '../api/client'
 import Tabs from '../components/Tabs'
+import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
 
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
@@ -60,7 +61,7 @@ interface ScanResult {
   statut: string
 }
 
-function EmballageTab() {
+function EmballageTab({ active }: { active: boolean }) {
   const siteId = getSiteId()
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -70,7 +71,7 @@ function EmballageTab() {
   const [erreur, setErreur] = useState<string | null>(null)
   const [dernier, setDernier] = useState<ScanResult | null>(null)
 
-  useEffect(() => { reload() }, [siteId])
+  useEffect(() => { if (active) reload() }, [siteId, active])
   useEffect(() => { inputRef.current?.focus() }, [chargement])
 
   async function reload() {
@@ -284,6 +285,18 @@ interface MasterBoxDetail {
   groupes: GroupeMasterBox[]
 }
 
+interface ChampExport {
+  id: number
+  code: string
+  label: string
+}
+
+interface ArticleExport {
+  id: number
+  statut: { label: string } | null
+  valeurs: { champId: number; valeur: string | null }[]
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
@@ -413,29 +426,6 @@ function MasterBoxImpression({ detail, onFermer }: { detail: MasterBoxDetail; on
         <div className="no-print" style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
           Master Box {detail.numero} — généré le {formatDate(detail.createdAt)}
           {detail.zone && ` — zone ${detail.zone}`}
-        </div>
-
-        {/* Liste des terminaux prêts à expédier */}
-        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#f1f5f9', marginBottom: '12px' }}>
-          Liste des terminaux — {detail.numero}{detail.clientValeur && ` (${detail.clientValeur})`}
-        </h2>
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr><th>#</th><th>S/N</th><th>P/N</th><th>RMA</th><th>Désignation</th></tr>
-            </thead>
-            <tbody>
-              {detail.articles.map((a, i) => (
-                <tr key={a.inventaireId}>
-                  <td>{i + 1}</td>
-                  <td style={{ fontFamily: 'monospace' }}>{a.sn || '—'}</td>
-                  <td>{a.pnValeur || '—'}</td>
-                  <td>{a.rmaValeur || '—'}</td>
-                  <td>{a.designationValeur || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -639,14 +629,26 @@ function EnvoiTab() {
   const [mbDetail, setMbDetail] = useState<MasterBoxDetail | null>(null)
   const [detail, setDetail] = useState<MasterBoxDetail | null>(null)
   const [confirmEnvoi, setConfirmEnvoi] = useState<ClientEnCours | null>(null)
+  const [bonEnvoi, setBonEnvoi] = useState('')
+  const [confirmRetrait, setConfirmRetrait] = useState<{ inventaireId: number; sn: string; masterBoxId: number } | null>(null)
+  const [retraitEnCours, setRetraitEnCours] = useState(false)
+  const [exportData, setExportData] = useState<{ champs: ChampExport[]; articles: ArticleExport[] } | null>(null)
 
   useEffect(() => { reload() }, [siteId])
+
+  useEffect(() => {
+    if (!modalClient) { setExportData(null); return }
+    get<{ champs: ChampExport[]; articles: ArticleExport[] }>(`/expeditions/${siteId}/masterbox/enregistrees-articles?clientValeur=${encodeURIComponent(modalClient)}`)
+      .then(setExportData)
+      .catch(() => setExportData(null))
+  }, [modalClient, siteId])
 
   async function reload() {
     setChargement(true)
     try {
       const data = await get<ClientEnCours[]>(`/expeditions/${siteId}/masterbox/enregistrees`)
       setEnCours(data)
+      return data
     } finally {
       setChargement(false)
     }
@@ -658,15 +660,41 @@ function EnvoiTab() {
     setSucces(null)
     try {
       const clientValeur = client.clientValeur === 'Sans client' ? null : client.clientValeur
-      const res = await post<{ ok: boolean; nbBoxes: number; nbArticles: number }>(`/expeditions/${siteId}/masterbox/envoyer`, { clientValeur })
+      const res = await post<{ ok: boolean; nbBoxes: number; nbArticles: number }>(`/expeditions/${siteId}/masterbox/envoyer`, { clientValeur, bonEnvoi: bonEnvoi.trim() || undefined })
       setSucces(`${res.nbArticles} article(s) expédié(s) dans ${res.nbBoxes} Master Box pour ${client.clientValeur}`)
       setConfirmEnvoi(null)
+      setBonEnvoi('')
       fermerModalClient()
       await reload()
     } catch (e: any) {
       setErreur(e.message || 'Erreur lors de l\'envoi')
     } finally {
       setEnvoiEnCours(null)
+    }
+  }
+
+  async function retirer() {
+    if (!confirmRetrait) return
+    setRetraitEnCours(true)
+    setErreur(null)
+    try {
+      const res = await post<{ ok: boolean; masterBoxSupprimee: boolean }>(`/expeditions/${siteId}/masterbox/retirer`, { inventaireId: confirmRetrait.inventaireId })
+      const data = await reload()
+      if (res.masterBoxSupprimee) {
+        setMbDetailId(null)
+        setMbDetail(null)
+      } else {
+        const d = await get<MasterBoxDetail>(`/expeditions/${siteId}/masterbox/${confirmRetrait.masterBoxId}`)
+        setMbDetail(d)
+      }
+      if (modalClient && data && !data.some(c => c.clientValeur === modalClient)) {
+        fermerModalClient()
+      }
+      setConfirmRetrait(null)
+    } catch (e: any) {
+      setErreur(e.message || 'Erreur lors du retrait')
+    } finally {
+      setRetraitEnCours(false)
     }
   }
 
@@ -774,9 +802,20 @@ function EnvoiTab() {
               <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
                 Master Box prêtes à expédier — {clientModal.clientValeur}
               </h3>
-              <button className="btn btn-secondary btn-icon" onClick={fermerModalClient}>
-                <X size={15} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {exportData && exportData.articles.length > 0 && (
+                  <ExportExcelButton
+                    columns={[{ key: 'statut', label: 'Statut' }, ...exportData.champs.map(c => ({ key: String(c.id), label: c.label }))] as ExportColumn[]}
+                    rows={exportData.articles}
+                    getValue={(row: ArticleExport, key: string) => key === 'statut' ? (row.statut?.label ?? '') : (row.valeurs.find(v => v.champId === Number(key))?.valeur ?? '')}
+                    filename={`expedition_${clientModal.clientValeur}_${new Date().toISOString().slice(0, 10)}.xlsx`}
+                    sheetName="Expédition"
+                  />
+                )}
+                <button className="btn btn-secondary btn-icon" onClick={fermerModalClient}>
+                  <X size={15} />
+                </button>
+              </div>
             </div>
 
             <div className="table-container" style={{ marginBottom: '16px' }}>
@@ -813,7 +852,7 @@ function EnvoiTab() {
                 <div className="table-container">
                   <table className="table">
                     <thead>
-                      <tr><th>#</th><th>S/N</th><th>P/N</th><th>RMA</th><th>Désignation</th></tr>
+                      <tr><th>#</th><th>S/N</th><th>P/N</th><th>RMA</th><th>Désignation</th><th></th></tr>
                     </thead>
                     <tbody>
                       {mbDetail.articles.map((a, i) => (
@@ -823,6 +862,15 @@ function EnvoiTab() {
                           <td>{a.pnValeur || '—'}</td>
                           <td>{a.rmaValeur || '—'}</td>
                           <td>{a.designationValeur || '—'}</td>
+                          <td>
+                            <button
+                              className="btn btn-secondary btn-icon"
+                              title="Retirer de la Master Box"
+                              onClick={() => setConfirmRetrait({ inventaireId: a.inventaireId, sn: a.sn || '—', masterBoxId: mbDetail.id })}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -845,7 +893,7 @@ function EnvoiTab() {
 
       {/* Modal de confirmation d'envoi */}
       {confirmEnvoi && (
-        <div className="modal-overlay" onClick={() => setConfirmEnvoi(null)}>
+        <div className="modal-overlay" onClick={() => { setConfirmEnvoi(null); setBonEnvoi('') }}>
           <div
             style={{ background: '#1a1d27', borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '100%', border: '1px solid #2d3748' }}
             onClick={e => e.stopPropagation()}
@@ -853,11 +901,20 @@ function EnvoiTab() {
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: '0 0 12px' }}>
               Confirmer l'expédition
             </h3>
-            <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '20px' }}>
+            <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '16px' }}>
               Confirmer l'expédition de <strong>{confirmEnvoi.totalQuantite} article(s)</strong> pour <strong>{confirmEnvoi.clientValeur}</strong> ?
             </p>
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label className="form-label">Bon d'envoi (n° de transport)</label>
+              <input
+                className="form-input"
+                value={bonEnvoi}
+                onChange={e => setBonEnvoi(e.target.value)}
+                placeholder="Ex: BT-123456"
+              />
+            </div>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => setConfirmEnvoi(null)}>
+              <button className="btn btn-secondary" onClick={() => { setConfirmEnvoi(null); setBonEnvoi('') }}>
                 Annuler
               </button>
               <button
@@ -872,6 +929,37 @@ function EnvoiTab() {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmation de retrait d'un article */}
+      {confirmRetrait && (
+        <div className="modal-overlay" onClick={() => setConfirmRetrait(null)}>
+          <div
+            style={{ background: '#1a1d27', borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '100%', border: '1px solid #2d3748' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: '0 0 12px' }}>
+              Retirer cet article ?
+            </h3>
+            <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '20px' }}>
+              Le S/N <strong style={{ fontFamily: 'monospace' }}>{confirmRetrait.sn}</strong> sera retiré de la Master Box et redeviendra disponible pour un nouvel emballage.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setConfirmRetrait(null)}>
+                Annuler
+              </button>
+              <button
+                className="btn btn-danger"
+                style={{ background: '#dc2626', color: 'white', borderColor: '#dc2626' }}
+                disabled={retraitEnCours}
+                onClick={retirer}
+              >
+                <Trash2 size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                Retirer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -879,6 +967,8 @@ function EnvoiTab() {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Expeditions() {
+  const [active, setActive] = useState('emballage')
+
   return (
     <div>
       <div className="page-header">
@@ -889,8 +979,10 @@ export default function Expeditions() {
       </div>
 
       <Tabs
+        active={active}
+        onChange={setActive}
         tabs={[
-          { key: 'emballage', label: 'Emballage', content: <EmballageTab /> },
+          { key: 'emballage', label: 'Emballage', content: <EmballageTab active={active === 'emballage'} /> },
           { key: 'masterbox', label: 'Master Box', content: <MasterBoxTab /> },
           { key: 'envoi', label: 'Envoi', content: <EnvoiTab /> },
         ]}
