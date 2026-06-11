@@ -1,3 +1,9 @@
+export function getSiteId(): number {
+  const raw = localStorage.getItem('utilisateur')
+  if (!raw) return 1
+  return JSON.parse(raw)?.site?.id ?? 1
+}
+
 export function getPermissions() {
   const utilisateur = JSON.parse(localStorage.getItem('utilisateur') || 'null')
   const isAdmin = utilisateur?.role?.code === 'ADMIN'

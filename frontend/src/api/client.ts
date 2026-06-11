@@ -11,6 +11,7 @@ function getHeaders(): HeadersInit {
 function handleResponse(res: Response): void {
   if (res.status === 401) {
     localStorage.removeItem('token')
+    localStorage.removeItem('utilisateur')
     window.location.href = '/login'
   }
 }

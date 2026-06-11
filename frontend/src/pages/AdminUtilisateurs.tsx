@@ -1,13 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X, RefreshCw, Copy } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
-import { getPermissions } from '../utils/permissions'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getPermissions, getSiteId } from '../utils/permissions'
 
 interface Role { id: number; code: string; label: string }
 interface Utilisateur { id: number; nom: string; prenom: string; login: string; actif: boolean; doitChangerMdp: boolean; role: Role }

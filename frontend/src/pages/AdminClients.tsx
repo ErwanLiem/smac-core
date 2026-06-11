@@ -1,10 +1,5 @@
 import BaseAdmin from '../components/BaseAdmin'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getSiteId } from '../utils/permissions'
 
 export default function AdminClients({ embedded }: { embedded?: boolean } = {}) {
   return (

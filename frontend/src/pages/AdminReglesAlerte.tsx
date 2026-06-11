@@ -1,13 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Plus, Pencil, Check, X, AlertTriangle } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
-import { getPermissions } from '../utils/permissions'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getPermissions, getSiteId } from '../utils/permissions'
 
 interface ChampInv {
   id: number

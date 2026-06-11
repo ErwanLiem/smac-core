@@ -53,6 +53,21 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   const [modal, setModal] = useState<{ id: number } | null>(null)
   const [editItem, setEditItem] = useState<{ id: number; valeurs: Record<number, string> } | null>(null)
 
+  useEffect(() => {
+    if (!showForm) return
+    const today = new Date().toISOString().split('T')[0]
+    const champsDateToday = champs.filter(c => c.type === 'DATE_TODAY')
+    if (champsDateToday.length === 0) return
+    setFormValeurs(f => {
+      const next = { ...f }
+      let modifie = false
+      for (const c of champsDateToday) {
+        if (!next[c.id]) { next[c.id] = today; modifie = true }
+      }
+      return modifie ? next : f
+    })
+  }, [showForm, champs])
+
   const hasActiveFiltres = Object.values(filtres).some(v => v.trim() !== '')
 
   const filteredItems = items.filter(item => {
@@ -265,10 +280,6 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
               {champs.map(c => {
                 const opts = c.options ? (() => { try { return JSON.parse(c.options) } catch { return [] } })() : []
                 const today = new Date().toISOString().split('T')[0]
-                // Auto-remplir DATE_TODAY si pas encore de valeur
-                if (c.type === 'DATE_TODAY' && !formValeurs[c.id]) {
-                  setTimeout(() => setFormValeurs(f => f[c.id] ? f : ({ ...f, [c.id]: today })), 0)
-                }
                 return (
                 <div className="form-group" key={c.id}>
                   <label className="form-label">

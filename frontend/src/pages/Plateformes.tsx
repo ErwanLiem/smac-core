@@ -1,10 +1,5 @@
 import BaseList from '../components/BaseList'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getSiteId } from '../utils/permissions'
 
 export default function Plateformes() {
   return <BaseList titre="Plateformes" sousTitre="Base plateformes" baseUrl="/plateformes" siteId={getSiteId()} pagePath="/plateformes" />

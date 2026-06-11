@@ -6,6 +6,30 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [0.9.0] - 2026-06-11
+
+### Ajouté
+- **Planning de production — quota du samedi configurable** :
+  - Réglage par défaut "Activer le quota de production le samedi par défaut" (Configuration > Production > Techniciens & quotas), désactivé par défaut. Lorsqu'il est désactivé, la capacité de chaque samedi est de 0 dans le planning quels que soient les quotas individuels des techniciens.
+  - Bouton "Actif / Inactif" sur la colonne du samedi dans le Planning : permet d'activer (ou de désactiver) ponctuellement la capacité d'un samedi en particulier, sans changer le réglage par défaut des autres samedis.
+- **Suivi PDA / Suivi PDA Labo — édition de l'emplacement** : la colonne "Code Stock Location" est désormais éditable directement dans le tableau ; la valeur saisie est enregistrée dans le champ inventaire `EMPLACEMENT` (Suivi PDA) ou `EMPLACEMENT LABO` (Suivi PDA Labo) de la ligne d'inventaire correspondante. La saisie doit être validée explicitement (touche Entrée ou bouton ✓ qui apparaît dès que la valeur est modifiée) ; un clic en dehors du champ (ou Échap) annule la modification sans l'enregistrer, pour éviter toute erreur de saisie accidentelle.
+
+### Corrigé (audit léger du code)
+- **Spinners infinis** : sur Tableau de bord, Suivi PDA et Suivi PDA Labo, une erreur réseau/API pendant le chargement laissait la page bloquée sur le spinner ; le chargement se termine désormais toujours (succès ou erreur).
+- **Suivi articles** : le message "Aucun article" tenait compte de tous les articles au lieu des seuls articles ayant un statut suivi.
+- **Inventaire** : suppression d'un bouton/modal "Ajouter" non fonctionnel (code mort), et d'une fonction de scan inutilisée sur la page de détail des Attendus.
+- **Listes génériques (Catalogue)** : le pré-remplissage des champs "Date du jour" dans le formulaire d'ajout ne se fait plus pendant le rendu (source d'avertissements React) mais via un effet dédié.
+- **Déconnexion automatique (session expirée)** : les informations de l'utilisateur stocké localement sont désormais effacées en plus du token, pour éviter un état incohérent après redirection vers la connexion.
+- **Réception de quantité** : une quantité non numérique envoyée à l'API est désormais rejetée (erreur 400) au lieu de corrompre le stock.
+- **Mise à jour d'une ligne d'inventaire** : si la requête ne transmet pas la liste des valeurs de champs, les valeurs existantes ne sont plus effacées par erreur.
+- **Demande de transfert (quantité)** : la ligne de stock source utilisée pour décrémenter le stock magasin est désormais choisie de manière déterministe (la plus ancienne), au lieu d'un choix arbitraire de la base de données.
+
+### Technique
+- Factorisation de `getSiteId()` (lecture du site de l'utilisateur connecté) dans `utils/permissions.ts`, remplaçant 24 copies locales identiques.
+- Factorisation des sons d'alerte/succès (`jouerSonAlerte`, `jouerSonSucces`) dans `utils/sons.ts`, remplaçant les copies de Réception, Expéditions et Attendus.
+
+---
+
 ## [0.8.0] - 2026-06-11
 
 ### Ajouté

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2, Pencil, Check, X, Plus } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
-import { getPermissions } from '../utils/permissions'
+import { getPermissions, getSiteId } from '../utils/permissions'
 
 function parseOptions(raw: string | null | undefined): string[] {
   if (!raw) return []
@@ -52,12 +52,6 @@ function OptionsEditor({ value, onChange }: { value: string; onChange: (v: strin
       </div>
     </div>
   )
-}
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
 }
 
 type ChampType = 'TEXT' | 'NUMBER' | 'DATE' | 'DATE_TODAY' | 'SELECT'

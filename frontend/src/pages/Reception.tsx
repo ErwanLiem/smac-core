@@ -2,14 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { CheckCircle, Plus, Trash2, X } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get } from '../api/client'
+import { getSiteId } from '../utils/permissions'
+import { jouerSonAlerte } from '../utils/sons'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
-
 function normalize(str: string): string {
   return str.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
 }
@@ -23,21 +19,6 @@ function findChampId(champs: Champ[], codes: string[]): number | null {
   const norm = codes.map(normalize)
   const c = champs.find(ch => norm.includes(normalize(ch.code)))
   return c ? c.id : null
-}
-
-function jouerSonAlerte() {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain); gain.connect(ctx.destination)
-    osc.type = 'square'
-    osc.frequency.setValueAtTime(880, ctx.currentTime)
-    osc.frequency.setValueAtTime(440, ctx.currentTime + 0.1)
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4)
-  } catch {}
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────

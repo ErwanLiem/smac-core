@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, X, Truck, Hash, History } from 'lucide-react'
 import { get, put } from '../api/client'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getSiteId } from '../utils/permissions'
 
 interface Config { labelPN: string; labelRMA: string; champsAffichageQTE: string[] }
 interface ChampArticle { id: number; code: string; label: string }

@@ -2,12 +2,7 @@ import { useEffect, useState } from 'react'
 import { articlesApi } from '../api/articles'
 import { workflowApi } from '../api/workflow'
 import type { Article, Transition } from '../types'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getSiteId } from '../utils/permissions'
 
 export default function Suivi() {
   const siteId = getSiteId()
@@ -115,7 +110,7 @@ export default function Suivi() {
                 </td>
               </tr>
             ))}
-            {articles.length === 0 && (
+            {articlesAvecStatut.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
                   Aucun article

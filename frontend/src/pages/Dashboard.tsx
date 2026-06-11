@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react'
 import { get } from '../api/client'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getSiteId } from '../utils/permissions'
 
 function dateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -94,18 +89,21 @@ export default function Dashboard() {
 
   async function reload() {
     setChargement(true)
-    const lundi = getLundi(new Date())
-    const debut = dateStr(lundi)
-    const fin = dateStr(addDays(lundi, 5))
-    const [s, cap, dem] = await Promise.all([
-      get<Stats>(`/dashboard/${siteId}/stats`),
-      get<Record<string, CapaciteJour>>(`/production/capacite/${siteId}?debut=${debut}&fin=${fin}`),
-      get<Demande[]>(`/production/demandes/${siteId}`)
-    ])
-    setStats(s)
-    setCapacite(cap)
-    setDemandes(dem)
-    setChargement(false)
+    try {
+      const lundi = getLundi(new Date())
+      const debut = dateStr(lundi)
+      const fin = dateStr(addDays(lundi, 5))
+      const [s, cap, dem] = await Promise.all([
+        get<Stats>(`/dashboard/${siteId}/stats`),
+        get<Record<string, CapaciteJour>>(`/production/capacite/${siteId}?debut=${debut}&fin=${fin}`),
+        get<Demande[]>(`/production/demandes/${siteId}`)
+      ])
+      setStats(s)
+      setCapacite(cap)
+      setDemandes(dem)
+    } finally {
+      setChargement(false)
+    }
   }
 
   if (chargement || !stats) {

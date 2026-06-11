@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { CheckCircle, XCircle, AlertTriangle, Lock, Copy } from 'lucide-react'
 import { attendusApi } from '../api/attendus'
 import { get } from '../api/client'
+import { getSiteId } from '../utils/permissions'
+import { jouerSonAlerte } from '../utils/sons'
 
 interface Ligne {
   id: number
@@ -41,12 +43,6 @@ interface Rapport {
 interface ArticleAccessoire {
   id: number
   label: string
-}
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
 }
 
 const CODES_NOM       = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
@@ -171,51 +167,6 @@ export default function AttendusDetail() {
       groups[l.pn].push(l)
     }
     return groups
-  }
-
-  async function handleScan(e: React.FormEvent) {
-    e.preventDefault()
-    if (!snSaisie.trim() || !pnActif) return
-    try {
-      const result = await attendusApi.scanner(Number(id), snSaisie.trim())
-      // On passe le PN actif et les accessoires
-      await fetch(`/api/attendus/${id}/scanner`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          sn: snSaisie.trim(),
-          pn: pnActif,
-          accessoires: accessoiresCochés.map(aid => articlesAccessoires.find(a => a.id === aid)?.label).filter(Boolean)
-        })
-      })
-      setDernierScan(result)
-      setSnSaisie('')
-            reload()
-    } catch {
-      setDernierScan({ resultat: 'ERREUR' })
-    }
-    snInputRef.current?.focus()
-  }
-
-  // Scan direct via l'API correcte
-  function jouerSonAlerte() {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const oscillator = ctx.createOscillator()
-      const gain = ctx.createGain()
-      oscillator.connect(gain)
-      gain.connect(ctx.destination)
-      oscillator.type = 'square'
-      oscillator.frequency.setValueAtTime(880, ctx.currentTime)
-      oscillator.frequency.setValueAtTime(440, ctx.currentTime + 0.1)
-      gain.gain.setValueAtTime(0.3, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-      oscillator.start(ctx.currentTime)
-      oscillator.stop(ctx.currentTime + 0.4)
-    } catch {}
   }
 
   async function scannerSN(e: React.FormEvent) {

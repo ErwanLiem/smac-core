@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Trash2, Plus, Pencil, X, History } from 'lucide-react'
+import { Trash2, Pencil, X, History } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get, del } from '../api/client'
-import { getPermissions } from '../utils/permissions'
+import { getPermissions, getSiteId } from '../utils/permissions'
 import ColonnesToggle from '../components/ColonnesToggle'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
 
@@ -21,12 +21,6 @@ interface HistoriqueEntry {
   createdAt: string
   details: Record<string, any> | null
   operateur: { id: number; login: string; nom: string; prenom: string } | null
-}
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
 }
 
 interface Champ {
@@ -84,10 +78,6 @@ export default function Inventaire() {
   const [inventaires, setInventaires] = useState<Inventaire[]>([])
   const [filtres, setFiltres] = useState<Record<string, string>>({})
   const dragColonne = useRef<number | null>(null)
-  const [showForm, setShowForm] = useState(false)
-  const [formArticleId, setFormArticleId] = useState<number>(0)
-  const [formStatutId, setFormStatutId] = useState<number>(0)
-  const [formValeurs, setFormValeurs] = useState<Record<number, string>>({})
   const [modal, setModal] = useState<{ id: number } | null>(null)
   const [modalMasse, setModalMasse] = useState(false)
   const [selection, setSelection] = useState<Set<number>>(new Set())
@@ -262,21 +252,6 @@ export default function Inventaire() {
     setFiltres({})
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    const valeurs = Object.entries(formValeurs).map(([champId, valeur]) => ({ champId: Number(champId), valeur }))
-    await inventaireApi.create(siteId, {
-      articleId: Number(formArticleId),
-      statutId: formStatutId || null,
-      valeurs
-    })
-    setFormArticleId(0)
-    setFormStatutId(0)
-    setFormValeurs({})
-    setShowForm(false)
-    reload()
-  }
-
   async function handleDelete(id: number) {
     await inventaireApi.delete(id)
     setModal(null)
@@ -343,11 +318,6 @@ export default function Inventaire() {
               filename={`inventaire_${new Date().toISOString().slice(0, 10)}.xlsx`}
               sheetName="Inventaire"
             />
-          )}
-          {false && (
-            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-              <Plus size={16} /> Ajouter
-            </button>
           )}
         </div>
       </div>
@@ -448,60 +418,6 @@ export default function Inventaire() {
               ))}
             </tbody>
           </table>
-          </div>
-        </div>
-      )}
-
-      {/* Modal ajout */}
-      {showForm && (
-        <div className="modal-overlay">
-          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Ajouter — Inventaire</h3>
-            <form onSubmit={handleCreate}>
-              <div className="form-group">
-                <label className="form-label">Article *</label>
-                <select required value={formArticleId} onChange={e => setFormArticleId(Number(e.target.value))} className="form-input">
-                  <option value={0}>— Choisir un article —</option>
-                  {articles.map(a => (
-                    <option key={a.id} value={a.id}>{getArticleLabel(a.id)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Statut initial</label>
-                <select value={formStatutId} onChange={e => setFormStatutId(Number(e.target.value))} className="form-input">
-                  <option value={0}>— Aucun statut —</option>
-                  {statuts.map(s => (
-                    <option key={s.id} value={s.id}>{s.label}</option>
-                  ))}
-                </select>
-              </div>
-              {champs.map(c => (
-                <div className="form-group" key={c.id}>
-                  <label className="form-label">
-                    {c.label}
-                    {c.obligatoire && <span style={{ color: '#dc2626', marginLeft: '4px' }}>*</span>}
-                  </label>
-                  {(c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
-                    <input type="date" required={c.obligatoire} className="form-input"
-                      value={formValeurs[c.id] ?? ''}
-                      onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))} />
-                  ) : c.type === 'NUMBER' ? (
-                    <input type="number" required={c.obligatoire} className="form-input"
-                      value={formValeurs[c.id] ?? ''}
-                      onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))} />
-                  ) : (
-                    <input type="text" required={c.obligatoire} className="form-input"
-                      value={formValeurs[c.id] ?? ''}
-                      onChange={e => setFormValeurs(f => ({ ...f, [c.id]: e.target.value }))} />
-                  )}
-                </div>
-              ))}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '24px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowForm(false); setFormValeurs({}); setFormArticleId(0); setFormStatutId(0) }}>Annuler</button>
-                <button type="submit" className="btn btn-primary">Enregistrer</button>
-              </div>
-            </form>
           </div>
         </div>
       )}

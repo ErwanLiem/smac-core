@@ -205,19 +205,19 @@ export async function update(req: Request, res: Response, next: any) {
     const { id } = req.params
     const { statutId, valeurs } = req.body
 
-    // Supprimer les anciennes valeurs
-    await prisma.valeurChampInventaire.deleteMany({
-      where: { inventaireId: Number(id) }
-    })
+    if (Array.isArray(valeurs)) {
+      // Supprimer les anciennes valeurs et recréer avec les nouvelles
+      await prisma.valeurChampInventaire.deleteMany({
+        where: { inventaireId: Number(id) }
+      })
+    }
 
     // Créer les nouvelles valeurs
     const inventaire = await prisma.inventaire.update({
       where: { id: Number(id) },
       data: {
         statutId: statutId ? Number(statutId) : null,
-        valeurs: {
-          create: valeurs
-        }
+        ...(Array.isArray(valeurs) ? { valeurs: { create: valeurs } } : {})
       },
       include: {
         article: true,
@@ -252,6 +252,10 @@ export async function receptionQte(req: Request, res: Response, next: any) {
     const { champId, quantite } = req.body
     const inventaireId = Number(id)
     const qte = Number(quantite)
+
+    if (isNaN(qte)) {
+      return res.status(400).json({ error: 'Quantité invalide' })
+    }
 
     const valeurActuelle = await prisma.valeurChampInventaire.findUnique({
       where: { inventaireId_champId: { inventaireId, champId: Number(champId) } }

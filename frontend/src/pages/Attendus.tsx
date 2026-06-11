@@ -3,12 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Upload, FileText, Lock, Clock, Trash2 } from 'lucide-react'
 import { attendusApi } from '../api/attendus'
 import { get } from '../api/client'
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
+import { getSiteId } from '../utils/permissions'
 
 interface Attendu {
   id: number; rma: string | null; bt: string | null; statut: string

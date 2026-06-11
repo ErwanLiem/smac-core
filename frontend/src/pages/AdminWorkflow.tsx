@@ -3,7 +3,7 @@ import { Trash2, Pencil, Check, X } from 'lucide-react'
 import Tabs from '../components/Tabs'
 import { workflowApi } from '../api/workflow'
 import type { Statut, Transition } from '../types'
-import { getPermissions } from '../utils/permissions'
+import { getPermissions, getSiteId } from '../utils/permissions'
 
 const COULEURS_PALETTE = [
   '#3b82f6', '#2563eb', '#1e40af', '#0369a1',
@@ -12,12 +12,6 @@ const COULEURS_PALETTE = [
   '#f97316', '#f59e0b', '#eab308',
   '#ec4899', '#a855f7', '#8b5cf6'
 ]
-
-function getSiteId(): number {
-  const raw = localStorage.getItem('utilisateur')
-  if (!raw) return 1
-  return JSON.parse(raw)?.site?.id ?? 1
-}
 
 // Badge sobre : fond coloré à 12% d'opacité + texte coloré
 function StatutBadge({ statut }: { statut: Statut }) {
