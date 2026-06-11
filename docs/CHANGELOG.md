@@ -23,6 +23,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - **Réception de quantité** : une quantité non numérique envoyée à l'API est désormais rejetée (erreur 400) au lieu de corrompre le stock.
 - **Mise à jour d'une ligne d'inventaire** : si la requête ne transmet pas la liste des valeurs de champs, les valeurs existantes ne sont plus effacées par erreur.
 - **Demande de transfert (quantité)** : la ligne de stock source utilisée pour décrémenter le stock magasin est désormais choisie de manière déterministe (la plus ancienne), au lieu d'un choix arbitraire de la base de données.
+- **Suppression d'un statut (Configuration > Workflow)** : la suppression était auparavant possible même si des inventaires utilisaient encore ce statut, ce qui supprimait silencieusement ces inventaires (suppression en cascade côté base de données). La suppression est désormais bloquée (erreur 400) tant que des inventaires référencent ce statut.
 
 ### Sécurité
 - **`/api/gestion` (utilisateurs, rôles) et `/api/sites`** : ces routes nécessitent désormais le rôle ADMIN (middleware `requireAdmin`), et plus seulement d'être connecté.
@@ -33,6 +34,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Factorisation des sons d'alerte/succès (`jouerSonAlerte`, `jouerSonSucces`) dans `utils/sons.ts`, remplaçant les copies de Réception, Expéditions et Attendus.
 - Ajout d'un wrapper `asyncHandler` (`backend/src/utils/asyncHandler.ts`) appliqué aux routes Articles, Clients, Plateformes et Sites : les erreurs levées par les contrôleurs async sont désormais transmises au middleware d'erreurs global (jusqu'ici, ces routes n'avaient pas de gestion d'erreur).
 - Remplacement de boucles `for...of` séquentielles par `Promise.all` lorsque les opérations sont indépendantes (mise à jour des valeurs de champs personnalisés d'un article/client/plateforme, recherche du RMA existant pour les doublons d'inventaire dans Attendus).
+- Factorisation Suivi PDA / Suivi PDA Labo : les fonctions communes (`normCode`, `getISOWeek`, `getSemainesDuMois`, `valeurPour`, résolution du mois ciblé, sélection des articles suivis en quantité) sont regroupées dans `backend/src/utils/pda.ts` ; côté frontend, la navigation mois précédent/suivant (`usePeriodeMensuelle`) et la cellule d'édition "Code Stock Location" (`EmplacementCell`) sont mutualisées entre `SuiviPDA.tsx` et `SuiviPDALabo.tsx`. Aucun changement de comportement.
 
 ---
 

@@ -3,7 +3,9 @@ import { ChevronLeft, ChevronRight, Package, Plus, Check } from 'lucide-react'
 import { get, post } from '../api/client'
 import { inventaireApi } from '../api/inventaire'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
+import EmplacementCell from '../components/EmplacementCell'
 import { getSiteId } from '../utils/permissions'
+import { usePeriodeMensuelle } from '../hooks/usePeriodeMensuelle'
 
 const CODES_DESIG = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE']
 const CODES_PN = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO']
@@ -45,14 +47,8 @@ interface SuiviPDALaboData {
   rows: LignePDALabo[]
 }
 
-const MOIS_COURANT = (() => {
-  const now = new Date()
-  return { annee: now.getFullYear(), mois: now.getMonth() + 1 }
-})()
-
 export default function SuiviPDALabo() {
   const siteId = getSiteId()
-  const [periode, setPeriode] = useState(MOIS_COURANT)
   const [data, setData] = useState<SuiviPDALaboData | null>(null)
   const [chargement, setChargement] = useState(true)
   const [articles, setArticles] = useState<Article[]>([])
@@ -62,6 +58,7 @@ export default function SuiviPDALabo() {
   const [erreurQTE, setErreurQTE] = useState('')
   const [emplacements, setEmplacements] = useState<Record<number, string>>({})
   const [emplacementsEnregistres, setEmplacementsEnregistres] = useState<Record<number, string>>({})
+  const { periode, moisPrecedent, moisSuivant, moisLabel, estMoisCourant } = usePeriodeMensuelle(data?.estMoisCourant)
 
   useEffect(() => { reload() }, [siteId, periode])
 
@@ -115,21 +112,6 @@ export default function SuiviPDALabo() {
       setErreurQTE(err.message ?? 'Erreur lors de la création')
     }
   }
-
-  function moisPrecedent() {
-    setPeriode(p => p.mois === 1 ? { annee: p.annee - 1, mois: 12 } : { annee: p.annee, mois: p.mois - 1 })
-  }
-
-  function moisSuivant() {
-    setPeriode(p => p.mois === 12 ? { annee: p.annee + 1, mois: 1 } : { annee: p.annee, mois: p.mois + 1 })
-  }
-
-  const moisLabel = (() => {
-    const label = new Date(periode.annee, periode.mois - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-    return label.charAt(0).toUpperCase() + label.slice(1)
-  })()
-
-  const estMoisCourant = data?.estMoisCourant ?? (periode.annee === MOIS_COURANT.annee && periode.mois === MOIS_COURANT.mois)
 
   // Colonnes proposées pour l'export Excel
   const colonnesExport: ExportColumn[] = [
@@ -228,38 +210,13 @@ export default function SuiviPDALabo() {
                       const valeur = emplacements[id] ?? ''
                       const modifie = valeur !== (emplacementsEnregistres[id] ?? '')
                       return (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <input
-                            type="text"
-                            className="form-input"
-                            style={{ minWidth: '90px', padding: '4px 6px' }}
-                            value={valeur}
-                            onChange={e => setEmplacements(f => ({ ...f, [id]: e.target.value }))}
-                            onKeyDown={async e => {
-                              if (e.key === 'Enter') {
-                                const target = e.target as HTMLInputElement
-                                await validerEmplacement(id)
-                                target.blur()
-                              } else if (e.key === 'Escape') {
-                                annulerEmplacement(id)
-                                ;(e.target as HTMLInputElement).blur()
-                              }
-                            }}
-                            onBlur={() => annulerEmplacement(id)}
-                          />
-                          {modifie && (
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-icon"
-                              title="Valider l'emplacement"
-                              onMouseDown={e => e.preventDefault()}
-                              onClick={() => validerEmplacement(id)}
-                              style={{ padding: '4px', flexShrink: 0 }}
-                            >
-                              <Check size={14} />
-                            </button>
-                          )}
-                        </div>
+                        <EmplacementCell
+                          valeur={valeur}
+                          modifie={modifie}
+                          onChange={v => setEmplacements(f => ({ ...f, [id]: v }))}
+                          onValider={() => validerEmplacement(id)}
+                          onAnnuler={() => annulerEmplacement(id)}
+                        />
                       )
                     })() : (row.location || '—')}
                   </td>

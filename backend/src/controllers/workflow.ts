@@ -44,7 +44,12 @@ export async function updateStatut(req: Request, res: Response) {
 }
 
 export async function deleteStatut(req: Request, res: Response) {
-  await prisma.statut.delete({ where: { id: Number(req.params.id) } })
+  const id = Number(req.params.id)
+  const nbInventaires = await prisma.inventaire.count({ where: { statutId: id } })
+  if (nbInventaires > 0) {
+    return res.status(400).json({ error: `Impossible de supprimer ce statut : ${nbInventaires} inventaire(s) l'utilisent encore.` })
+  }
+  await prisma.statut.delete({ where: { id } })
   res.status(204).send()
 }
 
