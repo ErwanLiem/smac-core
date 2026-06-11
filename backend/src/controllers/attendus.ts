@@ -479,7 +479,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
       const champsConfig: any[] = typeof configChampsCheck.champsAttendu === 'string' ? JSON.parse(configChampsCheck.champsAttendu) : (configChampsCheck.champsAttendu as any)
       let donnees: Record<string, string> = {}
       if (attendu.donneesCommunes) { try { donnees = JSON.parse(attendu.donneesCommunes) } catch {} }
-      const champsObligatoires = champsConfig.filter((c: any) => c.visible && c.obligatoire)
+      const champsObligatoires = champsConfig.filter((c: any) => c.visible && (c.obligatoire || c.obligatoireCloture))
       const manquants = champsObligatoires.filter((c: any) => !String(donnees[c.code] ?? '').trim())
       if (manquants.length > 0) {
         const champsInvLabels = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })

@@ -89,7 +89,7 @@ export default function AttendusDetail() {
   const [copie, setCopie] = useState(false)
   const [editInfos, setEditInfos] = useState(false)
   const [editDonnees, setEditDonnees] = useState<Record<string, string>>({})
-  const [configChamps, setConfigChamps] = useState<{ code: string; visible: boolean; obligatoire: boolean; visibleListe: boolean }[]>([])
+  const [configChamps, setConfigChamps] = useState<{ code: string; visible: boolean; obligatoire: boolean; visibleListe: boolean; obligatoireCloture?: boolean }[]>([])
   const [champsInv, setChampsInv] = useState<ChampInv[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [champsClients, setChampsClients] = useState<any[]>([])
@@ -295,11 +295,10 @@ export default function AttendusDetail() {
       setValiderOk(result)
       reload()
     } catch (e: any) {
-      try {
-        const parsed = JSON.parse(e.message)
-        setErreurCloture({ message: parsed.error, snsEnDoublon: parsed.snsEnDoublon || [], champsManquants: parsed.champsManquants })
+      if (e.data?.snsEnDoublon || e.data?.champsManquants) {
+        setErreurCloture({ message: e.data.error, snsEnDoublon: e.data.snsEnDoublon || [], champsManquants: e.data.champsManquants })
         setShowCloturer(false)
-      } catch {
+      } else {
         alert('Erreur : ' + e.message)
       }
     }
@@ -894,7 +893,11 @@ export default function AttendusDetail() {
                 const isPlateforme = CODES_PLATEFORME.includes(champ.code.toUpperCase())
                 return (
                   <div key={cc.code} className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">{champ.label}{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                    <label className="form-label">
+                      {champ.label}
+                      {cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}
+                      {!cc.obligatoire && cc.obligatoireCloture && <span style={{ color: '#f59e0b' }} title="Requis avant de pouvoir clôturer l'attendu"> * (requis pour clôture)</span>}
+                    </label>
                     {isClient ? (
                       <select className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))}>
                         <option value="">— Choisir un client —</option>

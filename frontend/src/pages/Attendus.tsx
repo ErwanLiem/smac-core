@@ -100,7 +100,7 @@ export default function Attendus() {
       setModalDelete(null)
       reload()
     } catch (e: any) {
-      try { alert(JSON.parse(e.message)?.error ?? 'Erreur') } catch { alert('Erreur') }
+      alert(e.data?.error ?? e.message ?? 'Erreur')
     }
   }
 
@@ -116,10 +116,7 @@ export default function Attendus() {
       reload()
       navigate(`/attendus/${result.id}`)
     } catch (e: any) {
-      try {
-        const parsed = JSON.parse(e.message)
-        setErreur(parsed?.error ?? 'Erreur import')
-      } catch { setErreur('Erreur import') }
+      setErreur(e.data?.error ?? e.message ?? 'Erreur import')
     } finally {
       setLoading(false)
     }

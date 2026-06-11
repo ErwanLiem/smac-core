@@ -320,7 +320,7 @@ export async function getDemandes(req: Request, res: Response, next: any) {
 export async function createDemandeSN(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { datePlanifiee, quantite, pnValeur, rmaValeur, clientValeur, caisseValeur } = req.body
+    const { datePlanifiee, quantite, pnValeur, rmaValeur, clientValeur, caisseValeur, force } = req.body
 
     const config = await prisma.configProduction.findUnique({ where: { siteId: Number(siteId) } })
     const champPNCode  = config?.champPNCode  ?? 'PN'
@@ -359,8 +359,9 @@ export async function createDemandeSN(req: Request, res: Response, next: any) {
     if (qteDemandee === 0) return res.status(400).json({ error: 'Aucun article disponible pour ce P/N × RMA' })
 
     let selectionnes: typeof matches = []
-    if (caisseValeur) {
-      // Caisse explicitement choisie : on prélève dans cette caisse
+    if (caisseValeur || force) {
+      // Caisse explicitement choisie, ou dispatch exceptionnel (force) :
+      // on prélève directement dans la sélection, quitte à scinder une caisse physique.
       selectionnes = matches.slice(0, qteDemandee)
     } else {
       // Pas de caisse choisie : ne jamais découper une caisse physique.

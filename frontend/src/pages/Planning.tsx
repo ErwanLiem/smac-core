@@ -66,7 +66,8 @@ interface Demande {
 function qteMaxSansDecoupe(carte: Carte, capaciteMax: number, caisseFiltre: string): number {
   if (caisseFiltre) {
     const c = carte.caisses.find(x => x.numero === caisseFiltre)
-    return Math.min(c?.quantite ?? carte.quantite, capaciteMax)
+    const qte = c?.quantite ?? carte.quantite
+    return qte <= capaciteMax ? qte : 0
   }
   if (carte.caisses.length === 0) return Math.min(carte.quantite, capaciteMax)
   const totalEnCaisses = carte.caisses.reduce((s, c) => s + c.quantite, 0)
@@ -78,6 +79,15 @@ function qteMaxSansDecoupe(carte: Carte, capaciteMax: number, caisseFiltre: stri
   }
   total += Math.min(Math.max(0, sansCaisse), restant)
   return total
+}
+
+/** Quantité totale disponible pour la caisse (ou la carte entière) sans tenir compte de la capacité ni de la règle de découpe. */
+function qteAbsolue(carte: Carte, caisseFiltre: string): number {
+  if (caisseFiltre) {
+    const c = carte.caisses.find(x => x.numero === caisseFiltre)
+    return c?.quantite ?? carte.quantite
+  }
+  return carte.quantite
 }
 
 function getDemandeCaisses(d: Demande): string[] {
@@ -106,6 +116,7 @@ export default function Planning() {
   const [modalDrop, setModalDrop] = useState<{ carte: Carte; jour: string } | null>(null)
   const [modalQte, setModalQte]   = useState(1)
   const [modalCaisseFiltre, setModalCaisseFiltre] = useState('')
+  const [modalException, setModalException] = useState(false)
   const [modalAbsence, setModalAbsence] = useState<{ jour: string; techId: number; nom: string; absenceId: number | null; quotaBase: number } | null>(null)
   const [absenceMotif, setAbsenceMotif] = useState('')
   const [modalPresences, setModalPresences] = useState<string | null>(null)
@@ -159,14 +170,10 @@ export default function Planning() {
     if (!dragCarte) return
     const cap = capacite[jour]?.capacite ?? 0
     const charge = getChargeJour(jour)
-    const restant = cap - charge
-    if (restant <= 0) {
-      setErreur(`Quota journalier atteint pour ce jour (capacité : ${cap}, déjà planifié : ${charge}). Impossible d'ajouter un transfert.`)
-      setDragCarte(null)
-      return
-    }
+    const restant = Math.max(0, cap - charge)
     setModalQte(qteMaxSansDecoupe(dragCarte, restant, ''))
     setModalCaisseFiltre('')
+    setModalException(false)
     setModalDrop({ carte: dragCarte, jour })
     setDragCarte(null)
     setErreur('')
@@ -178,7 +185,7 @@ export default function Planning() {
     const cap = capacite[modalDrop.jour]?.capacite ?? 0
     const charge = getChargeJour(modalDrop.jour)
     const restant = Math.max(0, cap - charge)
-    if (modalQte > restant) {
+    if (!modalException && modalQte > restant) {
       setErreur(`Quantité demandée (${modalQte}) dépasse la capacité restante ce jour (${restant}).`)
       return
     }
@@ -192,10 +199,12 @@ export default function Planning() {
         pnValeur: modalDrop.carte.pnValeur,
         rmaValeur: modalDrop.carte.rmaValeur,
         clientValeur: modalDrop.carte.clientValeur,
-        ...(modalCaisseFiltre ? { caisseValeur: modalCaisseFiltre } : {})
+        ...(modalCaisseFiltre ? { caisseValeur: modalCaisseFiltre } : {}),
+        ...(modalException ? { force: true } : {})
       })
       setModalDrop(null)
       setModalCaisseFiltre('')
+      setModalException(false)
       if (result?.quantite < result?.quantiteDemandee) {
         setInfo(`${result.quantite} article(s) planifié(s) sur ${result.quantiteDemandee} demandé(s) : une caisse ne peut pas être scindée, seules les caisses entièrement transférables ont été retenues.`)
       }
@@ -526,9 +535,9 @@ export default function Planning() {
       {/* ── Modal confirmation transfert ── */}
       {modalDrop && (() => {
         const restant = Math.max(0, (capacite[modalDrop.jour]?.capacite ?? 0) - getChargeJour(modalDrop.jour))
-        const maxQte = modalCaisseFiltre
-          ? (modalDrop.carte.caisses.find(c => c.numero === modalCaisseFiltre)?.quantite ?? modalDrop.carte.quantite)
-          : qteMaxSansDecoupe(modalDrop.carte, restant, '')
+        const maxQteNormal = qteMaxSansDecoupe(modalDrop.carte, restant, modalCaisseFiltre)
+        const maxQteAbsolu = qteAbsolue(modalDrop.carte, modalCaisseFiltre)
+        const maxQte = modalException ? maxQteAbsolu : maxQteNormal
         return (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '420px', width: '100%' }}>
@@ -548,14 +557,10 @@ export default function Planning() {
                   onChange={e => {
                     const num = e.target.value
                     setModalCaisseFiltre(num)
-                    if (num) {
-                      const c = modalDrop.carte.caisses.find(x => x.numero === num)
-                      if (c) {
-                        const cap = capacite[modalDrop.jour]?.capacite ?? 0
-                        const charge = getChargeJour(modalDrop.jour)
-                        setModalQte(Math.min(c.quantite, Math.max(0, cap - charge)))
-                      }
-                    }
+                    const cap = capacite[modalDrop.jour]?.capacite ?? 0
+                    const charge = getChargeJour(modalDrop.jour)
+                    const restantSel = Math.max(0, cap - charge)
+                    setModalQte(modalException ? qteAbsolue(modalDrop.carte, num) : qteMaxSansDecoupe(modalDrop.carte, restantSel, num))
                   }}>
                   <option value="">— Toutes les caisses —</option>
                   {modalDrop.carte.caisses.map(c => (
@@ -574,17 +579,40 @@ export default function Planning() {
                 required className="form-input"
                 value={modalQte}
                 onChange={e => setModalQte(Math.min(Math.max(1, maxQte), Math.max(1, Number(e.target.value))))} />
-              {!modalCaisseFiltre && modalDrop.carte.caisses.length > 0 && (
+              {!modalException && !modalCaisseFiltre && modalDrop.carte.caisses.length > 0 && (
                 <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
                   ℹ️ Une caisse physique ne peut pas être scindée : seules les caisses entièrement transférables sont prises en compte.
                 </p>
               )}
-              {maxQte === 0 && (
+              {!modalException && maxQte === 0 && (
                 <p style={{ fontSize: '12px', color: '#f87171', marginTop: '4px' }}>
-                  ⚠️ Aucune caisse complète ne tient dans la capacité restante ({restant}). Choisissez une caisse spécifique ou un autre jour.
+                  ⚠️ {modalCaisseFiltre
+                    ? `Cette caisse ne tient pas dans la capacité restante (${restant}) et ne peut pas être scindée. Choisissez une autre caisse ou un autre jour.`
+                    : `Aucune caisse complète ne tient dans la capacité restante (${restant}). Choisissez une caisse spécifique ou un autre jour.`}
                 </p>
               )}
             </div>
+            <div className="form-group" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: '#1f1709', border: '1px solid #92400e', borderRadius: '6px', padding: '10px 12px' }}>
+              <input
+                type="checkbox"
+                id="modalException"
+                checked={modalException}
+                onChange={e => {
+                  const checked = e.target.checked
+                  setModalException(checked)
+                  setModalQte(checked ? maxQteAbsolu : maxQteNormal)
+                }}
+                style={{ marginTop: '3px' }}
+              />
+              <label htmlFor="modalException" style={{ fontSize: '12px', color: '#fbbf24', cursor: 'pointer' }}>
+                Réception exceptionnelle : autoriser le découpage d'une caisse et/ou le dépassement de la capacité du jour pour ce dispatch.
+              </label>
+            </div>
+            {modalException && (
+              <p style={{ fontSize: '12px', color: '#f59e0b', marginTop: '4px', marginBottom: '12px' }}>
+                ⚠️ Le découpage de caisse et le dépassement de capacité sont autorisés pour ce transfert. Le jour apparaîtra en sur-capacité dans le planning.
+              </p>
+            )}
             {erreur && (
               <div style={{ background: '#1f0a0a', border: '1px solid #dc2626', borderRadius: '6px', padding: '8px 12px', color: '#ef4444', fontSize: '14px', marginBottom: '12px', display: 'flex', gap: '6px' }}>
                 <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} /> {erreur}

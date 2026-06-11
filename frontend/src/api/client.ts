@@ -15,18 +15,27 @@ function handleResponse(res: Response): void {
   }
 }
 
-async function parseErreur(res: Response): Promise<string> {
+/** Erreur API enrichie : `message` est le texte d'erreur, `data` contient le corps JSON complet de la réponse */
+export class ApiError extends Error {
+  data: any
+  constructor(message: string, data: any) {
+    super(message)
+    this.data = data
+  }
+}
+
+async function parseErreur(res: Response): Promise<ApiError> {
   try {
     const json = await res.json()
-    return json.error || json.message || `Erreur ${res.status}`
+    return new ApiError(json.error || json.message || `Erreur ${res.status}`, json)
   } catch {
-    return `Erreur ${res.status}`
+    return new ApiError(`Erreur ${res.status}`, null)
   }
 }
 
 export async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { headers: getHeaders() })
-  if (!res.ok) { handleResponse(res); throw new Error(await parseErreur(res)) }
+  if (!res.ok) { handleResponse(res); throw await parseErreur(res) }
   return res.json()
 }
 
@@ -36,7 +45,7 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
     headers: getHeaders(),
     body: JSON.stringify(body)
   })
-  if (!res.ok) { handleResponse(res); throw new Error(await parseErreur(res)) }
+  if (!res.ok) { handleResponse(res); throw await parseErreur(res) }
   return res.json()
 }
 
@@ -46,11 +55,11 @@ export async function put<T>(path: string, body: unknown): Promise<T> {
     headers: getHeaders(),
     body: JSON.stringify(body)
   })
-  if (!res.ok) { handleResponse(res); throw new Error(await parseErreur(res)) }
+  if (!res.ok) { handleResponse(res); throw await parseErreur(res) }
   return res.json()
 }
 
 export async function del(path: string): Promise<void> {
   const res = await fetch(`${BASE}${path}`, { method: 'DELETE', headers: getHeaders() })
-  if (!res.ok) { handleResponse(res); throw new Error(await parseErreur(res)) }
+  if (!res.ok) { handleResponse(res); throw await parseErreur(res) }
 }
