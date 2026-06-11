@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Check, X, Plus, Truck, Hash } from 'lucide-react'
-import { get, post, put } from '../api/client'
+import { Check, X, Truck, Hash, History } from 'lucide-react'
+import { get, put } from '../api/client'
 
 function getSiteId(): number {
   const raw = localStorage.getItem('utilisateur')
@@ -9,7 +9,6 @@ function getSiteId(): number {
 }
 
 interface Config { labelPN: string; labelRMA: string; champsAffichageQTE: string[] }
-interface Article { id: number; valeurs: any[] }
 interface ChampArticle { id: number; code: string; label: string }
 
 interface Demande {
@@ -26,24 +25,12 @@ interface Demande {
 
 const CODES_DESIG = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE']
 
-const CODES_PN = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO']
-
 function getArticleLabel(art: any): string {
   if (!art) return '—'
   const desig = art.valeurs?.find((v: any) =>
     CODES_DESIG.includes(v.champ?.code?.toUpperCase?.() ?? '')
   )?.valeur
   return desig || art.valeurs?.[0]?.valeur || `Article #${art.id}`
-}
-
-function getArticleOptionLabel(art: any): string {
-  if (!art) return '—'
-  const pn   = art.valeurs?.find((v: any) => CODES_PN.includes(v.champ?.code?.toUpperCase?.() ?? ''))?.valeur
-  const desig = art.valeurs?.find((v: any) => CODES_DESIG.includes(v.champ?.code?.toUpperCase?.() ?? ''))?.valeur
-  if (pn && desig) return `${pn} — ${desig}`
-  if (pn)   return pn
-  if (desig) return desig
-  return `Article #${art.id}`
 }
 
 function getValeurArticle(art: any, code: string): string {
@@ -80,27 +67,22 @@ export default function Logistique() {
   const [chargement, setChargement] = useState(true)
   const [config, setConfig]   = useState<Config>({ labelPN: 'P/N', labelRMA: 'RMA', champsAffichageQTE: [] })
   const [demandes, setDemandes] = useState<Demande[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
   const [champsArticle, setChampsArticle] = useState<ChampArticle[]>([])
   const [onglet, setOnglet]   = useState<'sn' | 'qte'>('sn')
-  const [showQTE, setShowQTE] = useState(false)
-  const [formQTE, setFormQTE] = useState({ articleId: 0, quantite: 1, datePlanifiee: new Date().toISOString().split('T')[0] })
   const [confirmAction, setConfirmAction] = useState<{ id: number; action: 'valider' | 'annuler' } | null>(null)
   const [succes, setSucces] = useState('')
-  const [erreurQTE, setErreurQTE] = useState('')
+  const [showHistorique, setShowHistorique] = useState(false)
 
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
-    const [cfg, d, arts, champs] = await Promise.all([
+    const [cfg, d, champs] = await Promise.all([
       get<Config>(`/production/config/${siteId}`),
       get<Demande[]>(`/production/demandes/${siteId}`),
-      get<Article[]>(`/production/articles-qte/${siteId}`),
       get<ChampArticle[]>(`/articles/${siteId}/champs`)
     ])
     setConfig(cfg)
     setDemandes(d)
-    setArticles(arts)
     setChampsArticle(champs)
     setChargement(false)
   }
@@ -111,19 +93,6 @@ export default function Logistique() {
     setSucces(action === 'valider' ? 'Transfert validé.' : 'Demande annulée.')
     setTimeout(() => setSucces(''), 2500)
     reload()
-  }
-
-  async function handleQTE(e: React.FormEvent) {
-    e.preventDefault()
-    setErreurQTE('')
-    try {
-      await post(`/production/demandes/${siteId}/qte`, formQTE)
-      setFormQTE({ articleId: 0, quantite: 1, datePlanifiee: new Date().toISOString().split('T')[0] })
-      setShowQTE(false)
-      reload()
-    } catch (err: any) {
-      setErreurQTE(err.message ?? 'Erreur lors de la création')
-    }
   }
 
   function getCaissesDemande(d: Demande): string[] {
@@ -151,7 +120,7 @@ export default function Logistique() {
     return <span style={{ fontSize: '11px', padding: '1px 8px', borderRadius: '4px', background: s.bg, color: s.color }}>{s.label}</span>
   }
 
-  function TableDemandes({ liste, historique }: { liste: Demande[]; historique: Demande[] }) {
+  function TableDemandes({ liste }: { liste: Demande[] }) {
     return (
       <div>
         {chargement ? (
@@ -208,43 +177,45 @@ export default function Logistique() {
             </table>
           </div>
         )}
+      </div>
+    )
+  }
 
-        {historique.length > 0 && (
-          <div style={{ marginTop: '20px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Historique</p>
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Détail</th>
-                    <th style={{ textAlign: 'center' }}>Qté</th>
-                    <th>Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historique.map(d => (
-                    <tr key={d.id} style={{ opacity: 0.7 }}>
-                      <td style={{ fontSize: '12px', color: '#6b7280' }}>{new Date(d.datePlanifiee).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</td>
-                      <td>
-                        {d.type === 'SN' ? (
-                          <div>
-                            {d.rmaValeur && <div style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>{d.rmaValeur}</div>}
-                            {d.pnValeur && <div style={{ fontSize: '11px', color: '#6b7280' }}>{config.labelPN} : {d.pnValeur}</div>}
-                          </div>
-                        ) : (
-                          <ArticleInfo article={d.article} champsAffichage={config.champsAffichageQTE} champsArticle={champsArticle} />
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>{d.quantite}</td>
-                      <td>{statutBadge(d.statut)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+  function TableHistorique({ historique }: { historique: Demande[] }) {
+    if (historique.length === 0) {
+      return <p style={{ textAlign: 'center', color: '#6b7280', padding: '24px' }}>Aucun historique</p>
+    }
+    return (
+      <div className="card" style={{ padding: 0, overflow: 'hidden', margin: 0 }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Détail</th>
+              <th style={{ textAlign: 'center' }}>Qté</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {historique.map(d => (
+              <tr key={d.id} style={{ opacity: 0.7 }}>
+                <td style={{ fontSize: '12px', color: '#6b7280' }}>{new Date(d.datePlanifiee).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}</td>
+                <td>
+                  {d.type === 'SN' ? (
+                    <div>
+                      {d.rmaValeur && <div style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1' }}>{d.rmaValeur}</div>}
+                      {d.pnValeur && <div style={{ fontSize: '11px', color: '#6b7280' }}>{config.labelPN} : {d.pnValeur}</div>}
+                    </div>
+                  ) : (
+                    <ArticleInfo article={d.article} champsAffichage={config.champsAffichageQTE} champsArticle={champsArticle} />
+                  )}
+                </td>
+                <td style={{ textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>{d.quantite}</td>
+                <td>{statutBadge(d.statut)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     )
   }
@@ -253,14 +224,9 @@ export default function Logistique() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Attente transfert</h1>
+          <h1 className="page-title">Transfert</h1>
           <p className="page-subtitle">Demandes de transfert vers la production</p>
         </div>
-        {onglet === 'qte' && (
-          <button className="btn btn-primary" onClick={() => setShowQTE(true)}>
-            <Plus size={15} /> Nouvelle demande QTE
-          </button>
-        )}
       </div>
 
       {succes && (
@@ -270,55 +236,44 @@ export default function Logistique() {
       )}
 
       {/* Onglets */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '1px solid #1f2937' }}>
-        {([
-          { key: 'sn',  label: 'Transfert SN',       count: snAttente.length,  icon: <Truck size={14} /> },
-          { key: 'qte', label: 'Transfert quantité',  count: qteAttente.length, icon: <Hash size={14} /> },
-        ] as const).map(t => (
-          <button key={t.key} onClick={() => setOnglet(t.key)}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px', fontWeight: 500, border: 'none', cursor: 'pointer', borderBottom: onglet === t.key ? '2px solid #3b82f6' : '2px solid transparent', background: 'transparent', color: onglet === t.key ? '#60a5fa' : '#6b7280', marginBottom: '-1px' }}>
-            {t.icon} {t.label}
-            {t.count > 0 && <span style={{ background: onglet === t.key ? '#1e3a5f' : '#1f2937', color: onglet === t.key ? '#60a5fa' : '#9ca3af', fontSize: '11px', padding: '0 6px', borderRadius: '10px' }}>{t.count}</span>}
-          </button>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #1f2937' }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {([
+            { key: 'sn',  label: 'Transfert Production', count: snAttente.length,  icon: <Truck size={14} /> },
+            { key: 'qte', label: 'Transfert PDA',         count: qteAttente.length, icon: <Hash size={14} /> },
+          ] as const).map(t => (
+            <button key={t.key} onClick={() => setOnglet(t.key)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', fontSize: '13px', fontWeight: 500, border: 'none', cursor: 'pointer', borderBottom: onglet === t.key ? '2px solid #3b82f6' : '2px solid transparent', background: 'transparent', color: onglet === t.key ? '#60a5fa' : '#6b7280', marginBottom: '-1px' }}>
+              {t.icon} {t.label}
+              {t.count > 0 && <span style={{ background: onglet === t.key ? '#1e3a5f' : '#1f2937', color: onglet === t.key ? '#60a5fa' : '#9ca3af', fontSize: '11px', padding: '0 6px', borderRadius: '10px' }}>{t.count}</span>}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-secondary" style={{ marginBottom: '8px' }} onClick={() => setShowHistorique(true)}>
+          <History size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+          Historique
+        </button>
       </div>
 
-      {onglet === 'sn'  && <TableDemandes liste={snAttente}  historique={snHistorique} />}
-      {onglet === 'qte' && <TableDemandes liste={qteAttente} historique={qteHistorique} />}
+      {onglet === 'sn'  && <TableDemandes liste={snAttente} />}
+      {onglet === 'qte' && <TableDemandes liste={qteAttente} />}
 
-      {/* Modal demande QTE */}
-      {showQTE && (
-        <div className="modal-overlay">
-          <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '400px', width: '100%' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Demande de transfert quantité</h3>
-            <form onSubmit={handleQTE}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Article *</label>
-                  <select required className="form-input" value={formQTE.articleId} onChange={e => { setFormQTE(f => ({ ...f, articleId: Number(e.target.value) })); setErreurQTE('') }}>
-                    <option value={0}>— Choisir un article —</option>
-                    {articles.map(a => <option key={a.id} value={a.id}>{getArticleOptionLabel(a)}</option>)}
-                  </select>
-                </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Quantité *</label>
-                  <input type="number" min={1} required className="form-input" value={formQTE.quantite} onChange={e => { setFormQTE(f => ({ ...f, quantite: Number(e.target.value) })); setErreurQTE('') }} />
-                </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Date planifiée *</label>
-                  <input type="date" required className="form-input" value={formQTE.datePlanifiee} onChange={e => setFormQTE(f => ({ ...f, datePlanifiee: e.target.value }))} />
-                </div>
-              </div>
-              {erreurQTE && (
-                <div style={{ background: '#1f0a0a', border: '1px solid #dc2626', borderRadius: '6px', padding: '10px 14px', color: '#ef4444', fontSize: '13px', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  ⚠ {erreurQTE}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => { setShowQTE(false); setErreurQTE('') }}>Annuler</button>
-                <button type="submit" className="btn btn-primary"><Check size={14} /> Créer la demande</button>
-              </div>
-            </form>
+      {/* Modal historique */}
+      {showHistorique && (
+        <div className="modal-overlay" onClick={() => setShowHistorique(false)}>
+          <div
+            style={{ background: '#1a1d27', borderRadius: '12px', padding: '24px', maxWidth: '720px', width: '100%', maxHeight: '80vh', overflow: 'auto', border: '1px solid #2d3748' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+                Historique — {onglet === 'sn' ? 'Transfert Production' : 'Transfert PDA'}
+              </h3>
+              <button className="btn btn-secondary btn-icon" onClick={() => setShowHistorique(false)}>
+                <X size={15} />
+              </button>
+            </div>
+            <TableHistorique historique={onglet === 'sn' ? snHistorique : qteHistorique} />
           </div>
         </div>
       )}

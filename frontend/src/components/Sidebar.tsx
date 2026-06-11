@@ -68,7 +68,7 @@ export default function Sidebar() {
         { name: 'Attendus', path: '/attendus', icon: ClipboardList },
         { name: 'Réception', path: '/reception', icon: Package },
         { name: 'Inventaire', path: '/inventaire', icon: Warehouse },
-        { name: 'Attente transfert', path: '/logistique', icon: Truck },
+        { name: 'Transfert', path: '/logistique', icon: Truck },
         { name: 'Suivi PDA', path: '/suivi-pda', icon: Package },
         { name: 'Expéditions', path: '/expeditions', icon: PackageCheck },
       ],
