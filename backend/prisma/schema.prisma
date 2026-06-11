@@ -416,7 +416,7 @@ model masterBox {
   site         site             @relation(fields: [siteId], references: [id], map: "MasterBox_siteId_fkey")
   lignes       ligneMasterBox[]
 
-  @@unique([siteId, clientValeur, numero], map: "MasterBox_siteId_clientValeur_numero_key")
+  @@index([siteId, clientValeur, numero], map: "MasterBox_siteId_clientValeur_numero_idx")
   @@index([siteId], map: "MasterBox_siteId_fkey")
 }
 
