@@ -56,7 +56,7 @@ export async function getArticleById(req: Request, res: Response) {
     include: {
       statut: true,
       valeurs: { include: { champ: true } },
-      historiquestatut: { include: { statut: true }, orderBy: { createdAt: 'desc' } }
+      historiqueStatuts: { include: { statut: true }, orderBy: { createdAt: 'desc' } }
     }
   })
   if (!article) return res.status(404).json({ error: 'Article introuvable' })
@@ -115,7 +115,7 @@ export async function updateArticle(req: Request, res: Response) {
 export async function deleteArticle(req: Request, res: Response) {
   const id = Number(req.params.id)
   await prisma.valeurChamp.deleteMany({ where: { articleId: id } })
-  await prisma.historiquestatut.deleteMany({ where: { articleId: id } })
+  await prisma.historiqueStatut.deleteMany({ where: { articleId: id } })
   await prisma.article.delete({ where: { id } })
   res.json({ ok: true })
 }
@@ -140,7 +140,7 @@ export async function changerStatut(req: Request, res: Response) {
       data: { statutId: transition.statutToId },
       include: { statut: true, valeurs: { include: { champ: true } } }
     }),
-    prisma.historiquestatut.create({
+    prisma.historiqueStatut.create({
       data: { articleId: id, statutId: transition.statutToId, commentaire, userId }
     })
   ])

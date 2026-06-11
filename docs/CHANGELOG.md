@@ -35,6 +35,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 - Ajout d'un wrapper `asyncHandler` (`backend/src/utils/asyncHandler.ts`) appliqué aux routes Articles, Clients, Plateformes et Sites : les erreurs levées par les contrôleurs async sont désormais transmises au middleware d'erreurs global (jusqu'ici, ces routes n'avaient pas de gestion d'erreur).
 - Remplacement de boucles `for...of` séquentielles par `Promise.all` lorsque les opérations sont indépendantes (mise à jour des valeurs de champs personnalisés d'un article/client/plateforme, recherche du RMA existant pour les doublons d'inventaire dans Attendus).
 - Factorisation Suivi PDA / Suivi PDA Labo : les fonctions communes (`normCode`, `getISOWeek`, `getSemainesDuMois`, `valeurPour`, résolution du mois ciblé, sélection des articles suivis en quantité) sont regroupées dans `backend/src/utils/pda.ts` ; côté frontend, la navigation mois précédent/suivant (`usePeriodeMensuelle`) et la cellule d'édition "Code Stock Location" (`EmplacementCell`) sont mutualisées entre `SuiviPDA.tsx` et `SuiviPDALabo.tsx`. Aucun changement de comportement.
+- Renommage du modèle Prisma `historiquestatut` en `historiqueStatut` (convention camelCase, cohérente avec les autres modèles), via `@@map("HistoriqueStatut")` pour conserver la table existante. Aucune migration nécessaire, aucun changement de comportement.
 
 ---
 

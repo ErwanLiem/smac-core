@@ -15,7 +15,7 @@ model article {
   updatedAt        DateTime           @updatedAt
   site             site               @relation(fields: [siteId], references: [id], map: "Article_siteId_fkey")
   statut           statut?            @relation(fields: [statutId], references: [id], map: "Article_statutId_fkey")
-  historiquestatut  historiquestatut[]
+  historiqueStatuts historiqueStatut[]
   valeurs           valeurChamp[]
   inventaires       inventaire[]
   demandesTransfert demandeTransfert[]
@@ -267,7 +267,7 @@ model historiqueActivite {
   @@index([entite, entiteId], map: "HistoriqueActivite_entite_fkey")
 }
 
-model historiquestatut {
+model historiqueStatut {
   id          Int      @id @default(autoincrement())
   articleId   Int
   statutId    Int
@@ -279,6 +279,7 @@ model historiquestatut {
 
   @@index([articleId], map: "HistoriqueStatut_articleId_fkey")
   @@index([statutId], map: "HistoriqueStatut_statutId_fkey")
+  @@map("HistoriqueStatut")
 }
 
 model role {
@@ -491,7 +492,7 @@ model statut {
   roles                                      String             @default("[]") @db.Text
   article                                    article[]
   inventaire                                 inventaire[]
-  historiquestatut                           historiquestatut[]
+  historiqueStatuts                          historiqueStatut[]
   site                                       site               @relation(fields: [siteId], references: [id], map: "Statut_siteId_fkey")
   transitionsFrom transition[] @relation("transition_statutFromIdTostatut")
   transitionsTo   transition[] @relation("transition_statutToIdTostatut")
