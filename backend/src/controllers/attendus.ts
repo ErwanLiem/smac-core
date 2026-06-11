@@ -588,22 +588,25 @@ export async function rapport(req: Request, res: Response) {
   }) : []
 
   // Garder uniquement les doublons avec statut NON final
-  const doublonsInventaire: any[] = []
-  for (const val of valeursExistantes.filter(e => !(hasRole(e.inventaire?.statut?.roles, 'estFinal')))) {
-    const ligne = recusNonInjectes.find(l => l.sn === val.valeur)
-    if (!ligne) continue
-    let rmaExistant = null
-    if (champsRMA.length > 0) {
-      const valRMA = await prisma.valeurChampInventaire.findFirst({
-        where: { inventaireId: val.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
+  const doublonsInventaire = (await Promise.all(
+    valeursExistantes
+      .filter(e => !(hasRole(e.inventaire?.statut?.roles, 'estFinal')))
+      .map(async val => {
+        const ligne = recusNonInjectes.find(l => l.sn === val.valeur)
+        if (!ligne) return null
+        let rmaExistant = null
+        if (champsRMA.length > 0) {
+          const valRMA = await prisma.valeurChampInventaire.findFirst({
+            where: { inventaireId: val.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
+          })
+          rmaExistant = valRMA?.valeur ?? null
+        }
+        return {
+          ...ligne,
+          notes: rmaExistant ? `Déjà en inventaire — RMA : ${rmaExistant}` : 'Déjà en inventaire'
+        }
       })
-      rmaExistant = valRMA?.valeur ?? null
-    }
-    doublonsInventaire.push({
-      ...ligne,
-      notes: rmaExistant ? `Déjà en inventaire — RMA : ${rmaExistant}` : 'Déjà en inventaire'
-    })
-  }
+  )).filter((d): d is NonNullable<typeof d> => d !== null)
 
   // Fusionner avec les lignes DOUBLON_INVENTAIRE stockées
   const doublonsStockes = attendu.lignes.filter(l => l.statut === 'DOUBLON_INVENTAIRE')

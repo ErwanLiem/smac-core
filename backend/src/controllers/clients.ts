@@ -73,13 +73,13 @@ export async function updateClient(req: Request, res: Response) {
   const id = Number(req.params.id)
   const { valeurs } = req.body
   if (valeurs) {
-    for (const v of valeurs as { champId: number; valeur: string }[]) {
-      await prisma.valeurChampClient.upsert({
+    await Promise.all((valeurs as { champId: number; valeur: string }[]).map(v =>
+      prisma.valeurChampClient.upsert({
         where: { clientId_champId: { clientId: id, champId: v.champId } },
         update: { valeur: v.valeur },
         create: { clientId: id, champId: v.champId, valeur: v.valeur }
       })
-    }
+    ))
   }
   const client = await prisma.client.update({
     where: { id },

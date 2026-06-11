@@ -73,13 +73,13 @@ export async function updatePlateforme(req: Request, res: Response) {
   const id = Number(req.params.id)
   const { valeurs } = req.body
   if (valeurs) {
-    for (const v of valeurs as { champId: number; valeur: string }[]) {
-      await prisma.valeurChampPlateforme.upsert({
+    await Promise.all((valeurs as { champId: number; valeur: string }[]).map(v =>
+      prisma.valeurChampPlateforme.upsert({
         where: { plateformeId_champId: { plateformeId: id, champId: v.champId } },
         update: { valeur: v.valeur },
         create: { plateformeId: id, champId: v.champId, valeur: v.valeur }
       })
-    }
+    ))
   }
   const plateforme = await prisma.plateforme.update({
     where: { id },

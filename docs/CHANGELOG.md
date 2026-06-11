@@ -31,6 +31,8 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ### Technique
 - Factorisation de `getSiteId()` (lecture du site de l'utilisateur connecté) dans `utils/permissions.ts`, remplaçant 24 copies locales identiques.
 - Factorisation des sons d'alerte/succès (`jouerSonAlerte`, `jouerSonSucces`) dans `utils/sons.ts`, remplaçant les copies de Réception, Expéditions et Attendus.
+- Ajout d'un wrapper `asyncHandler` (`backend/src/utils/asyncHandler.ts`) appliqué aux routes Articles, Clients, Plateformes et Sites : les erreurs levées par les contrôleurs async sont désormais transmises au middleware d'erreurs global (jusqu'ici, ces routes n'avaient pas de gestion d'erreur).
+- Remplacement de boucles `for...of` séquentielles par `Promise.all` lorsque les opérations sont indépendantes (mise à jour des valeurs de champs personnalisés d'un article/client/plateforme, recherche du RMA existant pour les doublons d'inventaire dans Attendus).
 
 ---
 
