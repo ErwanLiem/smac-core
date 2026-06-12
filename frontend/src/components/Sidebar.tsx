@@ -43,7 +43,11 @@ export default function Sidebar() {
 
     refreshTransferts()
     window.addEventListener('transferts-en-attente:changed', refreshTransferts)
-    return () => window.removeEventListener('transferts-en-attente:changed', refreshTransferts)
+    const interval = setInterval(refreshTransferts, 15000)
+    return () => {
+      window.removeEventListener('transferts-en-attente:changed', refreshTransferts)
+      clearInterval(interval)
+    }
   }, [location.pathname])
 
   function handleLogout() {
@@ -133,7 +137,12 @@ export default function Sidebar() {
             <div key={section.title} className={`sidebar-section ${isExpanded ? '' : 'collapsed'} ${isSectionHighlighted ? 'has-active' : ''}`}>
               <button onClick={() => toggleSection(section.title)} className="sidebar-section-header" style={isSectionHighlighted ? { color: '#2563eb', fontWeight: 600 } : {}}>
                 <span>{section.title}</span>
-                <ChevronDown className="sidebar-section-icon" size={16} />
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {section.title === 'LOGISTIQUE' && transfertsEnAttente > 0 && (
+                    <span className="sidebar-link-badge">{transfertsEnAttente}</span>
+                  )}
+                  <ChevronDown className="sidebar-section-icon" size={16} />
+                </span>
               </button>
               <div className="sidebar-section-items">
                 {section.items.map((item) => {

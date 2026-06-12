@@ -210,6 +210,7 @@ export default function Planning() {
         setInfo(`${result.quantite} article(s) planifié(s) sur ${result.quantiteDemandee} demandé(s) : une caisse ne peut pas être scindée, seules les caisses entièrement transférables ont été retenues.`)
       }
       reload()
+      window.dispatchEvent(new Event('transferts-en-attente:changed'))
     } catch (e: any) {
       setErreur(e?.message ?? 'Erreur lors de la création de la demande')
     } finally {
@@ -714,6 +715,7 @@ export default function Planning() {
                                   try {
                                     await put(`/production/demandes/${d.id}/annuler`, {})
                                     reload()
+                                    window.dispatchEvent(new Event('transferts-en-attente:changed'))
                                   } catch (e: any) {
                                     setErreur(e?.message ?? 'Erreur lors de l\'annulation de la demande')
                                   }
@@ -877,6 +879,7 @@ export default function Planning() {
                   await put(`/production/demandes/${confirmAnnuler}/annuler`, {})
                   setConfirmAnnuler(null)
                   reload()
+                  window.dispatchEvent(new Event('transferts-en-attente:changed'))
                 } catch (e: any) {
                   setConfirmAnnuler(null)
                   setErreur(e?.message ?? 'Erreur lors de l\'annulation de la demande')

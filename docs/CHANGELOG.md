@@ -9,7 +9,7 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ## [0.9.1] - 2026-06-12
 
 ### Ajouté
-- **Sidebar — pastille "Transfert"** : un badge sur le lien "Transfert" du module Logistique indique le nombre de demandes de transfert en attente (production SN + PDA QTE cumulées). La pastille se met à jour immédiatement lorsqu'un transfert est validé ou annulé depuis la page Logistique, sans nécessiter de rafraîchissement de page.
+- **Sidebar — pastille "Transfert"** : un badge sur le lien "Transfert" et sur l'en-tête de la section "LOGISTIQUE" (visible même repliée) indique le nombre de demandes de transfert en attente (production SN + PDA QTE cumulées). La pastille se met à jour immédiatement pour l'utilisateur à l'origine de l'action (création d'un dispatch, demande de transfert PDA, validation/annulation depuis Logistique ou Planning) et est synchronisée pour les autres utilisateurs via une actualisation automatique toutes les 15 secondes.
 
 ### Corrigé
 - **Annulation d'une demande de transfert (production)** : annuler la commande de dispatch dans laquelle se trouve une machine ne remet plus systématiquement celle-ci en statut "stock". Le comportement dépend désormais du statut actuel de la machine :

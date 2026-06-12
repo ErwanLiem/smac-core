@@ -108,6 +108,7 @@ export default function SuiviPDALabo() {
       setFormQTE({ articleId: 0, quantite: 1, datePlanifiee: new Date().toISOString().split('T')[0] })
       setShowQTE(false)
       reload()
+      window.dispatchEvent(new Event('transferts-en-attente:changed'))
     } catch (err: any) {
       setErreurQTE(err.message ?? 'Erreur lors de la création')
     }
