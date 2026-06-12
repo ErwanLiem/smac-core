@@ -70,6 +70,16 @@ export default function Logistique() {
 
   useEffect(() => { reload() }, [siteId])
 
+  useEffect(() => {
+    function onChange() { reload() }
+    window.addEventListener('transferts-en-attente:changed', onChange)
+    const interval = setInterval(onChange, 15000)
+    return () => {
+      window.removeEventListener('transferts-en-attente:changed', onChange)
+      clearInterval(interval)
+    }
+  }, [siteId])
+
   async function reload() {
     const [cfg, d, champs] = await Promise.all([
       get<Config>(`/production/config/${siteId}`),

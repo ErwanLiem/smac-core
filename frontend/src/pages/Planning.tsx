@@ -151,7 +151,7 @@ export default function Planning() {
   }
 
   function getDemandesJour(jour: string) {
-    return demandes.filter(d => d.datePlanifiee?.startsWith(jour) && d.statut !== 'ANNULEE')
+    return demandes.filter(d => d.type === 'SN' && d.datePlanifiee?.startsWith(jour) && d.statut !== 'ANNULEE')
   }
 
   function getChargeJour(jour: string) {
