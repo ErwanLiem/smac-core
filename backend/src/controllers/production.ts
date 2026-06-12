@@ -620,14 +620,32 @@ export async function annulerDemande(req: Request, res: Response, next: any) {
     if (!demande) return res.status(404).json({ error: 'Demande introuvable' })
     if (demande.statut === 'ANNULEE') return res.status(400).json({ error: 'Demande déjà annulée' })
 
-    // Remettre les inventaires SN en statut Stock (rôle 'estStock')
-    // — que la demande soit EN_ATTENTE ou VALIDEE (retour arrière)
+    // Remettre en statut Stock (rôle 'estStock') uniquement les inventaires SN dont le
+    // statut actuel permet encore une annulation sans rien fausser dans le circuit :
+    // - 'estTransfert' : la machine n'a pas encore bougé physiquement, rien n'a été fait dessus.
+    // - 'ATTENTE_RÉPARATION' : la machine est en production mais rien n'a encore été fait dessus.
+    // Pour tout autre statut (déjà réparée, expédiée, etc.), l'annulation est refusée :
+    // la demande reste valide et visible au planning.
     if (demande.type === 'SN' && demande.lignes.length > 0) {
+      const transfertIds = await getStatutIdsByRole(demande.siteId, 'estTransfert')
+      const attenteReparationIds = await getStatutIdsByRole(demande.siteId, 'ATTENTE_RÉPARATION')
+      const annulableIds = [...new Set([...transfertIds, ...attenteReparationIds])]
       const stockIds = await getStatutIdsByRole(demande.siteId, 'estStock')
       const statutStock = stockIds.length > 0 ? await prisma.statut.findFirst({ where: { id: { in: stockIds } } }) : null
+
+      const enAttenteOuReparation = annulableIds.length > 0
+        ? await prisma.inventaire.count({
+            where: { id: { in: demande.lignes.map(l => l.inventaireId) }, statutId: { in: annulableIds } }
+          })
+        : 0
+
+      if (enAttenteOuReparation === 0) {
+        return res.status(400).json({ error: 'Le statut actuel de cette commande ne permet pas son annulation.' })
+      }
+
       if (statutStock) {
         await prisma.inventaire.updateMany({
-          where: { id: { in: demande.lignes.map(l => l.inventaireId) } },
+          where: { id: { in: demande.lignes.map(l => l.inventaireId) }, statutId: { in: annulableIds } },
           data: { statutId: statutStock.id }
         })
       }

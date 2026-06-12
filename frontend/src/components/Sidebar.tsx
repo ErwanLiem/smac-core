@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -15,11 +15,14 @@ import {
   PackageCheck,
 } from 'lucide-react'
 import type { Utilisateur } from '../types'
+import { get } from '../api/client'
+import { getSiteId } from '../utils/permissions'
 
 export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const [expandedSection, setExpandedSection] = useState<string | null>('ACCUEIL')
+  const [transfertsEnAttente, setTransfertsEnAttente] = useState(0)
 
   const utilisateur: Utilisateur | null = JSON.parse(localStorage.getItem('utilisateur') || 'null')
   const permissions: string[] = utilisateur?.permissions ?? []
@@ -28,6 +31,20 @@ export default function Sidebar() {
   function peutVoir(path: string) {
     return isAdmin || permissions.includes(`${path}:view`)
   }
+
+  useEffect(() => {
+    if (!peutVoir('/logistique')) return
+
+    function refreshTransferts() {
+      get<{ id: number }[]>(`/production/demandes/${getSiteId()}?statut=EN_ATTENTE`)
+        .then(demandes => setTransfertsEnAttente(demandes.length))
+        .catch(() => {})
+    }
+
+    refreshTransferts()
+    window.addEventListener('transferts-en-attente:changed', refreshTransferts)
+    return () => window.removeEventListener('transferts-en-attente:changed', refreshTransferts)
+  }, [location.pathname])
 
   function handleLogout() {
     localStorage.removeItem('token')
@@ -126,6 +143,9 @@ export default function Sidebar() {
                     <Link key={item.path} to={item.path} className={`sidebar-link ${isActive ? 'active' : ''}`}>
                       <Icon className="sidebar-link-icon" size={18} />
                       <span>{item.name}</span>
+                      {item.path === '/logistique' && transfertsEnAttente > 0 && (
+                        <span className="sidebar-link-badge">{transfertsEnAttente}</span>
+                      )}
                     </Link>
                   )
                 })}

@@ -88,6 +88,7 @@ export default function Logistique() {
     setSucces(action === 'valider' ? 'Transfert validé.' : 'Demande annulée.')
     setTimeout(() => setSucces(''), 2500)
     reload()
+    window.dispatchEvent(new Event('transferts-en-attente:changed'))
   }
 
   function getCaissesDemande(d: Demande): string[] {

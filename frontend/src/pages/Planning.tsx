@@ -711,8 +711,12 @@ export default function Planning() {
                               </div>
                               <button
                                 onClick={async () => {
-                                  await put(`/production/demandes/${d.id}/annuler`, {})
-                                  reload()
+                                  try {
+                                    await put(`/production/demandes/${d.id}/annuler`, {})
+                                    reload()
+                                  } catch (e: any) {
+                                    setErreur(e?.message ?? 'Erreur lors de l\'annulation de la demande')
+                                  }
                                 }}
                                 style={{ flexShrink: 0, fontSize: '12px', padding: '4px 11px', background: '#7f1d1d', border: '1px solid #dc2626', borderRadius: '4px', color: '#fca5a5', cursor: 'pointer', fontWeight: 600 }}
                               >
@@ -869,9 +873,14 @@ export default function Planning() {
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setConfirmAnnuler(null)}>Retour</button>
               <button className="btn btn-danger" onClick={async () => {
-                await put(`/production/demandes/${confirmAnnuler}/annuler`, {})
-                setConfirmAnnuler(null)
-                reload()
+                try {
+                  await put(`/production/demandes/${confirmAnnuler}/annuler`, {})
+                  setConfirmAnnuler(null)
+                  reload()
+                } catch (e: any) {
+                  setConfirmAnnuler(null)
+                  setErreur(e?.message ?? 'Erreur lors de l\'annulation de la demande')
+                }
               }}>
                 Confirmer l'annulation
               </button>
