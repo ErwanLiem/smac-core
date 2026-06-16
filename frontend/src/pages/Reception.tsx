@@ -4,6 +4,7 @@ import { inventaireApi } from '../api/inventaire'
 import { get } from '../api/client'
 import { getSiteId } from '../utils/permissions'
 import { jouerSonAlerte } from '../utils/sons'
+import EmplacementSelect from '../components/EmplacementSelect'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function normalize(str: string): string {
@@ -28,6 +29,7 @@ const CODES_TYPE        = ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE']  // articles ET 
 const CODES_SUIVI       = ['SUIVI', 'MODE_SUIVI', 'TRACKING']
 const CODES_CLIENT      = ['CLIENT', 'CLIENTS']
 const CODES_PLATEFORME  = ['PLATEFORME', 'PLATEFORMES']
+const CODES_EMPLACEMENT = ['EMPLACEMENT']
 const CODES_NOM         = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -160,6 +162,11 @@ export default function Reception() {
     const sn = snCurrent.trim()
     if (!sn) return
 
+    if (!caisseActive) {
+      setErreur('Veuillez saisir un numéro de caisse avant de scanner un S/N')
+      return
+    }
+
     if (lignesSN.some(l => l.sn === sn)) {
       jouerSonAlerte()
       setAlerteSN({ sn, statut: null, rma: null, contexte: 'listeCours' })
@@ -206,6 +213,7 @@ export default function Reception() {
   function handlePreparer(e: React.FormEvent) {
     e.preventDefault()
     if (!articleId) return
+    if (modeSuivi === 'SN' && !caisseActive) { setErreur('Veuillez saisir un numéro de caisse'); return }
     if (modeSuivi === 'SN' && lignesSN.length === 0) { setErreur('Ajoutez au moins un S/N'); return }
     if (modeSuivi === 'QTE' && quantite < 1) { setErreur('La quantité doit être supérieure à 0'); return }
     setErreur(null)
@@ -238,6 +246,7 @@ export default function Reception() {
     setLignesSN([])
     setQuantite(1)
     setSnCurrent('')
+    setCaisseActive('')
   }
 
   // ─── Valider ──────────────────────────────────────────────────────────────
@@ -413,7 +422,9 @@ export default function Reception() {
                   return (
                     <div key={c.id} className="form-group" style={{ margin: 0 }}>
                       <label className="form-label">{c.label} <span style={{ color: '#dc2626' }}>*</span></label>
-                      {CODES_CLIENT.includes(normalize(c.code)) ? (
+                      {CODES_EMPLACEMENT.includes(normalize(c.code)) ? (
+                        <EmplacementSelect required value={champsCommuns[c.id] ?? ''} onChange={val => setChampsCommuns(f => ({ ...f, [c.id]: val }))} />
+                      ) : CODES_CLIENT.includes(normalize(c.code)) ? (
                         <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
                           <option value="">— Choisir un client —</option>
                           {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
@@ -466,7 +477,7 @@ export default function Reception() {
               <>
                 {/* Caisse active */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '8px 12px', background: caisseActive ? '#1c2a1c' : '#1a1d27', border: `1px solid ${caisseActive ? '#4ade80' : '#374151'}`, borderRadius: '8px' }}>
-                  <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>📦 Caisse :</span>
+                  <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>📦 Caisse <span style={{ color: '#dc2626' }}>*</span> :</span>
                   <input
                     className="form-input"
                     placeholder="Scanner ou saisir le n° de caisse..."

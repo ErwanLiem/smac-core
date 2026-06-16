@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, X, AlertTriangle, Check, Lock, Unlock } from 'lucide-react'
 import { get, post, put } from '../api/client'
 import { getSiteId } from '../utils/permissions'
+import { joursOuvresRestants } from '../utils/dates'
 
 function dateStr(d: Date) {
   // Utiliser les composantes locales (pas UTC) pour éviter le décalage de timezone
@@ -27,6 +28,8 @@ interface Carte {
   quantite: number
   ids: number[]
   caisses: Array<{ numero: string; quantite: number }>
+  dateRic: string | null
+  slaJours: number | null
 }
 
 interface CapaciteJour {
@@ -395,6 +398,26 @@ export default function Planning() {
                   ))}
                 </div>
               )}
+              {/* Indicateur SLA */}
+              {carte.slaJours !== null && carte.dateRic && (() => {
+                const restant = joursOuvresRestants(new Date(carte.dateRic), carte.slaJours)
+                const depasse = restant < 0
+                const urgent  = restant >= 0 && restant <= 3
+                const bg    = depasse ? '#3b0f0f' : urgent ? '#3b2700' : '#0f2318'
+                const border = depasse ? '#dc2626' : urgent ? '#f59e0b' : '#16a34a'
+                const color  = depasse ? '#f87171' : urgent ? '#fbbf24' : '#4ade80'
+                const label  = depasse
+                  ? `SLA dépassé de ${Math.abs(restant)} j ouvré${Math.abs(restant) > 1 ? 's' : ''}`
+                  : restant === 0
+                    ? 'SLA : dernier jour !'
+                    : `SLA : ${restant} j ouvré${restant > 1 ? 's' : ''} restant${restant > 1 ? 's' : ''}`
+                return (
+                  <div style={{ margin: '5px 0 3px', padding: '3px 7px', borderRadius: '4px', background: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ fontSize: '10px' }}>{depasse || urgent ? '⚠' : '✓'}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color }}>{label}</span>
+                  </div>
+                )
+              })()}
               {/* Pied de carte */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
                 <span style={{ fontSize: '12px', fontWeight: 700, color: '#e2e8f0' }}>{carte.quantite} S/N</span>

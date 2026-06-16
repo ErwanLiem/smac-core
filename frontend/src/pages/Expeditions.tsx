@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { ScanLine, PackageCheck, AlertTriangle, Boxes, Truck, Printer, ArrowLeft, Send, Save, X, Trash2 } from 'lucide-react'
-import { get, post } from '../api/client'
+import { ScanLine, PackageCheck, AlertTriangle, Boxes, Truck, Printer, ArrowLeft, Send, Save, X, Trash2, FileText } from 'lucide-react'
+import { get, post, put } from '../api/client'
+import { genererHTMLBL, type ConfigSite as ConfigSiteType, type PlateformeAdresse, type ArticleBL, type ColisBL } from '../utils/generateBL'
 import Tabs from '../components/Tabs'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
 import { getSiteId } from '../utils/permissions'
@@ -596,11 +597,32 @@ function EnvoiTab() {
   const [detail, setDetail] = useState<MasterBoxDetail | null>(null)
   const [confirmEnvoi, setConfirmEnvoi] = useState<ClientEnCours | null>(null)
   const [bonEnvoi, setBonEnvoi] = useState('')
+  const [bonLivraison, setBonLivraison] = useState('')
   const [confirmRetrait, setConfirmRetrait] = useState<{ inventaireId: number; sn: string; masterBoxId: number } | null>(null)
   const [retraitEnCours, setRetraitEnCours] = useState(false)
   const [exportData, setExportData] = useState<{ champs: ChampExport[]; articles: ArticleExport[] } | null>(null)
+  const [plateformes, setPlateformes] = useState<any[]>([])
+  const [champsPlateforme, setChampsPlateforme] = useState<any[]>([])
+  const [plateformeSelectionnee, setPlateformeSelectionnee] = useState<number | ''>('')
+  const [configSite, setConfigSite] = useState<ConfigSiteType | null>(null)
+  const [genBLenCours, setGenBLenCours] = useState(false)
+  const [eta, setEta] = useState('')
+  const [colis, setColis] = useState<ColisBL[]>([{ type: 'Carton', longueur: '', largeur: '', hauteur: '', poids: '' }])
+  const [blParClient, setBlParClient] = useState<Record<string, { numero: string; eta: string; colis: ColisBL[] }>>({})
 
   useEffect(() => { reload() }, [siteId])
+
+  useEffect(() => {
+    Promise.all([
+      get<any[]>(`/plateformes/${siteId}`),
+      get<any[]>(`/plateformes/${siteId}/champs`),
+      get<ConfigSiteType>(`/config-site/${siteId}`)
+    ]).then(([pl, cp, cs]) => {
+      setPlateformes(pl)
+      setChampsPlateforme(cp.filter((c: any) => c.actif))
+      setConfigSite(cs)
+    }).catch(() => {})
+  }, [siteId])
 
   useEffect(() => {
     if (!modalClient) { setExportData(null); return }
@@ -620,16 +642,93 @@ function EnvoiTab() {
     }
   }
 
+  function getPlateformeAdresse(pl: any): PlateformeAdresse {
+    function val(code: string): string {
+      const champ = champsPlateforme.find((c: any) => c.code.toUpperCase() === code)
+      if (!champ) return ''
+      return pl.valeurs?.find((v: any) => v.champId === champ.id)?.valeur ?? ''
+    }
+    return {
+      nom: val('NOM'),
+      adresse: val('ADRESSE'),
+      codePostal: val('CODE_POSTALE'),
+      ville: val('VILLE'),
+      pays: val('PAYS'),
+      tel: val('TEL'),
+      mail: val('MAIL'),
+      contact: val('CONTACT')
+    }
+  }
+
+  async function handleGenererBL() {
+    if (!configSite) return
+    setGenBLenCours(true)
+    try {
+      const clientValeur = confirmEnvoi?.clientValeur === 'Sans client' ? '' : (confirmEnvoi?.clientValeur ?? '')
+      const clientKey = confirmEnvoi?.clientValeur ?? ''
+
+      // Récupère un nouveau numéro seulement si aucun n'existe encore pour ce client
+      let numero = blParClient[clientKey]?.numero ?? ''
+      const [numeroResult, { articles: articlesRaw }] = await Promise.all([
+        numero ? Promise.resolve({ numero }) : post<{ numero: string }>(`/config-site/${siteId}/next-bl`, {}),
+        get<{ articles: ArticleBL[] }>(`/expeditions/${siteId}/masterbox/bl-articles?clientValeur=${encodeURIComponent(clientValeur)}`)
+      ])
+      numero = numeroResult.numero
+
+      // Mémorise en mémoire et en base pour partage multi-postes
+      setBlParClient(prev => ({ ...prev, [clientKey]: { numero, eta, colis } }))
+      const clientParam = clientKey === 'Sans client' ? '' : clientKey
+      await put(`/expeditions/${siteId}/brouillon-bl?clientValeur=${encodeURIComponent(clientParam)}`, {
+        numeroBL: numero,
+        bonTransport: bonEnvoi.trim() || null,
+        eta,
+        colisJson: JSON.stringify(colis),
+        plateformeId: plateformeSelectionnee || null
+      }).catch(() => {})
+
+      const pl = plateformes.find((p: any) => p.id === plateformeSelectionnee)
+      const destinataire: PlateformeAdresse = pl
+        ? getPlateformeAdresse(pl)
+        : { nom: '', adresse: '', codePostal: '', ville: '', pays: '', tel: '', mail: '', contact: '' }
+
+      const now = new Date()
+      const date = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`
+      const etaFormate = eta ? new Date(eta).toLocaleDateString('en-GB') : ''
+      const html = genererHTMLBL({ numero, bonTransport: bonEnvoi, date, eta: etaFormate, expediteur: configSite, destinataire, articles: articlesRaw, colis })
+
+      const win = window.open('', '_blank')
+      if (win) { win.document.write(html); win.document.close() }
+    } catch (e: any) {
+      setErreur(e.message || 'Erreur lors de la génération du BL')
+    } finally {
+      setGenBLenCours(false)
+    }
+  }
+
+  function handleConfirmerEnvoi() {
+    envoyer(confirmEnvoi!)
+  }
+
   async function envoyer(client: ClientEnCours) {
     setEnvoiEnCours(client.clientValeur)
     setErreur(null)
     setSucces(null)
     try {
       const clientValeur = client.clientValeur === 'Sans client' ? null : client.clientValeur
-      const res = await post<{ ok: boolean; nbBoxes: number; nbArticles: number }>(`/expeditions/${siteId}/masterbox/envoyer`, { clientValeur, bonEnvoi: bonEnvoi.trim() || undefined })
+      const numeroBL = bonLivraison.trim() || blParClient[client.clientValeur]?.numero || undefined
+      const res = await post<{ ok: boolean; nbBoxes: number; nbArticles: number }>(`/expeditions/${siteId}/masterbox/envoyer`, {
+        clientValeur,
+        bonEnvoi: bonEnvoi.trim() || undefined,
+        bonLivraison: numeroBL
+      })
       setSucces(`${res.nbArticles} article(s) expédié(s) dans ${res.nbBoxes} Master Box pour ${client.clientValeur}`)
       setConfirmEnvoi(null)
       setBonEnvoi('')
+      setBonLivraison('')
+      setEta('')
+      setColis([{ type: 'Carton', longueur: '', largeur: '', hauteur: '', poids: '' }])
+      setBlParClient(prev => { const next = { ...prev }; delete next[client.clientValeur]; return next })
+      try { localStorage.removeItem(`bl_par_client_${siteId}`) } catch {}
       fermerModalClient()
       await reload()
     } catch (e: any) {
@@ -848,7 +947,29 @@ function EnvoiTab() {
             <button
               className="btn btn-primary"
               disabled={envoiEnCours === clientModal.clientValeur}
-              onClick={() => setConfirmEnvoi(clientModal)}
+              onClick={async () => {
+                setBonLivraison('')
+                setConfirmEnvoi(clientModal)
+                try {
+                  const clientParam = clientModal.clientValeur === 'Sans client' ? '' : clientModal.clientValeur
+                  const brouillon = await get<{ numeroBL: string; bonTransport: string | null; eta: string | null; colisJson: string | null; plateformeId: number | null } | null>(
+                    `/expeditions/${siteId}/brouillon-bl?clientValeur=${encodeURIComponent(clientParam)}`
+                  )
+                  if (brouillon) {
+                    const colisStored: ColisBL[] = brouillon.colisJson ? JSON.parse(brouillon.colisJson) : [{ type: 'Carton', longueur: '', largeur: '', hauteur: '', poids: '' }]
+                    setBlParClient(prev => ({ ...prev, [clientModal.clientValeur]: { numero: brouillon.numeroBL, eta: brouillon.eta ?? '', colis: colisStored } }))
+                    setBonEnvoi(brouillon.bonTransport ?? '')
+                    setEta(brouillon.eta ?? '')
+                    setColis(colisStored)
+                    if (brouillon.plateformeId) setPlateformeSelectionnee(brouillon.plateformeId)
+                  } else {
+                    setBonEnvoi('')
+                    setEta('')
+                    setColis([{ type: 'Carton', longueur: '', largeur: '', hauteur: '', poids: '' }])
+                    setPlateformeSelectionnee('')
+                  }
+                } catch {}
+              }}
             >
               <Send size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
               Envoyer les articles ({clientModal.totalQuantite})
@@ -861,17 +982,18 @@ function EnvoiTab() {
       {confirmEnvoi && (
         <div className="modal-overlay" onClick={() => { setConfirmEnvoi(null); setBonEnvoi('') }}>
           <div
-            style={{ background: '#1a1d27', borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '100%', border: '1px solid #2d3748' }}
+            style={{ background: '#1a1d27', borderRadius: '12px', padding: '24px', maxWidth: '480px', width: '100%', border: '1px solid #2d3748' }}
             onClick={e => e.stopPropagation()}
           >
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', margin: '0 0 12px' }}>
               Confirmer l'expédition
             </h3>
             <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '16px' }}>
-              Confirmer l'expédition de <strong>{confirmEnvoi.totalQuantite} article(s)</strong> pour <strong>{confirmEnvoi.clientValeur}</strong> ?
+              Expédition de <strong>{confirmEnvoi.totalQuantite} article(s)</strong> pour <strong>{confirmEnvoi.clientValeur}</strong>
             </p>
-            <div className="form-group" style={{ marginBottom: '20px' }}>
-              <label className="form-label">Bon d'envoi (n° de transport)</label>
+
+            <div className="form-group" style={{ marginBottom: '12px' }}>
+              <label className="form-label">N° de transport (BT)</label>
               <input
                 className="form-input"
                 value={bonEnvoi}
@@ -879,22 +1001,149 @@ function EnvoiTab() {
                 placeholder="Ex: BT-123456"
               />
             </div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button className="btn btn-secondary" onClick={() => { setConfirmEnvoi(null); setBonEnvoi('') }}>
-                Annuler
-              </button>
-              <button
-                className="btn btn-primary"
-                disabled={envoiEnCours === confirmEnvoi.clientValeur}
-                onClick={() => envoyer(confirmEnvoi)}
-              >
-                <Send size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                Confirmer
-              </button>
+
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label">
+                N° BL
+                <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: '6px', fontSize: '11px' }}>
+                  (fourni par le client — laisser vide pour en générer un)
+                </span>
+              </label>
+              <input
+                className="form-input"
+                value={bonLivraison}
+                onChange={e => setBonLivraison(e.target.value)}
+                placeholder="Ex: BL-2026-0001"
+              />
             </div>
+
+            {!bonLivraison.trim() && (
+              <div style={{ background: '#141720', borderRadius: '8px', padding: '14px', marginBottom: '16px', border: '1px solid #2d3748' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Générer mon BL
+                </div>
+
+                {blParClient[confirmEnvoi.clientValeur]?.numero && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', padding: '6px 10px', background: '#1e3a5f', borderRadius: '6px', border: '1px solid #2563eb' }}>
+                    <FileText size={13} color="#60a5fa" />
+                    <span style={{ fontSize: '12px', color: '#93c5fd' }}>N° généré : </span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#f8fafc', fontSize: '13px' }}>{blParClient[confirmEnvoi.clientValeur].numero}</span>
+                  </div>
+                )}
+
+                {plateformes.length > 0 && (
+                  <div className="form-group" style={{ marginBottom: '10px' }}>
+                    <label className="form-label" style={{ fontSize: '12px' }}>Plateforme destinataire</label>
+                    <select
+                      className="form-input"
+                      value={plateformeSelectionnee}
+                      onChange={e => setPlateformeSelectionnee(e.target.value === '' ? '' : Number(e.target.value))}
+                    >
+                      <option value="">— Choisir une plateforme —</option>
+                      {plateformes.map(pl => {
+                        const champNom = champsPlateforme.find((c: any) => c.code.toUpperCase() === 'NOM')
+                        const nom = champNom ? pl.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur ?? `Plateforme #${pl.id}` : `Plateforme #${pl.id}`
+                        return <option key={pl.id} value={pl.id}>{nom}</option>
+                      })}
+                    </select>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginBottom: '10px' }}>
+                  <label className="form-label" style={{ fontSize: '12px' }}>ETA (date de livraison estimée)</label>
+                  <input type="date" className="form-input" value={eta} onChange={e => setEta(e.target.value)} />
+                </div>
+
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ fontSize: '12px', margin: 0 }}>Colis</label>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: '11px', padding: '2px 8px', height: 'auto' }}
+                      onClick={() => setColis(c => [...c, { type: 'Carton', longueur: '', largeur: '', hauteur: '', poids: '' }])}
+                    >
+                      + Ajouter un colis
+                    </button>
+                  </div>
+                  {colis.map((c, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 1fr 1fr 70px auto', gap: '4px', alignItems: 'center', marginBottom: '4px' }}>
+                      <select
+                        className="form-input"
+                        style={{ fontSize: '11px', padding: '4px 6px' }}
+                        value={c.type}
+                        onChange={e => setColis(prev => prev.map((x, j) => j === i ? { ...x, type: e.target.value } : x))}
+                      >
+                        <option>Carton</option>
+                        <option>Palette</option>
+                        <option>Caisse</option>
+                        <option>Autre</option>
+                      </select>
+                      <input className="form-input" style={{ fontSize: '11px', padding: '4px 6px' }} placeholder="L (cm)" value={c.longueur}
+                        onChange={e => setColis(prev => prev.map((x, j) => j === i ? { ...x, longueur: e.target.value } : x))} />
+                      <input className="form-input" style={{ fontSize: '11px', padding: '4px 6px' }} placeholder="l (cm)" value={c.largeur}
+                        onChange={e => setColis(prev => prev.map((x, j) => j === i ? { ...x, largeur: e.target.value } : x))} />
+                      <input className="form-input" style={{ fontSize: '11px', padding: '4px 6px' }} placeholder="H (cm)" value={c.hauteur}
+                        onChange={e => setColis(prev => prev.map((x, j) => j === i ? { ...x, hauteur: e.target.value } : x))} />
+                      <input className="form-input" style={{ fontSize: '11px', padding: '4px 6px' }} placeholder="kg" value={c.poids}
+                        onChange={e => setColis(prev => prev.map((x, j) => j === i ? { ...x, poids: e.target.value } : x))} />
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-icon"
+                        style={{ padding: '4px', opacity: colis.length === 1 ? 0.3 : 1 }}
+                        disabled={colis.length === 1}
+                        onClick={() => setColis(prev => prev.filter((_, j) => j !== i))}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>L × l × H en cm, poids en kg</div>
+                </div>
+
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  disabled={genBLenCours || !configSite}
+                  onClick={handleGenererBL}
+                >
+                  <FileText size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                  {genBLenCours ? 'En cours...' : blParClient[confirmEnvoi.clientValeur]?.numero ? 'Réimprimer le BL (articles mis à jour)' : 'Générer et imprimer mon BL'}
+                </button>
+              </div>
+            )}
+
+            {(() => {
+              const aBL = !!(bonLivraison.trim() || blParClient[confirmEnvoi.clientValeur]?.numero)
+              return (
+                <div>
+                  {!aBL && (
+                    <p style={{ fontSize: '12px', color: '#f87171', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <AlertTriangle size={13} />
+                      Un numéro de BL est requis pour confirmer l'expédition.
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button className="btn btn-secondary" onClick={() => { setConfirmEnvoi(null); setBonEnvoi('') }}>
+                      Annuler
+                    </button>
+                    <button
+                      className="btn btn-primary"
+                      disabled={envoiEnCours === confirmEnvoi.clientValeur || !aBL}
+                      onClick={handleConfirmerEnvoi}
+                    >
+                      <Send size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
+                      Confirmer l'envoi
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}
+
+      {/* Avertissement BL manquant */}
 
       {/* Modal de confirmation de retrait d'un article */}
       {confirmRetrait && (

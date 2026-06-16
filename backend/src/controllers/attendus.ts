@@ -399,17 +399,18 @@ export async function scannerSN(req: Request, res: Response, next: any) {
     let dejaEnInventaire = false
     let rmaExistant: string | null = null
 
-    const existingVal = await prisma.valeurChampInventaire.findFirst({
+    const existingVals = await prisma.valeurChampInventaire.findMany({
       where: { champId: { in: idsSN }, valeur: snNorm },
       include: { inventaire: { include: { statut: true } } }
     })
 
-    if (existingVal && !(hasRole(existingVal.inventaire?.statut?.roles, 'estFinal'))) {
+    const existingActif = existingVals.find(e => !hasRole(e.inventaire?.statut?.roles, 'estFinal'))
+    if (existingActif) {
       dejaEnInventaire = true
       const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(c.code)))
       if (champsRMA.length > 0) {
         const valRMA = await prisma.valeurChampInventaire.findFirst({
-          where: { inventaireId: existingVal.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
+          where: { inventaireId: existingActif.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
         })
         rmaExistant = valRMA?.valeur ?? null
       }

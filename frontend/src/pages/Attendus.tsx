@@ -121,8 +121,8 @@ export default function Attendus() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Attendus</h1>
-          <p className="page-subtitle">{attendus.length} attendu{attendus.length !== 1 ? 's' : ''}</p>
+          <h1 className="page-title">Réceptions prévues</h1>
+          <p className="page-subtitle">{attendus.length} réception{attendus.length !== 1 ? 's' : ''} prévue{attendus.length !== 1 ? 's' : ''}</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowImport(true)}>
           <Plus size={16} /> Nouvel attendu

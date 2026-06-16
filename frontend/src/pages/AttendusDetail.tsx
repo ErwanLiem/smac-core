@@ -5,6 +5,7 @@ import { attendusApi } from '../api/attendus'
 import { get } from '../api/client'
 import { getSiteId } from '../utils/permissions'
 import { jouerSonAlerte } from '../utils/sons'
+import EmplacementSelect from '../components/EmplacementSelect'
 
 interface Ligne {
   id: number
@@ -331,7 +332,7 @@ export default function AttendusDetail() {
       <div className="page-header">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <button onClick={() => navigate('/attendus')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '13px' }}>← Attendus</button>
+            <button onClick={() => navigate('/attendus')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '13px' }}>← Réceptions prévues</button>
             {isClos && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#1e2130', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>}
           </div>
           <h1 className="page-title">
@@ -339,7 +340,7 @@ export default function AttendusDetail() {
               const colonnes = configChamps.filter(c => c.visibleListe)
               if (colonnes.length > 0 && editDonnees[colonnes[0].code]) return editDonnees[colonnes[0].code]
               if (attendu.rma) return attendu.rma
-              return `Attendu #${attendu.id}`
+              return `Réception prévue #${attendu.id}`
             })()}
           </h1>
           <p className="page-subtitle">
@@ -842,6 +843,7 @@ export default function AttendusDetail() {
                 const opts = parseOptions(champ.options)
                 const isClient = CODES_CLIENT.includes(champ.code.toUpperCase())
                 const isPlateforme = CODES_PLATEFORME.includes(champ.code.toUpperCase())
+                const isEmplacement = champ.code.toUpperCase() === 'EMPLACEMENT'
                 return (
                   <div key={cc.code} className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">
@@ -849,7 +851,9 @@ export default function AttendusDetail() {
                       {cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}
                       {!cc.obligatoire && cc.obligatoireCloture && <span style={{ color: '#f59e0b' }} title="Requis avant de pouvoir clôturer l'attendu"> * (requis pour clôture)</span>}
                     </label>
-                    {isClient ? (
+                    {isEmplacement ? (
+                      <EmplacementSelect value={editDonnees[cc.code] ?? ''} onChange={val => setEditDonnees(d => ({ ...d, [cc.code]: val }))} />
+                    ) : isClient ? (
                       <select className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))}>
                         <option value="">— Choisir un client —</option>
                         {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
@@ -875,7 +879,7 @@ export default function AttendusDetail() {
                 )
               })}
               {configChamps.filter(c => c.visible).length === 0 && (
-                <p style={{ color: '#9ca3af', fontSize: '13px' }}>Aucun champ configuré — allez dans Configuration → Attendus.</p>
+                <p style={{ color: '#9ca3af', fontSize: '13px' }}>Aucun champ configuré — allez dans Configuration → Réceptions prévues.</p>
               )}
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>

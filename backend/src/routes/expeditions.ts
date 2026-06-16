@@ -15,6 +15,9 @@ router.post('/:siteId/masterbox/:id/enregistrer', ctrl.enregistrerMasterBox)
 router.get('/:siteId/masterbox/en-cours', ctrl.getMasterBoxesEnCours)
 router.get('/:siteId/masterbox/enregistrees', ctrl.getMasterBoxesEnregistrees)
 router.get('/:siteId/masterbox/enregistrees-articles', ctrl.getArticlesMasterBoxEnregistrees)
+router.get('/:siteId/masterbox/bl-articles', ctrl.getArticlesBL)
+router.get('/:siteId/brouillon-bl', ctrl.getBrouillonBL)
+router.put('/:siteId/brouillon-bl', ctrl.saveBrouillonBL)
 router.get('/:siteId/masterbox/:id', ctrl.getMasterBoxDetail)
 
 export default router

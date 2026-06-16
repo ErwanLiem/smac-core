@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Trash2, Plus, X, Check, Pencil } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 import ColonnesToggle from './ColonnesToggle'
+import { formatDate } from '../utils/dates'
 
 interface Champ {
   id: number
@@ -138,8 +139,11 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
     dragColonne.current = null
   }
 
-  function getValeur(item: Item, champId: number) {
-    return item.valeurs.find(v => v.champId === champId)?.valeur ?? '—'
+  function getValeur(item: Item, champ: Champ) {
+    const valeur = item.valeurs.find(v => v.champId === champ.id)?.valeur ?? null
+    if (!valeur) return '—'
+    if (champ.type === 'DATE' || champ.type === 'DATE_TODAY') return formatDate(valeur)
+    return valeur
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -246,7 +250,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
               {filteredItems.map((item, idx) => (
                 <tr key={item.id} style={{ background: idx % 2 === 0 ? '#1a1d27' : '#141720' }}>
                   {champsAffiches.map(c => (
-                    <td key={c.id}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                    <td key={c.id}>{getValeur(item, c) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>
                     {new Date(item.createdAt).toLocaleDateString('fr-FR')}

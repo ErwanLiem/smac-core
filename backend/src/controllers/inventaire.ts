@@ -94,29 +94,32 @@ export async function checkSN(req: Request, res: Response) {
   })
   const idsSN = champsSN.length > 0 ? champsSN.map(c => c.id) : champsInv.map(c => c.id)
 
-  const existing = await prisma.valeurChampInventaire.findFirst({
+  const existants = await prisma.valeurChampInventaire.findMany({
     where: { champId: { in: idsSN }, valeur: sn },
     include: { inventaire: { include: { statut: true } } }
   })
 
-  if (!existing) return res.json({ existe: false })
+  if (existants.length === 0) return res.json({ existe: false })
 
-  const estFinal = (() => {
-    const r = existing.inventaire?.statut?.roles
-    try { return r ? JSON.parse(r).includes('estFinal') : false } catch { return false }
-  })()
+  // Si au moins une entrée a un statut non final, c'est celle-là qui compte (machine active)
+  const actif = existants.find(e => {
+    const r = e.inventaire?.statut?.roles
+    try { return r ? !JSON.parse(r).includes('estFinal') : true } catch { return true }
+  })
+  const reference = actif ?? existants[existants.length - 1]
+  const estFinal = !actif
 
-  // Chercher le RMA
+  // Chercher le RMA sur l'entrée de référence
   const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normCode(c.code)))
   let rma = null
   if (champsRMA.length > 0) {
     const valRMA = await prisma.valeurChampInventaire.findFirst({
-      where: { inventaireId: existing.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
+      where: { inventaireId: reference.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
     })
     rma = valRMA?.valeur ?? null
   }
 
-  res.json({ existe: true, estFinal, statut: existing.inventaire?.statut?.label ?? null, rma })
+  res.json({ existe: true, estFinal, statut: reference.inventaire?.statut?.label ?? null, rma })
 }
 
 // INVENTAIRE

@@ -123,8 +123,8 @@ export default function AdminAttendus() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Attendus</h1>
-          <p className="page-subtitle">Paramétrez le formulaire de création, le mapping Excel et la clôture des attendus</p>
+          <h1 className="page-title">Réceptions prévues</h1>
+          <p className="page-subtitle">Paramétrez le formulaire de création, le mapping Excel et la clôture des réceptions prévues</p>
         </div>
       </div>
 

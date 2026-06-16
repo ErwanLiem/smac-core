@@ -317,12 +317,16 @@ model site {
   configAttendus       configAttendus?
   configImportExcel    configImportExcel[]
   regleAlerte          regleAlerte[]
+  configSite           configSite?
+  compteurBL           compteurBL[]
+  brouillonBL          brouillonBL[]
   configProduction     configProduction?
   technicienProduction technicienProduction[]
   demandeTransfert     demandeTransfert[]
   inventaireLabo       inventaireLabo[]
   masterBox            masterBox[]
   exceptionCapaciteJour exceptionCapaciteJour[]
+  emplacements          emplacement[]
 }
 
 // ─── Module Production ───────────────────────────────────────────────────────
@@ -464,6 +468,63 @@ model inventaireLabo {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+model emplacement {
+  id          Int      @id @default(autoincrement())
+  siteId      Int
+  nom         String
+  capaciteMax Int
+  description String?  @db.LongText
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  site        site     @relation(fields: [siteId], references: [id], map: "Emplacement_siteId_fkey")
+
+  @@unique([siteId, nom], map: "Emplacement_siteId_nom_key")
+  @@index([siteId], map: "Emplacement_siteId_fkey")
+}
+
+model configSite {
+  id             Int    @id @default(autoincrement())
+  siteId         Int    @unique
+  nomSociete     String @default("")
+  adresse        String @default("")
+  ville          String @default("")
+  codePostal     String @default("")
+  pays           String @default("")
+  tel            String @default("")
+  email          String @default("")
+  siteWeb        String @default("")
+  tva            String @default("")
+  capitalSocial  String @default("")
+  site           site   @relation(fields: [siteId], references: [id], map: "ConfigSite_siteId_fkey")
+}
+
+model brouillonBL {
+  id              Int      @id @default(autoincrement())
+  siteId          Int
+  clientValeur    String?
+  numeroBL        String
+  bonTransport    String?
+  eta             String?
+  colisJson       String?  @db.LongText
+  plateformeId    Int?
+  updatedAt       DateTime @updatedAt
+  site            site     @relation(fields: [siteId], references: [id], map: "BrouillonBL_siteId_fkey")
+
+  @@unique([siteId, clientValeur], map: "BrouillonBL_siteId_clientValeur_key")
+  @@index([siteId], map: "BrouillonBL_siteId_fkey")
+}
+
+model compteurBL {
+  id      Int    @id @default(autoincrement())
+  siteId  Int
+  annee   Int
+  dernier Int    @default(0)
+  site    site   @relation(fields: [siteId], references: [id], map: "CompteurBL_siteId_fkey")
+
+  @@unique([siteId, annee], map: "CompteurBL_siteId_annee_key")
+  @@index([siteId], map: "CompteurBL_siteId_fkey")
+}
 
 model regleAlerte {
   id             Int          @id @default(autoincrement())

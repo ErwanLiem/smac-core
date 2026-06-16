@@ -4,7 +4,9 @@ import { inventaireApi } from '../api/inventaire'
 import { get, del } from '../api/client'
 import { getPermissions, getSiteId } from '../utils/permissions'
 import ColonnesToggle from '../components/ColonnesToggle'
+import EmplacementSelect from '../components/EmplacementSelect'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
+import { formatDate } from '../utils/dates'
 
 const LABELS_TYPE_HISTORIQUE: Record<string, string> = {
   RECEPTION: 'Réception',
@@ -132,8 +134,11 @@ export default function Inventaire() {
     setChargement(false)
   }
 
-  function getValeur(item: Inventaire, champId: number) {
-    return item.valeurs.find(v => v.champId === champId)?.valeur ?? '—'
+  function getValeur(item: Inventaire, champ: Champ) {
+    const valeur = item.valeurs.find(v => v.champId === champ.id)?.valeur ?? null
+    if (!valeur) return '—'
+    if (champ.type === 'DATE' || champ.type === 'DATE_TODAY') return formatDate(valeur)
+    return valeur
   }
 
   // Colonnes triées selon l'ordre drag & drop
@@ -412,7 +417,7 @@ export default function Inventaire() {
                   </td>
                   <td style={{ padding: '4px 10px' }}><StatutBadge statut={item.statut} /></td>
                   {champsAffiches.map(c => (
-                    <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c.id) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                    <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
                   ))}
                 </tr>
               ))}
@@ -447,7 +452,13 @@ export default function Inventaire() {
                     {c.label}
                     {c.obligatoire && <span style={{ color: '#dc2626', marginLeft: '4px' }}>*</span>}
                   </label>
-                  {(c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
+                  {c.code.toUpperCase() === 'EMPLACEMENT' ? (
+                    <EmplacementSelect
+                      value={editItem.valeurs[c.id] ?? ''}
+                      onChange={val => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: val } } : ei)}
+                      required={c.obligatoire}
+                    />
+                  ) : (c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
                     <input type="date" required={c.obligatoire} className="form-input"
                       value={editItem.valeurs[c.id] ?? ''}
                       onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />

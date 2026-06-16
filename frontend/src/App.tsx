@@ -18,6 +18,8 @@ import Logistique from './pages/Logistique'
 import SuiviPDA from './pages/SuiviPDA'
 import SuiviPDALabo from './pages/SuiviPDALabo'
 import Expeditions from './pages/Expeditions'
+import Emplacements from './pages/Emplacements'
+import ConfigSite from './pages/ConfigSite'
 import AttendusDetail from './pages/AttendusDetail'
 import Layout from './components/Layout'
 
@@ -54,6 +56,8 @@ function App() {
             <Route path="/suivi-pda" element={<SuiviPDA />} />
             <Route path="/suivi-pda-labo" element={<SuiviPDALabo />} />
             <Route path="/expeditions" element={<Expeditions />} />
+            <Route path="/emplacements" element={<Emplacements />} />
+            <Route path="/admin/config-site" element={<ConfigSite />} />
             <Route path="/attendus/:id" element={<AttendusDetail />} />
             <Route path="/admin/acces" element={<AdminAcces />} />
           </Route>

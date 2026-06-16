@@ -201,23 +201,26 @@ export async function scanEmballage(req: Request, res: Response, next: any) {
     const champsSN = findChampsSN(champsInv)
     const idsSN = champsSN.length > 0 ? champsSN.map(c => c.id) : champsInv.map(c => c.id)
 
-    const valeur = await prisma.valeurChampInventaire.findFirst({
+    const valeurs = await prisma.valeurChampInventaire.findMany({
       where: { champId: { in: idsSN }, valeur: sn },
       include: { inventaire: { include: { statut: true, valeurs: true } } }
     })
 
-    if (!valeur || !valeur.inventaire) {
+    if (valeurs.length === 0) {
       return res.status(404).json({ error: `S/N ${sn} introuvable en inventaire` })
     }
 
-    const inv = valeur.inventaire
+    const valeur = valeurs.find(v => hasRole(v.inventaire?.statut?.roles, 'CONTROL')) ?? null
 
-    if (!hasRole(inv.statut?.roles, 'CONTROL')) {
+    if (!valeur || !valeur.inventaire) {
+      const dernierStatut = valeurs[valeurs.length - 1]?.inventaire?.statut?.label ?? '—'
       return res.status(400).json({
-        error: `Ce S/N n'est pas en statut "Contrôle qualité" (statut actuel : ${inv.statut?.label ?? '—'})`,
-        statutActuel: inv.statut?.label ?? null
+        error: `Ce S/N n'est pas en statut "Contrôle qualité" (statut actuel : ${dernierStatut})`,
+        statutActuel: dernierStatut
       })
     }
+
+    const inv = valeur.inventaire
 
     const result = await getTransitionEmballage(siteId)
     if (!result) {
@@ -324,16 +327,14 @@ export async function scanMasterBox(req: Request, res: Response, next: any) {
     const champsSN = findChampsSN(champsInv)
     const idsSN = champsSN.length > 0 ? champsSN.map(c => c.id) : champsInv.map(c => c.id)
 
-    const valeur = await prisma.valeurChampInventaire.findFirst({
+    const valeurs = await prisma.valeurChampInventaire.findMany({
       where: { champId: { in: idsSN }, valeur: sn },
       include: { inventaire: { include: { statut: true, valeurs: true, ligneMasterBox: true } } }
     })
 
-    if (!valeur || !valeur.inventaire) {
+    if (valeurs.length === 0) {
       return res.status(404).json({ error: `S/N ${sn} introuvable en inventaire` })
     }
-
-    const inv = valeur.inventaire
 
     const result = await getTransitionEmballage(siteId)
     if (!result) {
@@ -341,12 +342,17 @@ export async function scanMasterBox(req: Request, res: Response, next: any) {
     }
     const statutEmballeId = result.transition.statutToId
 
-    if (inv.statutId !== statutEmballeId) {
+    const valeur = valeurs.find(v => v.inventaire?.statutId === statutEmballeId) ?? null
+
+    if (!valeur || !valeur.inventaire) {
+      const dernierStatut = valeurs[valeurs.length - 1]?.inventaire?.statut?.label ?? '—'
       return res.status(400).json({
-        error: `Ce S/N n'est pas au statut "Emballé" (statut actuel : ${inv.statut?.label ?? '—'})`,
-        statutActuel: inv.statut?.label ?? null
+        error: `Ce S/N n'est pas au statut "Emballé" (statut actuel : ${dernierStatut})`,
+        statutActuel: dernierStatut
       })
     }
+
+    const inv = valeur.inventaire
 
     if (inv.ligneMasterBox) {
       return res.status(400).json({ error: `Ce S/N est déjà affecté à une Master Box` })
@@ -506,6 +512,8 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
     const clientValeur = (raw === null || raw === undefined || raw === '') ? null : String(raw)
     const bonEnvoiRaw = req.body?.bonEnvoi
     const bonEnvoi = (bonEnvoiRaw === null || bonEnvoiRaw === undefined) ? '' : String(bonEnvoiRaw).trim()
+    const bonLivraisonRaw = req.body?.bonLivraison
+    const bonLivraison = (bonLivraisonRaw === null || bonLivraisonRaw === undefined) ? '' : String(bonLivraisonRaw).trim()
 
     const expedition = await getTransitionExpedition(siteId)
     if (!expedition) {
@@ -532,8 +540,9 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
           data: { statutId: expedition.transition.statutToId }
         })
         await renseignerDateChamp(siteId, champsInv, ligne.inventaireId, 'DATE_SHP', dateAujourdhui)
-        if (bonEnvoi) {
-          await renseignerValeurChamp(champsInv, ligne.inventaireId, 'BONDENVOI', bonEnvoi)
+        const valeurBon = bonLivraison || bonEnvoi
+        if (valeurBon) {
+          await renseignerValeurChamp(champsInv, ligne.inventaireId, 'BONDENVOI', valeurBon)
         }
         await enregistrerOperation({
           siteId,
@@ -547,8 +556,36 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
       await prisma.masterBox.update({ where: { id: box.id }, data: { statut: 'EXPEDIEE' } })
     }
 
+    await deleteBrouillonBL(siteId, clientValeur)
     res.json({ ok: true, nbBoxes: boxes.length, nbArticles })
   } catch (e) { next(e) }
+}
+
+export async function getBrouillonBL(req: Request, res: Response, next: any) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const clientValeur = req.query.clientValeur ? String(req.query.clientValeur) : null
+    const brouillon = await prisma.brouillonBL.findUnique({ where: { siteId_clientValeur: { siteId, clientValeur: clientValeur ?? '' } } })
+    res.json(brouillon ?? null)
+  } catch (e) { next(e) }
+}
+
+export async function saveBrouillonBL(req: Request, res: Response, next: any) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const clientValeur = req.query.clientValeur ? String(req.query.clientValeur) : null
+    const { numeroBL, bonTransport, eta, colisJson, plateformeId } = req.body
+    const brouillon = await prisma.brouillonBL.upsert({
+      where: { siteId_clientValeur: { siteId, clientValeur: clientValeur ?? '' } },
+      create: { siteId, clientValeur: clientValeur ?? '', numeroBL, bonTransport: bonTransport || null, eta: eta || null, colisJson: colisJson || null, plateformeId: plateformeId || null },
+      update: { numeroBL, bonTransport: bonTransport || null, eta: eta || null, colisJson: colisJson || null, plateformeId: plateformeId || null }
+    })
+    res.json(brouillon)
+  } catch (e) { next(e) }
+}
+
+export async function deleteBrouillonBL(siteId: number, clientValeur: string | null) {
+  await prisma.brouillonBL.deleteMany({ where: { siteId, clientValeur } })
 }
 
 /**
@@ -575,6 +612,34 @@ export async function getArticlesMasterBoxEnregistrees(req: Request, res: Respon
     }))
 
     res.json({ champs, articles })
+  } catch (e) { next(e) }
+}
+
+/**
+ * Articles des Master Box EN_ATTENTE d'un client, avec S/N, P/N et désignation déjà résolus
+ * via getChampsAffichage — utilisé pour la génération du BL côté frontend.
+ */
+export async function getArticlesBL(req: Request, res: Response, next: any) {
+  try {
+    const siteId = Number(req.params.siteId)
+    const raw = req.query.clientValeur
+    const clientValeur = (raw === undefined || raw === null || raw === '' || raw === 'Sans client') ? null : String(raw)
+
+    const { champPN, champRMA, champDesignation, champSN, champModelArticle } = await getChampsAffichage(siteId)
+
+    const lignes = await prisma.ligneMasterBox.findMany({
+      where: { masterBox: { siteId, statut: 'EN_ATTENTE', clientValeur } },
+      include: { inventaire: { include: { valeurs: true, article: { include: { valeurs: true } } } } }
+    })
+
+    const articles = lignes.map(l => ({
+      sn: valeurChamp(l.inventaire.valeurs, champSN),
+      pn: valeurChamp(l.inventaire.valeurs, champPN),
+      designation: valeurChamp(l.inventaire.valeurs, champDesignation),
+      model: valeurChamp(l.inventaire.article?.valeurs ?? [], champModelArticle),
+    }))
+
+    res.json({ articles })
   } catch (e) { next(e) }
 }
 

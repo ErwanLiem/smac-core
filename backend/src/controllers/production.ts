@@ -295,6 +295,7 @@ export async function getCartes(req: Request, res: Response, next: any) {
     const champCAISSE      = champsInv.find(c => normCode(c.code) === 'CAISSE')
     const champDESIGNATION = champsInv.find(c => normCode(c.code) === 'DESIGNATION')
     const champCLIENT      = champsInv.find(c => normCode(c.code) === 'CLIENT')
+    const champDATERIC     = champsInv.find(c => normCode(c.code) === 'DATE_RIC' || normCode(c.code) === 'DATE_RECEPTION' || normCode(c.code) === 'DATE_REC')
 
     // Récupérer tous les inventaires avec statut rôle 'estStock'
     const stockIds = await getStatutIdsByRole(Number(siteId), 'estStock')
@@ -306,23 +307,42 @@ export async function getCartes(req: Request, res: Response, next: any) {
       include: { valeurs: true }
     })
 
+    // Charger le SLA clients : champClient SLA + NOM
+    const champClientSLA = await prisma.champClient.findFirst({ where: { siteId: Number(siteId), code: 'SLA' } })
+    const champClientNOM = await prisma.champClient.findFirst({ where: { siteId: Number(siteId), code: { in: ['NOM', 'NOM_CLIENT', 'RAISON_SOCIALE'] } } })
+    const slaParClient: Record<string, number> = {}
+    if (champClientSLA && champClientNOM) {
+      const clients = await prisma.client.findMany({
+        where: { siteId: Number(siteId) },
+        include: { valeurs: { where: { champId: { in: [champClientSLA.id, champClientNOM.id] } } } }
+      })
+      for (const cl of clients) {
+        const nom = cl.valeurs.find(v => v.champId === champClientNOM!.id)?.valeur
+        const sla = cl.valeurs.find(v => v.champId === champClientSLA!.id)?.valeur
+        if (nom && sla && !isNaN(Number(sla))) slaParClient[nom] = Number(sla)
+      }
+    }
+
     // Grouper par P/N × RMA × Client
-    const groupes = new Map<string, { pnValeur: string; rmaValeur: string; designationValeur: string; clientValeur: string; ids: number[]; quantite: number; caisseMap: Map<string, number> }>()
+    const groupes = new Map<string, { pnValeur: string; rmaValeur: string; designationValeur: string; clientValeur: string; ids: number[]; quantite: number; caisseMap: Map<string, number>; dateRic: string | null }>()
 
     for (const inv of inventaires) {
-      const pnVal     = inv.valeurs.find(v => v.champId === champPN.id)?.valeur    ?? ''
-      const rmaVal    = inv.valeurs.find(v => v.champId === champRMA.id)?.valeur   ?? ''
-      const caisseVal = champCAISSE      ? (inv.valeurs.find(v => v.champId === champCAISSE.id)?.valeur      ?? '') : ''
-      const desgVal   = champDESIGNATION ? (inv.valeurs.find(v => v.champId === champDESIGNATION.id)?.valeur ?? '') : ''
-      const clientVal = champCLIENT      ? (inv.valeurs.find(v => v.champId === champCLIENT.id)?.valeur      ?? '') : ''
+      const pnVal      = inv.valeurs.find(v => v.champId === champPN.id)?.valeur    ?? ''
+      const rmaVal     = inv.valeurs.find(v => v.champId === champRMA.id)?.valeur   ?? ''
+      const caisseVal  = champCAISSE      ? (inv.valeurs.find(v => v.champId === champCAISSE.id)?.valeur      ?? '') : ''
+      const desgVal    = champDESIGNATION ? (inv.valeurs.find(v => v.champId === champDESIGNATION.id)?.valeur ?? '') : ''
+      const clientVal  = champCLIENT      ? (inv.valeurs.find(v => v.champId === champCLIENT.id)?.valeur      ?? '') : ''
+      const dateRicVal = champDATERIC     ? (inv.valeurs.find(v => v.champId === champDATERIC.id)?.valeur     ?? null) : null
       const key = `${pnVal}__${rmaVal}__${clientVal}`
       if (!groupes.has(key)) {
-        groupes.set(key, { pnValeur: pnVal, rmaValeur: rmaVal, designationValeur: desgVal, clientValeur: clientVal, ids: [], quantite: 0, caisseMap: new Map() })
+        groupes.set(key, { pnValeur: pnVal, rmaValeur: rmaVal, designationValeur: desgVal, clientValeur: clientVal, ids: [], quantite: 0, caisseMap: new Map(), dateRic: dateRicVal })
       }
       const g = groupes.get(key)!
       g.ids.push(inv.id)
       g.quantite++
       if (caisseVal) g.caisseMap.set(caisseVal, (g.caisseMap.get(caisseVal) ?? 0) + 1)
+      // Conserver la date la plus ancienne du groupe
+      if (dateRicVal && (!g.dateRic || dateRicVal < g.dateRic)) g.dateRic = dateRicVal
     }
 
     const result = Array.from(groupes.values()).map(g => ({
@@ -332,7 +352,9 @@ export async function getCartes(req: Request, res: Response, next: any) {
       clientValeur: g.clientValeur,
       ids: g.ids,
       quantite: g.quantite,
-      caisses: Array.from(g.caisseMap.entries()).map(([numero, quantite]) => ({ numero, quantite }))
+      caisses: Array.from(g.caisseMap.entries()).map(([numero, quantite]) => ({ numero, quantite })),
+      dateRic: g.dateRic,
+      slaJours: g.clientValeur ? (slaParClient[g.clientValeur] ?? null) : null
     }))
 
     res.json(result)
