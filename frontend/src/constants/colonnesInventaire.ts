@@ -34,12 +34,14 @@ export const COLONNES_INVENTAIRE: ColonneInventaire[] = [
   { key: 'dateSHP',            label: 'Date SHP',           type: 'date' },
   { key: 'genericNotes',       label: 'Notes génériques',   type: 'text',  receptionSN: true },
   { key: 'livelloRiparazione', label: 'Niveau réparation',  type: 'text' },
+  { key: 'codeStatut',         label: 'Code Statut',        type: 'text' },
   { key: 'customer',           label: 'Client',             type: 'text',  receptionSN: true, receptionQTE: true },
   { key: 'partNumber',         label: 'P/N',                type: 'text',  receptionSN: true, receptionQTE: true },
   { key: 'productFamily',      label: 'Famille produit',    type: 'text',  receptionSN: true },
   { key: 'mercurySn',          label: 'Mercury SN',         type: 'text' },
-  { key: 'defectFromCustomer', label: 'Défaut client',      type: 'text',  receptionSN: true },
-  { key: 'descrCode',          label: 'Descr. Code',        type: 'text' },
+  { key: 'defectFromCustomer',  label: 'Défaut client',             type: 'text',  receptionSN: true },
+  { key: 'defectCodeCastles',   label: 'Defect code by Castles',    type: 'text' },
+  { key: 'descrCode',           label: 'Descr. Code',               type: 'text' },
   { key: 'repaireNotes',       label: 'Notes réparation',   type: 'text' },
 ]
 

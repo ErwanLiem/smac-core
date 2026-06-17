@@ -157,8 +157,9 @@ model inventaire {
 
   // Réception
   dateRic            DateTime? @db.Date
-  defectFromCustomer String?
-  descrCode          String?
+  defectFromCustomer  String?
+  defectCodeCastles   String?
+  descrCode           String?
   repaireNotes       String?
   genericNotes       String?
 
@@ -178,6 +179,9 @@ model inventaire {
   dateBsf            DateTime? @db.Date
   dateBsfn           DateTime? @db.Date
   dateNlv            DateTime? @db.Date
+
+  // Identifiant statut brut (import Excel)
+  codeStatut         String?
 
   // MAJ / Injection
   dateMaj            DateTime? @db.Date

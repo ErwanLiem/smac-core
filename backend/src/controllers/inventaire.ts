@@ -110,11 +110,11 @@ export async function update(req: Request, res: Response, next: any) {
     const colonnesAutorisees = [
       'serialNumber', 'partNumber', 'rma', 'customer', 'productFamily',
       'mercurySn', 'warranty', 'rmaCreationDate', 'dateRic',
-      'defectFromCustomer', 'descrCode', 'repaireNotes', 'genericNotes',
+      'defectFromCustomer', 'defectCodeCastles', 'descrCode', 'repaireNotes', 'genericNotes',
       'dateRip', 'techLabo', 'livelloRiparazione',
       'dateLav', 'dateAsp', 'dateLab', 'datePrv', 'datePrr', 'datePrf',
       'datePra', 'dateEng', 'dateAsw', 'dateBsf', 'dateBsfn', 'dateNlv',
-      'dateMaj', 'dateTest', 'datePack', 'dateCls', 'dateSHP', 'archive',
+      'codeStatut', 'dateMaj', 'dateTest', 'datePack', 'dateCls', 'dateSHP', 'archive',
     ]
     const data: Record<string, any> = {}
     for (const col of colonnesAutorisees) {
