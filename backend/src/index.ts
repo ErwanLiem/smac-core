@@ -16,6 +16,7 @@ import expeditionsRouter from './routes/expeditions'
 import dashboardRouter from './routes/dashboard'
 import emplacementsRouter from './routes/emplacements'
 import configSiteRouter from './routes/configSite'
+import historiqueActiviteRouter from './routes/historiqueActivite'
 import { requireAuth, requireAdmin } from './middleware/auth'
 import { Prisma } from '@prisma/client'
 
@@ -52,6 +53,7 @@ app.use('/api/dashboard', requireAuth, dashboardRouter)
 app.use('/api/emplacements', requireAuth, emplacementsRouter)
 app.use('/api/config-site', requireAuth, configSiteRouter)
 app.use('/api/gestion', requireAuth, requireAdmin, utilisateursRouter)
+app.use('/api/historique-activite', requireAuth, historiqueActiviteRouter)
 
 // Middleware global de gestion des erreurs
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {

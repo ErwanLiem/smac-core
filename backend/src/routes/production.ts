@@ -2,6 +2,9 @@ import { Router } from 'express'
 import * as ctrl from '../controllers/production'
 import * as suiviPdaCtrl from '../controllers/suiviPda'
 import * as suiviPdaLaboCtrl from '../controllers/suiviPdaLabo'
+import * as repCtrl from '../controllers/reparation'
+import * as majCtrl from '../controllers/majInjection'
+import * as cqCtrl  from '../controllers/controleQualite'
 
 const router = Router({ mergeParams: true })
 
@@ -42,5 +45,30 @@ router.get('/suivi-pda/:siteId', suiviPdaCtrl.getSuiviPDA)
 
 // Suivi PDA Labo
 router.get('/suivi-pda-labo/:siteId', suiviPdaLaboCtrl.getSuiviPDALabo)
+
+// ─── Réparation ───────────────────────────────────────────────────────────────
+router.get('/reparation/:siteId/rma',                     repCtrl.getRmaList)
+router.get('/reparation/:siteId/rma/:rma/inventaires',    repCtrl.getInventairesRma)
+router.get('/reparation/:siteId/scan',                    repCtrl.scanInventaire)
+router.get('/reparation/:siteId/inventaire/:id',          repCtrl.getDetailInventaire)
+router.put('/reparation/:siteId/inventaire/:id/panne',    repCtrl.saisirPanneConstatee)
+router.post('/reparation/:siteId/inventaire/:id/pda',     repCtrl.utiliserPDA)
+router.put('/reparation/:siteId/inventaire/:id/statut',   repCtrl.changerStatutReparation)
+
+// ─── MAJ / Injection ──────────────────────────────────────────────────────────
+router.get('/maj-injection/:siteId/rma',                    majCtrl.getRmaList)
+router.get('/maj-injection/:siteId/rma/:rma/inventaires',   majCtrl.getInventairesRma)
+router.get('/maj-injection/:siteId/scan',                   majCtrl.scanInventaire)
+router.get('/maj-injection/:siteId/inventaire/:id',         majCtrl.getDetailInventaire)
+router.put('/maj-injection/:siteId/inventaire/:id/valider', majCtrl.validerMajInjection)
+router.put('/maj-injection/:siteId/inventaire/:id/statut',  majCtrl.changerStatut)
+
+// ─── Contrôle qualité ─────────────────────────────────────────────────────────
+router.get('/controle-qualite/:siteId/rma',                    cqCtrl.getRmaList)
+router.get('/controle-qualite/:siteId/rma/:rma/inventaires',   cqCtrl.getInventairesRma)
+router.get('/controle-qualite/:siteId/scan',                   cqCtrl.scanInventaire)
+router.get('/controle-qualite/:siteId/inventaire/:id',         cqCtrl.getDetailInventaire)
+router.put('/controle-qualite/:siteId/inventaire/:id/valider', cqCtrl.validerControle)
+router.put('/controle-qualite/:siteId/inventaire/:id/statut',  cqCtrl.changerStatut)
 
 export default router

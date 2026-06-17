@@ -5,6 +5,11 @@ import AdminWorkflow from './pages/AdminWorkflow'
 import AdminDonnees from './pages/AdminDonnees'
 import AdminAcces from './pages/AdminAcces'
 import Suivi from './pages/Suivi'
+import Reparation from './pages/Reparation'
+import MajInjection from './pages/MajInjection'
+import ControleQualite from './pages/ControleQualite'
+import AttenteInfo from './pages/AttenteInfo'
+import HistoriqueActivite from './pages/HistoriqueActivite'
 import Articles from './pages/Articles'
 import Clients from './pages/Clients'
 import Plateformes from './pages/Plateformes'
@@ -41,6 +46,11 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/suivi" element={<Suivi />} />
+            <Route path="/reparation" element={<Reparation />} />
+            <Route path="/maj-injection" element={<MajInjection />} />
+            <Route path="/controle-qualite" element={<ControleQualite />} />
+            <Route path="/attente-info" element={<AttenteInfo />} />
+            <Route path="/admin/historique-activite" element={<HistoriqueActivite />} />
             <Route path="/admin/workflow" element={<AdminWorkflow />} />
             <Route path="/admin/donnees" element={<AdminDonnees />} />
             <Route path="/articles" element={<Articles />} />

@@ -13,6 +13,8 @@ import {
   Package,
   Truck,
   PackageCheck,
+  Wrench,
+  History,
 } from 'lucide-react'
 import type { Utilisateur } from '../types'
 import { get } from '../api/client'
@@ -78,7 +80,10 @@ export default function Sidebar() {
     {
       title: 'PRODUCTION',
       items: [
-        { name: 'Suivi', path: '/suivi', icon: ClipboardList },
+        { name: 'Réparation', path: '/reparation', icon: Wrench },
+        { name: 'MAJ / Injection', path: '/maj-injection', icon: ClipboardList },
+        { name: 'Contrôle qualité', path: '/controle-qualite', icon: ClipboardList },
+        { name: 'Attente info', path: '/attente-info', icon: ClipboardList },
         { name: 'Planning', path: '/planning', icon: ClipboardList },
         { name: 'Suivi PDA Labo', path: '/suivi-pda-labo', icon: Package },
       ],
@@ -93,6 +98,12 @@ export default function Sidebar() {
         { name: 'Suivi PDA', path: '/suivi-pda', icon: Package },
         { name: 'Expéditions', path: '/expeditions', icon: PackageCheck },
         { name: 'Emplacements', path: '/emplacements', icon: Warehouse },
+      ],
+    },
+    {
+      title: 'ADMINISTRATION',
+      items: [
+        { name: 'Historique activité', path: '/admin/historique-activite', icon: History },
       ],
     },
     {
