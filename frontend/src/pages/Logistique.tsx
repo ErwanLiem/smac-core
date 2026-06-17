@@ -104,7 +104,7 @@ export default function Logistique() {
   function getCaissesDemande(d: Demande): string[] {
     return [...new Set(
       d.lignes
-        .map((l: any) => l.inventaire?.valeurs?.find((v: any) => v.champ?.code === 'CAISSE')?.valeur)
+        .map((l: any) => l.inventaire?.genericNotes ?? null)
         .filter(Boolean)
     )] as string[]
   }

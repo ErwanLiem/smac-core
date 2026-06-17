@@ -41,13 +41,12 @@ export default function AdminProduction() {
   const { isAdmin } = getPermissions()
 
   const [chargement, setChargement] = useState(true)
-  const [config, setConfig]           = useState<Config>({ champPNCode: 'PN', champRMACode: 'BL', labelPN: 'P/N', labelRMA: 'RMA', champTypeArticleCode: 'TYPE', typesArticleQTE: [], champsAffichageQTE: [], quotaSamediActif: false })
+  const [config, setConfig]           = useState<Config>({ champPNCode: 'partNumber', champRMACode: 'rma', labelPN: 'P/N', labelRMA: 'RMA', champTypeArticleCode: 'TYPE', typesArticleQTE: [], champsAffichageQTE: [], quotaSamediActif: false })
   const [champsArticle, setChampsArticle] = useState<ChampInv[]>([])
   const [articlesData, setArticlesData]   = useState<any[]>([])
   const [configModif, setConfigModif] = useState(false)
   const [techniciens, setTechniciens] = useState<Technicien[]>([])
   const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([])
-  const [champsInv, setChampsInv]     = useState<ChampInv[]>([])
   const [newTech, setNewTech]         = useState({ userId: 0, quotaJournalier: 10 })
   const [editTech, setEditTech]       = useState<Technicien | null>(null)
   const [confirmDel, setConfirmDel]   = useState<number | null>(null)
@@ -56,18 +55,16 @@ export default function AdminProduction() {
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
-    const [cfg, techs, users, champs, champsArt, arts] = await Promise.all([
+    const [cfg, techs, users, champsArt, arts] = await Promise.all([
       get<Config>(`/production/config/${siteId}`),
       get<Technicien[]>(`/production/techniciens/${siteId}`),
       get<Utilisateur[]>(`/gestion/${siteId}/utilisateurs`),
-      get<ChampInv[]>(`/inventaire/${siteId}/champs`),
       get<ChampInv[]>(`/articles/${siteId}/champs`),
       get<any[]>(`/articles/${siteId}`)
     ])
     setConfig(cfg)
     setTechniciens(techs)
     setUtilisateurs(users)
-    setChampsInv(champs.filter(c => c.actif !== false))
     setChampsArticle(champsArt.filter(c => c.actif !== false))
     setArticlesData(arts)
     setConfigModif(false)
@@ -157,15 +154,13 @@ export default function AdminProduction() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Champ P/N <span style={{ color: '#60a5fa', fontWeight: 400 }}>(inventaire)</span></label>
-              <select className="form-input" value={config.champPNCode} onChange={e => { setConfig(c => ({ ...c, champPNCode: e.target.value })); setConfigModif(true) }}>
-                {champsInv.map(c => <option key={c.id} value={c.code}>{c.label} ({c.code})</option>)}
-              </select>
+              <input disabled className="form-input" value="partNumber" style={{ background: '#141720', color: '#6b7280', cursor: 'not-allowed' }} />
+              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>Colonne fixe — non configurable</p>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Champ RMA <span style={{ color: '#60a5fa', fontWeight: 400 }}>(inventaire)</span></label>
-              <select className="form-input" value={config.champRMACode} onChange={e => { setConfig(c => ({ ...c, champRMACode: e.target.value })); setConfigModif(true) }}>
-                {champsInv.map(c => <option key={c.id} value={c.code}>{c.label} ({c.code})</option>)}
-              </select>
+              <input disabled className="form-input" value="rma" style={{ background: '#141720', color: '#6b7280', cursor: 'not-allowed' }} />
+              <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>Colonne fixe — non configurable</p>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label">Label P/N <span style={{ color: '#6b7280', fontWeight: 400 }}>(affiché)</span></label>

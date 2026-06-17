@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Package, Plus, Check } from 'lucide-react'
 import { get, post } from '../api/client'
-import { inventaireApi } from '../api/inventaire'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
-import EmplacementCell from '../components/EmplacementCell'
 import { getSiteId } from '../utils/permissions'
 import { usePeriodeMensuelle } from '../hooks/usePeriodeMensuelle'
 
@@ -26,9 +24,7 @@ interface Semaine { numero: number; label: string }
 
 interface LignePDALabo {
   articleId: number
-  inventaireId: number | null
   reference: string
-  location: string
   additionalReference: string
   wording: string
   range: string
@@ -43,7 +39,6 @@ interface SuiviPDALaboData {
   mois: number
   estMoisCourant: boolean
   semaines: Semaine[]
-  champEmplacementLaboId: number | null
   rows: LignePDALabo[]
 }
 
@@ -56,8 +51,6 @@ export default function SuiviPDALabo() {
   const [showQTE, setShowQTE] = useState(false)
   const [formQTE, setFormQTE] = useState({ articleId: 0, quantite: 1, datePlanifiee: new Date().toISOString().split('T')[0] })
   const [erreurQTE, setErreurQTE] = useState('')
-  const [emplacements, setEmplacements] = useState<Record<number, string>>({})
-  const [emplacementsEnregistres, setEmplacementsEnregistres] = useState<Record<number, string>>({})
   const { periode, moisPrecedent, moisSuivant, moisLabel, estMoisCourant } = usePeriodeMensuelle(data?.estMoisCourant)
 
   useEffect(() => { reload() }, [siteId, periode])
@@ -69,24 +62,9 @@ export default function SuiviPDALabo() {
     try {
       const d = await get<SuiviPDALaboData>(`/production/suivi-pda-labo/${siteId}?annee=${periode.annee}&mois=${periode.mois}`)
       setData(d)
-      const initEmpl: Record<number, string> = {}
-      for (const row of d.rows) if (row.inventaireId) initEmpl[row.inventaireId] = row.location
-      setEmplacements(initEmpl)
-      setEmplacementsEnregistres(initEmpl)
     } finally {
       setChargement(false)
     }
-  }
-
-  async function validerEmplacement(inventaireId: number) {
-    if (!data || !data.champEmplacementLaboId) return
-    const valeur = emplacements[inventaireId] ?? ''
-    await inventaireApi.updateValeurChamp(inventaireId, data.champEmplacementLaboId, valeur)
-    setEmplacementsEnregistres(f => ({ ...f, [inventaireId]: valeur }))
-  }
-
-  function annulerEmplacement(inventaireId: number) {
-    setEmplacements(f => ({ ...f, [inventaireId]: emplacementsEnregistres[inventaireId] ?? '' }))
   }
 
   async function reloadStockLogistique() {
@@ -117,7 +95,6 @@ export default function SuiviPDALabo() {
   // Colonnes proposées pour l'export Excel
   const colonnesExport: ExportColumn[] = [
     { key: 'reference', label: 'Reference' },
-    { key: 'location', label: 'Code Stock Location' },
     { key: 'additionalReference', label: 'Additional references' },
     { key: 'wording', label: 'Wording' },
     { key: 'range', label: 'Range' },
@@ -134,7 +111,6 @@ export default function SuiviPDALabo() {
     }
     switch (key) {
       case 'reference': return row.reference
-      case 'location': return row.inventaireId ? (emplacements[row.inventaireId] ?? row.location) : row.location
       case 'additionalReference': return row.additionalReference
       case 'wording': return row.wording
       case 'range': return row.range
@@ -189,7 +165,6 @@ export default function SuiviPDALabo() {
             <thead>
               <tr>
                 <th>Reference</th>
-                <th>Code Stock Location</th>
                 <th>Additional references</th>
                 <th>Wording</th>
                 <th>Range</th>
@@ -205,22 +180,6 @@ export default function SuiviPDALabo() {
               {data.rows.map(row => (
                 <tr key={row.articleId}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{row.reference || '—'}</td>
-                  <td>
-                    {row.inventaireId && data.champEmplacementLaboId ? (() => {
-                      const id = row.inventaireId!
-                      const valeur = emplacements[id] ?? ''
-                      const modifie = valeur !== (emplacementsEnregistres[id] ?? '')
-                      return (
-                        <EmplacementCell
-                          valeur={valeur}
-                          modifie={modifie}
-                          onChange={v => setEmplacements(f => ({ ...f, [id]: v }))}
-                          onValider={() => validerEmplacement(id)}
-                          onAnnuler={() => annulerEmplacement(id)}
-                        />
-                      )
-                    })() : (row.location || '—')}
-                  </td>
                   <td>{row.additionalReference || '—'}</td>
                   <td>{row.wording || '—'}</td>
                   <td>{row.range || '—'}</td>

@@ -5,7 +5,7 @@ import { attendusApi } from '../api/attendus'
 import { get } from '../api/client'
 import { getSiteId } from '../utils/permissions'
 import { jouerSonAlerte } from '../utils/sons'
-import EmplacementSelect from '../components/EmplacementSelect'
+import { COLONNES_INVENTAIRE, getLabelColonne } from '../constants/colonnesInventaire'
 
 interface Ligne {
   id: number
@@ -31,8 +31,6 @@ interface Attendu {
   lignes: Ligne[]
 }
 
-interface ChampInv { id: number; code: string; label: string; type: string; options: string | null; actif: boolean }
-
 interface Rapport {
   nonRecus: Ligne[]
   inattendus: Ligne[]
@@ -49,11 +47,6 @@ interface ArticleAccessoire {
 const CODES_NOM       = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
 const CODES_CLIENT    = ['CLIENT', 'CLIENTS']
 const CODES_PLATEFORME = ['PLATEFORME', 'PLATEFORMES']
-
-function parseOptions(raw: string | null): string[] {
-  if (!raw) return []
-  try { return JSON.parse(raw) } catch { return [] }
-}
 
 function getEntiteLabel(entite: any, champs: any[]): string {
   const champNom = champs.find((c: any) => CODES_NOM.includes(c.code.toUpperCase()))
@@ -87,7 +80,6 @@ export default function AttendusDetail() {
   const [editInfos, setEditInfos] = useState(false)
   const [editDonnees, setEditDonnees] = useState<Record<string, string>>({})
   const [configChamps, setConfigChamps] = useState<{ code: string; visible: boolean; obligatoire: boolean; visibleListe: boolean; obligatoireCloture?: boolean }[]>([])
-  const [champsInv, setChampsInv] = useState<ChampInv[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [champsClients, setChampsClients] = useState<any[]>([])
   const [plateformes, setPlateformes] = useState<any[]>([])
@@ -98,13 +90,12 @@ export default function AttendusDetail() {
 
 
   async function reload() {
-    const [data, arts, champsArts, plats, champsPlats, ci, cl, cc, cfg] = await Promise.all([
+    const [data, arts, champsArts, plats, champsPlats, cl, cc, cfg] = await Promise.all([
       attendusApi.getDetail(Number(id)),
       get<any[]>(`/articles/${siteId}`),
       get<any[]>(`/articles/${siteId}/champs`),
       get<any[]>(`/plateformes/${siteId}`),
       get<any[]>(`/plateformes/${siteId}/champs`),
-      get<ChampInv[]>(`/inventaire/${siteId}/champs`),
       get<any[]>(`/clients/${siteId}`),
       get<any[]>(`/clients/${siteId}/champs`),
       get<any>(`/config-attendus/${siteId}`)
@@ -112,7 +103,6 @@ export default function AttendusDetail() {
     setAttendu(data)
     setPlateformes(plats)
     setChampsPlateformes(champsPlats.filter((c: any) => c.actif))
-    setChampsInv(ci.filter((c: any) => c.actif))
     setClients(cl)
     setChampsClients(cc.filter((c: any) => c.actif))
 
@@ -219,9 +209,6 @@ export default function AttendusDetail() {
     reload()
   }
 
-  const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
-
-
   async function handleSaveInfos() {
     await attendusApi.update(Number(id), { donneesCommunes: editDonnees })
     setEditInfos(false)
@@ -265,8 +252,8 @@ export default function AttendusDetail() {
   function texteRapportEmail(): string {
     if (!rapport || !attendu) return ''
     const rmaName = attendu.rma || 'N/A'
-    const champClient = champsInv.find(c => CODES_CLIENT.includes(c.code.toUpperCase()))
-    const clientName = (champClient && editDonnees[champClient.code]) || 'N/A'
+    const champClientCode = configChamps.find(c => CODES_CLIENT.includes(c.code.toUpperCase()))?.code
+    const clientName = (champClientCode && editDonnees[champClientCode]) || editDonnees['customer'] || 'N/A'
     const hasEcarts = rapport.nonRecus.length > 0 || rapport.inattendus.length > 0 || (rapport.doublonsInventaire?.length ?? 0) > 0
 
     const lines: string[] = []
@@ -345,8 +332,7 @@ export default function AttendusDetail() {
           </h1>
           <p className="page-subtitle">
             {configChamps.filter(c => c.visibleListe).slice(1).map(c => {
-              const champ = champsInv.find(ci => ci.code === c.code)
-              return editDonnees[c.code] ? `${champ?.label ?? c.code} : ${editDonnees[c.code]}` : null
+              return editDonnees[c.code] ? `${getLabelColonne(c.code)} : ${editDonnees[c.code]}` : null
             }).filter(Boolean).join(' · ')}
             {configChamps.filter(c => c.visibleListe).slice(1).some(c => editDonnees[c.code]) ? ' · ' : ''}
             {new Date(attendu.createdAt).toLocaleDateString('fr-FR')}
@@ -838,22 +824,19 @@ export default function AttendusDetail() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Modifier les informations</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {configChamps.filter(c => c.visible).map(cc => {
-                const champ = champsInv.find(c => c.code === cc.code)
-                if (!champ) return null
-                const opts = parseOptions(champ.options)
-                const isClient = CODES_CLIENT.includes(champ.code.toUpperCase())
-                const isPlateforme = CODES_PLATEFORME.includes(champ.code.toUpperCase())
-                const isEmplacement = champ.code.toUpperCase() === 'EMPLACEMENT'
+                const colDef = COLONNES_INVENTAIRE.find(c => c.key === cc.code)
+                const label = colDef?.label ?? getLabelColonne(cc.code)
+                const isClient = CODES_CLIENT.includes(cc.code.toUpperCase())
+                const isPlateforme = CODES_PLATEFORME.includes(cc.code.toUpperCase())
+                const isDate = colDef?.type === 'date'
                 return (
                   <div key={cc.code} className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">
-                      {champ.label}
+                      {label}
                       {cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}
                       {!cc.obligatoire && cc.obligatoireCloture && <span style={{ color: '#f59e0b' }} title="Requis avant de pouvoir clôturer l'attendu"> * (requis pour clôture)</span>}
                     </label>
-                    {isEmplacement ? (
-                      <EmplacementSelect value={editDonnees[cc.code] ?? ''} onChange={val => setEditDonnees(d => ({ ...d, [cc.code]: val }))} />
-                    ) : isClient ? (
+                    {isClient ? (
                       <select className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))}>
                         <option value="">— Choisir un client —</option>
                         {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
@@ -863,15 +846,8 @@ export default function AttendusDetail() {
                         <option value="">— Choisir une plateforme —</option>
                         {plateformes.map(pl => <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>{getEntiteLabel(pl, champsPlateformes)}</option>)}
                       </select>
-                    ) : champ.type === 'SELECT' ? (
-                      <select className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))}>
-                        <option value="">— Choisir —</option>
-                        {opts.map(o => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : (champ.type === 'DATE' || champ.type === 'DATE_TODAY') ? (
+                    ) : isDate ? (
                       <input type="date" className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))} />
-                    ) : champ.type === 'NUMBER' ? (
-                      <input type="number" className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))} />
                     ) : (
                       <input type="text" className="form-input" value={editDonnees[cc.code] ?? ''} onChange={e => setEditDonnees(d => ({ ...d, [cc.code]: e.target.value }))} />
                     )}

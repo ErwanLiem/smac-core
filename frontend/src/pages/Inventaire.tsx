@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Trash2, Pencil, X, History } from 'lucide-react'
+import { Trash2, Pencil, X, History, Columns3 } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get, del } from '../api/client'
 import { getPermissions, getSiteId } from '../utils/permissions'
-import ColonnesToggle from '../components/ColonnesToggle'
-import EmplacementSelect from '../components/EmplacementSelect'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
 import { formatDate } from '../utils/dates'
+import { COLONNES_INVENTAIRE } from '../constants/colonnesInventaire'
 
 const LABELS_TYPE_HISTORIQUE: Record<string, string> = {
   RECEPTION: 'Réception',
@@ -23,22 +22,6 @@ interface HistoriqueEntry {
   createdAt: string
   details: Record<string, any> | null
   operateur: { id: number; login: string; nom: string; prenom: string } | null
-}
-
-interface Champ {
-  id: number
-  code: string
-  label: string
-  type: string
-  obligatoire: boolean
-  ordre: number
-  actif: boolean
-}
-
-interface ValeurChamp {
-  champId: number
-  valeur: string | null
-  champ: Champ
 }
 
 interface Article {
@@ -60,30 +43,31 @@ interface Inventaire {
   statut: Statut | null
   couleurAlerte: string | null
   createdAt: string
-  valeurs: ValeurChamp[]
+  [key: string]: any
 }
+
+const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
 
 export default function Inventaire() {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
-  const pagePath = '/inventaire'
   const peutEditer = isAdmin
   const peutSupprimer = isAdmin
-  const peutCreer = isAdmin
 
   const [chargement, setChargement] = useState(true)
-  const [champs, setChamps] = useState<Champ[]>([])
-  const [colonnesOrdre, setColonnesOrdre] = useState<number[]>([])
-  const [colonnesCachees, setColonnesCachees] = useState<Set<number>>(new Set())
+  const [colonnesOrdre, setColonnesOrdre] = useState<string[]>([])
+  const [colonnesCachees, setColonnesCachees] = useState<Set<string>>(new Set())
+  const [showToggle, setShowToggle] = useState(false)
+  const toggleRef = useRef<HTMLDivElement>(null)
   const [articles, setArticles] = useState<any[]>([])
   const [statuts, setStatuts] = useState<Statut[]>([])
   const [inventaires, setInventaires] = useState<Inventaire[]>([])
   const [filtres, setFiltres] = useState<Record<string, string>>({})
-  const dragColonne = useRef<number | null>(null)
+  const dragColonne = useRef<string | null>(null)
   const [modal, setModal] = useState<{ id: number } | null>(null)
   const [modalMasse, setModalMasse] = useState(false)
   const [selection, setSelection] = useState<Set<number>>(new Set())
-  const [editItem, setEditItem] = useState<{ id: number; articleId: number; statutId: number | null; valeurs: Record<number, string> } | null>(null)
+  const [editItem, setEditItem] = useState<{ id: number; articleId: number; statutId: number | null; fields: Record<string, string> } | null>(null)
   const [historique, setHistorique] = useState<HistoriqueEntry[] | null>(null)
   const [historiqueLoading, setHistoriqueLoading] = useState(false)
 
@@ -94,8 +78,6 @@ export default function Inventaire() {
 
   useEffect(() => { reload() }, [siteId])
 
-  // Recharger les données quand l'utilisateur revient sur la page (ex: après validation
-  // d'un transfert dans Logistique, la quantité en stock peut avoir changé)
   useEffect(() => {
     function onVisible() {
       if (document.visibilityState === 'visible') reload()
@@ -108,74 +90,78 @@ export default function Inventaire() {
     }
   }, [siteId])
 
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (toggleRef.current && !toggleRef.current.contains(e.target as Node)) setShowToggle(false)
+    }
+    if (showToggle) document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showToggle])
+
   async function reload() {
-    const [c, a, s, i] = await Promise.all([
-      inventaireApi.getChamps(siteId),
+    const [a, s, i] = await Promise.all([
       get(`/articles/${siteId}`),
       get(`/workflow/${siteId}/statuts`),
       inventaireApi.getAll(siteId)
     ])
-    const champsActifs = c.filter(ch => ch.actif)
-    setChamps(champsActifs)
-    // Restaurer l'ordre sauvegardé, en ignorant les champs supprimés et ajoutant les nouveaux
     const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
-    const savedOrdre = JSON.parse(localStorage.getItem(`inventaire_colonnes_${login}`) || '[]') as number[]
-    const ids = champsActifs.map(ch => ch.id)
+    const allKeys = COLONNES_INVENTAIRE.map(c => c.key)
+    const savedOrdre = JSON.parse(localStorage.getItem(`inventaire_colonnes_${login}`) || '[]') as string[]
     const restored = [
-      ...savedOrdre.filter(id => ids.includes(id)),
-      ...ids.filter(id => !savedOrdre.includes(id))
+      ...savedOrdre.filter(k => allKeys.includes(k)),
+      ...allKeys.filter(k => !savedOrdre.includes(k))
     ]
     setColonnesOrdre(restored)
-    const savedCachees = JSON.parse(localStorage.getItem(`inventaire_colonnes_cachees_${login}`) || '[]') as number[]
-    setColonnesCachees(new Set(savedCachees.filter(id => ids.includes(id))))
+    const savedCachees = JSON.parse(localStorage.getItem(`inventaire_colonnes_cachees_${login}`) || '[]') as string[]
+    setColonnesCachees(new Set(savedCachees.filter(k => allKeys.includes(k))))
     setArticles(a)
     setStatuts(s)
     setInventaires(i)
     setChargement(false)
   }
 
-  function getValeur(item: Inventaire, champ: Champ) {
-    const valeur = item.valeurs.find(v => v.champId === champ.id)?.valeur ?? null
-    if (!valeur) return '—'
-    if (champ.type === 'DATE' || champ.type === 'DATE_TODAY') return formatDate(valeur)
-    return valeur
+  function getValeur(item: Inventaire, key: string): string {
+    const col = COLONNES_INVENTAIRE.find(c => c.key === key)
+    const val = item[key]
+    if (val == null || val === '') return '—'
+    if (col?.type === 'date') return formatDate(val)
+    return String(val)
   }
 
-  // Colonnes triées selon l'ordre drag & drop
-  const champsOrdonnes = colonnesOrdre.map(id => champs.find(c => c.id === id)).filter(Boolean) as Champ[]
-  // Colonnes effectivement affichées (hors colonnes masquées par l'utilisateur)
-  const champsAffiches = champsOrdonnes.filter(c => !colonnesCachees.has(c.id))
+  const colonnesOrdonnees = colonnesOrdre
+    .map(k => COLONNES_INVENTAIRE.find(c => c.key === k))
+    .filter(Boolean) as typeof COLONNES_INVENTAIRE
+  const colonnesAffichees = colonnesOrdonnees.filter(c => !colonnesCachees.has(c.key))
 
-  // Colonnes proposées pour l'export Excel (toutes les colonnes disponibles, indépendamment de leur visibilité à l'écran)
   const colonnesExport: ExportColumn[] = [
     { key: 'statut', label: 'Statut' },
-    ...champsOrdonnes.map(c => ({ key: String(c.id), label: c.label }))
+    { key: 'article', label: 'Article' },
+    ...colonnesOrdonnees.map(c => ({ key: c.key, label: c.label }))
   ]
 
   function valeurExport(item: Inventaire, key: string): string {
     if (key === 'statut') return item.statut?.label ?? ''
-    const champId = Number(key)
-    return item.valeurs.find(v => v.champId === champId)?.valeur ?? ''
+    if (key === 'article') return getArticleLabel(item.articleId)
+    const v = getValeur(item, key)
+    return v === '—' ? '' : v
   }
 
-  function toggleColonne(champId: number) {
+  function toggleColonne(key: string) {
     setColonnesCachees(prev => {
       const next = new Set(prev)
-      next.has(champId) ? next.delete(champId) : next.add(champId)
+      next.has(key) ? next.delete(key) : next.add(key)
       const login = JSON.parse(localStorage.getItem('utilisateur') || '{}')?.login ?? 'default'
       localStorage.setItem(`inventaire_colonnes_cachees_${login}`, JSON.stringify(Array.from(next)))
       return next
     })
   }
 
-  function onDragStart(champId: number) {
-    dragColonne.current = champId
-  }
+  function onDragStart(key: string) { dragColonne.current = key }
 
-  function onDrop(champId: number) {
-    if (dragColonne.current === null || dragColonne.current === champId) return
+  function onDrop(key: string) {
+    if (dragColonne.current === null || dragColonne.current === key) return
     const from = colonnesOrdre.indexOf(dragColonne.current)
-    const to = colonnesOrdre.indexOf(champId)
+    const to = colonnesOrdre.indexOf(key)
     const newOrdre = [...colonnesOrdre]
     newOrdre.splice(from, 1)
     newOrdre.splice(to, 0, dragColonne.current)
@@ -223,39 +209,32 @@ export default function Inventaire() {
     reload()
   }
 
-  const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
-
   function getArticleLabel(articleId: number): string {
     const art = articles.find(a => a.id === articleId)
     if (!art) return `Article #${articleId}`
-    const desig = art.valeurs.find(v =>
+    const desig = art.valeurs.find((v: any) =>
       CODES_DESIGNATION.includes(v.champ?.code?.toUpperCase?.() ?? '')
     )?.valeur
-    return desig || art.valeurs.map(v => v.valeur).filter(Boolean)[0] || `Article #${articleId}`
+    return desig || art.valeurs.map((v: any) => v.valeur).filter(Boolean)[0] || `Article #${articleId}`
   }
 
   const hasActiveFiltres = Object.values(filtres).some(v => v.trim() !== '')
 
   const filteredInventaires = inventaires.filter(inv => {
-    // Filtre Statut
     if (filtres['statut']?.trim()) {
-      const label = inv.statut?.label ?? ''
-      if (!label.toLowerCase().includes(filtres['statut'].toLowerCase())) return false
+      if (!(inv.statut?.label ?? '').toLowerCase().includes(filtres['statut'].toLowerCase())) return false
     }
-    // Filtres champs dynamiques
-    for (const champ of champs) {
-      const filtre = filtres[String(champ.id)]?.trim()
+    for (const col of COLONNES_INVENTAIRE) {
+      const filtre = filtres[col.key]?.trim()
       if (filtre) {
-        const valeur = String(inv.valeurs.find(v => v.champId === champ.id)?.valeur ?? '')
-        if (!valeur.toLowerCase().includes(filtre.toLowerCase())) return false
+        const val = String(inv[col.key] ?? '')
+        if (!val.toLowerCase().includes(filtre.toLowerCase())) return false
       }
     }
     return true
   })
 
-  function resetFiltres() {
-    setFiltres({})
-  }
+  function resetFiltres() { setFiltres({}) }
 
   async function handleDelete(id: number) {
     await inventaireApi.delete(id)
@@ -264,19 +243,26 @@ export default function Inventaire() {
   }
 
   function openEdit(item: Inventaire) {
-    const valeurs: Record<number, string> = {}
-    item.valeurs.forEach(v => { valeurs[v.champId] = v.valeur ?? '' })
-    setEditItem({ id: item.id, articleId: item.articleId, statutId: item.statutId, valeurs })
+    const fields: Record<string, string> = {}
+    for (const col of COLONNES_INVENTAIRE) {
+      const val = item[col.key]
+      if (val != null) {
+        fields[col.key] = col.type === 'date' ? String(val).split('T')[0] : String(val)
+      } else {
+        fields[col.key] = ''
+      }
+    }
+    setEditItem({ id: item.id, articleId: item.articleId, statutId: item.statutId, fields })
   }
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editItem) return
-    const valeurs = Object.entries(editItem.valeurs).map(([champId, valeur]) => ({ champId: Number(champId), valeur }))
-    await inventaireApi.update(editItem.id, {
-      statutId: editItem.statutId || null,
-      valeurs
-    })
+    const data: Record<string, any> = { statutId: editItem.statutId || null }
+    for (const col of COLONNES_INVENTAIRE) {
+      data[col.key] = editItem.fields[col.key] || null
+    }
+    await inventaireApi.update(editItem.id, data)
     setEditItem(null)
     reload()
   }
@@ -312,28 +298,33 @@ export default function Inventaire() {
               <X size={14} /> Effacer filtres
             </button>
           )}
-          {champsOrdonnes.length > 0 && (
-            <ColonnesToggle champs={champsOrdonnes} colonnesCachees={colonnesCachees} onToggle={toggleColonne} />
-          )}
-          {colonnesExport.length > 0 && (
-            <ExportExcelButton
-              columns={colonnesExport}
-              rows={filteredInventaires}
-              getValue={valeurExport}
-              filename={`inventaire_${new Date().toISOString().slice(0, 10)}.xlsx`}
-              sheetName="Inventaire"
-            />
-          )}
+          <div ref={toggleRef} style={{ position: 'relative' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setShowToggle(o => !o)} title="Afficher ou masquer des colonnes">
+              <Columns3 size={14} /> Colonnes
+            </button>
+            {showToggle && (
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '4px', background: '#1a1d27', border: '1px solid #2d3140', borderRadius: '8px', padding: '8px', zIndex: 20, minWidth: '180px', maxHeight: '320px', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+                {colonnesOrdonnees.map(c => (
+                  <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 6px', fontSize: '13px', color: '#e2e8f0', cursor: 'pointer', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+                    <input type="checkbox" checked={!colonnesCachees.has(c.key)} onChange={() => toggleColonne(c.key)} />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          <ExportExcelButton
+            columns={colonnesExport}
+            rows={filteredInventaires}
+            getValue={valeurExport}
+            filename={`inventaire_${new Date().toISOString().slice(0, 10)}.xlsx`}
+            sheetName="Inventaire"
+          />
         </div>
       </div>
 
       {chargement ? (
         <div className="loading-container"><div className="loading-spinner" /></div>
-      ) : champs.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '48px', color: '#9ca3af' }}>
-          <p style={{ marginBottom: '8px', fontWeight: 500 }}>Aucun champ configuré</p>
-          <p style={{ fontSize: '13px' }}>Configurez d'abord les champs dans Configuration → Structure inventaire.</p>
-        </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
@@ -349,12 +340,12 @@ export default function Inventaire() {
                 </th>
                 <th></th>
                 <th>Statut</th>
-                {champsAffiches.map(c => (
-                  <th key={c.id}
+                {colonnesAffichees.map(c => (
+                  <th key={c.key}
                     draggable
-                    onDragStart={() => onDragStart(c.id)}
+                    onDragStart={() => onDragStart(c.key)}
                     onDragOver={e => e.preventDefault()}
-                    onDrop={() => onDrop(c.id)}
+                    onDrop={() => onDrop(c.key)}
                     style={{ cursor: 'grab', userSelect: 'none', whiteSpace: 'nowrap' }}
                     title="Glisser pour déplacer"
                   >
@@ -371,11 +362,11 @@ export default function Inventaire() {
                     onChange={e => setFiltres(f => ({ ...f, statut: e.target.value }))}
                     style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
                 </td>
-                {champsAffiches.map(c => (
-                  <td key={c.id} style={{ padding: '4px 8px' }}>
+                {colonnesAffichees.map(c => (
+                  <td key={c.key} style={{ padding: '4px 8px' }}>
                     <input className="form-input" placeholder="Filtrer..."
-                      value={filtres[String(c.id)] ?? ''}
-                      onChange={e => setFiltres(f => ({ ...f, [c.id]: e.target.value }))}
+                      value={filtres[c.key] ?? ''}
+                      onChange={e => setFiltres(f => ({ ...f, [c.key]: e.target.value }))}
                       style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
                   </td>
                 ))}
@@ -383,7 +374,7 @@ export default function Inventaire() {
             </thead>
             <tbody>
               {filteredInventaires.length === 0 && (
-                <tr><td colSpan={champsAffiches.length + 2} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
+                <tr><td colSpan={colonnesAffichees.length + 3} style={{ textAlign: 'center', color: '#9ca3af', padding: '40px' }}>
                   {hasActiveFiltres ? 'Aucun résultat' : 'Aucune donnée'}
                 </td></tr>
               )}
@@ -416,8 +407,13 @@ export default function Inventaire() {
                     )}
                   </td>
                   <td style={{ padding: '4px 10px' }}><StatutBadge statut={item.statut} /></td>
-                  {champsAffiches.map(c => (
-                    <td key={c.id} style={{ padding: '4px 10px' }}>{getValeur(item, c) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  {colonnesAffichees.map(c => (
+                    <td key={c.key} style={{ padding: '4px 10px' }}>
+                      {getValeur(item, c.key) === '—'
+                        ? <span style={{ color: '#d1d5db' }}>—</span>
+                        : getValeur(item, c.key)
+                      }
+                    </td>
                   ))}
                 </tr>
               ))}
@@ -430,7 +426,7 @@ export default function Inventaire() {
       {/* Modal édition */}
       {editItem && (
         <div className="modal-overlay">
-          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '520px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
+          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px' }}>Modifier — Inventaire</h3>
             <form onSubmit={handleEdit}>
               <div className="form-group">
@@ -446,30 +442,17 @@ export default function Inventaire() {
                   ))}
                 </select>
               </div>
-              {champs.map(c => (
-                <div className="form-group" key={c.id}>
-                  <label className="form-label">
-                    {c.label}
-                    {c.obligatoire && <span style={{ color: '#dc2626', marginLeft: '4px' }}>*</span>}
-                  </label>
-                  {c.code.toUpperCase() === 'EMPLACEMENT' ? (
-                    <EmplacementSelect
-                      value={editItem.valeurs[c.id] ?? ''}
-                      onChange={val => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: val } } : ei)}
-                      required={c.obligatoire}
-                    />
-                  ) : (c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
-                    <input type="date" required={c.obligatoire} className="form-input"
-                      value={editItem.valeurs[c.id] ?? ''}
-                      onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />
-                  ) : c.type === 'NUMBER' ? (
-                    <input type="number" required={c.obligatoire} className="form-input"
-                      value={editItem.valeurs[c.id] ?? ''}
-                      onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />
+              {COLONNES_INVENTAIRE.map(c => (
+                <div className="form-group" key={c.key}>
+                  <label className="form-label">{c.label}</label>
+                  {c.type === 'date' ? (
+                    <input type="date" className="form-input"
+                      value={editItem.fields[c.key] ?? ''}
+                      onChange={e => setEditItem(ei => ei ? { ...ei, fields: { ...ei.fields, [c.key]: e.target.value } } : ei)} />
                   ) : (
-                    <input type="text" required={c.obligatoire} className="form-input"
-                      value={editItem.valeurs[c.id] ?? ''}
-                      onChange={e => setEditItem(ei => ei ? { ...ei, valeurs: { ...ei.valeurs, [c.id]: e.target.value } } : ei)} />
+                    <input type="text" className="form-input"
+                      value={editItem.fields[c.key] ?? ''}
+                      onChange={e => setEditItem(ei => ei ? { ...ei, fields: { ...ei.fields, [c.key]: e.target.value } } : ei)} />
                   )}
                 </div>
               ))}
@@ -500,7 +483,7 @@ export default function Inventaire() {
         </div>
       )}
 
-      {/* Modal historique / détail */}
+      {/* Modal historique */}
       {historique !== null && (
         <div className="modal-overlay">
           <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>

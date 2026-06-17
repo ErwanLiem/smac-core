@@ -252,17 +252,28 @@ interface MasterBoxDetail {
   groupes: GroupeMasterBox[]
 }
 
-interface ChampExport {
-  id: number
-  code: string
-  label: string
-}
-
 interface ArticleExport {
   id: number
+  serialNumber: string
+  partNumber: string
+  rma: string
+  customer: string
+  productFamily: string
+  livelloRiparazione: string
+  warranty: string
   statut: { label: string } | null
-  valeurs: { champId: number; valeur: string | null }[]
 }
+
+const ARTICLE_EXPORT_COLUMNS = [
+  { key: 'statut', label: 'Statut' },
+  { key: 'serialNumber', label: 'N° de série' },
+  { key: 'partNumber', label: 'P/N' },
+  { key: 'rma', label: 'RMA' },
+  { key: 'customer', label: 'Client' },
+  { key: 'productFamily', label: 'Famille produit' },
+  { key: 'livelloRiparazione', label: 'Niveau réparation' },
+  { key: 'warranty', label: 'Garantie' },
+]
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
@@ -600,7 +611,7 @@ function EnvoiTab() {
   const [bonLivraison, setBonLivraison] = useState('')
   const [confirmRetrait, setConfirmRetrait] = useState<{ inventaireId: number; sn: string; masterBoxId: number } | null>(null)
   const [retraitEnCours, setRetraitEnCours] = useState(false)
-  const [exportData, setExportData] = useState<{ champs: ChampExport[]; articles: ArticleExport[] } | null>(null)
+  const [exportData, setExportData] = useState<{ articles: ArticleExport[] } | null>(null)
   const [plateformes, setPlateformes] = useState<any[]>([])
   const [champsPlateforme, setChampsPlateforme] = useState<any[]>([])
   const [plateformeSelectionnee, setPlateformeSelectionnee] = useState<number | ''>('')
@@ -626,7 +637,7 @@ function EnvoiTab() {
 
   useEffect(() => {
     if (!modalClient) { setExportData(null); return }
-    get<{ champs: ChampExport[]; articles: ArticleExport[] }>(`/expeditions/${siteId}/masterbox/enregistrees-articles?clientValeur=${encodeURIComponent(modalClient)}`)
+    get<{ articles: ArticleExport[] }>(`/expeditions/${siteId}/masterbox/enregistrees-articles?clientValeur=${encodeURIComponent(modalClient)}`)
       .then(setExportData)
       .catch(() => setExportData(null))
   }, [modalClient, siteId])
@@ -870,9 +881,9 @@ function EnvoiTab() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {exportData && exportData.articles.length > 0 && (
                   <ExportExcelButton
-                    columns={[{ key: 'statut', label: 'Statut' }, ...exportData.champs.map(c => ({ key: String(c.id), label: c.label }))] as ExportColumn[]}
+                    columns={ARTICLE_EXPORT_COLUMNS as ExportColumn[]}
                     rows={exportData.articles}
-                    getValue={(row: ArticleExport, key: string) => key === 'statut' ? (row.statut?.label ?? '') : (row.valeurs.find(v => v.champId === Number(key))?.valeur ?? '')}
+                    getValue={(row: ArticleExport, key: string) => key === 'statut' ? (row.statut?.label ?? '') : ((row as any)[key] ?? '')}
                     filename={`expedition_${clientModal.clientValeur}_${new Date().toISOString().slice(0, 10)}.xlsx`}
                     sheetName="Expédition"
                   />

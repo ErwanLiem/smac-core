@@ -2,16 +2,10 @@ import { useEffect, useState } from 'react'
 import { Trash2, Plus, Pencil, Check, X, AlertTriangle } from 'lucide-react'
 import { get, post, put, del } from '../api/client'
 import { getPermissions, getSiteId } from '../utils/permissions'
-
-interface ChampInv {
-  id: number
-  code: string
-  label: string
-  type: string
-}
+import { COLONNES_INVENTAIRE, COLONNES_DATE } from '../constants/colonnesInventaire'
 
 interface AutoFillItem {
-  codeChamp: string
+  colonne: string
   valeur: string
 }
 
@@ -34,14 +28,14 @@ const FORM_VIDE = {
   actif: true,
 }
 
+const CHAMPS_DATE_LABELS = COLONNES_DATE.reduce((acc, c) => { acc[c.key] = c.label; return acc }, {} as Record<string, string>)
+
 export default function AdminReglesAlerte({ embedded }: { embedded?: boolean } = {}) {
   const siteId = getSiteId()
   const { isAdmin } = getPermissions()
 
   const [chargement, setChargement] = useState(true)
   const [regles, setRegles] = useState<RegleAlerte[]>([])
-  const [champsDate, setChampsDate] = useState<ChampInv[]>([])
-  const [tousChamps, setTousChamps] = useState<ChampInv[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [form, setForm] = useState({ ...FORM_VIDE })
@@ -51,19 +45,13 @@ export default function AdminReglesAlerte({ embedded }: { embedded?: boolean } =
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
-    const [r, c] = await Promise.all([
-      get<RegleAlerte[]>(`/regles-alerte/${siteId}`),
-      get<ChampInv[]>(`/inventaire/${siteId}/champs`)
-    ])
+    const r = await get<RegleAlerte[]>(`/regles-alerte/${siteId}`)
     setRegles(r.map(regle => ({
       ...regle,
       champsAutoFill: regle.champsAutoFill
         ? (typeof regle.champsAutoFill === 'string' ? JSON.parse(regle.champsAutoFill) : regle.champsAutoFill)
         : []
     })))
-    const actifs = c.filter(ch => ch.actif !== false)
-    setTousChamps(actifs)
-    setChampsDate(actifs.filter(ch => ch.type === 'DATE' || ch.type === 'DATE_TODAY'))
     setChargement(false)
   }
 
@@ -113,7 +101,7 @@ export default function AdminReglesAlerte({ embedded }: { embedded?: boolean } =
   }
 
   function addAutoFill() {
-    setForm(f => ({ ...f, champsAutoFill: [...f.champsAutoFill, { codeChamp: '', valeur: '' }] }))
+    setForm(f => ({ ...f, champsAutoFill: [...f.champsAutoFill, { colonne: '', valeur: '' }] }))
   }
 
   function updateAutoFill(idx: number, key: keyof AutoFillItem, value: string) {
@@ -194,7 +182,7 @@ export default function AdminReglesAlerte({ embedded }: { embedded?: boolean } =
               {regles.map(r => (
                 <tr key={r.id}>
                   <td>{r.nom}</td>
-                  <td><code style={{ background: '#0f172a', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>{r.codeChampDate}</code></td>
+                  <td><code style={{ background: '#0f172a', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>{CHAMPS_DATE_LABELS[r.codeChampDate] ?? r.codeChampDate}</code></td>
                   <td>{r.seuilMois} mois</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -204,7 +192,7 @@ export default function AdminReglesAlerte({ embedded }: { embedded?: boolean } =
                   </td>
                   <td style={{ fontSize: '12px', color: '#9ca3af' }}>
                     {r.champsAutoFill && r.champsAutoFill.length > 0
-                      ? r.champsAutoFill.map(af => `${af.codeChamp} = "${af.valeur}"`).join(', ')
+                      ? r.champsAutoFill.map(af => `${af.colonne} = "${af.valeur}"`).join(', ')
                       : <span style={{ color: '#4b5563' }}>—</span>
                     }
                   </td>
@@ -244,20 +232,11 @@ export default function AdminReglesAlerte({ embedded }: { embedded?: boolean } =
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Champ date à surveiller *</label>
-                  {champsDate.length > 0 ? (
-                    <select required className="form-input" value={form.codeChampDate} onChange={e => setForm(f => ({ ...f, codeChampDate: e.target.value }))}>
-                      <option value="">— Choisir —</option>
-                      {champsDate.map(c => <option key={c.id} value={c.code}>{c.label} ({c.code})</option>)}
-                    </select>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input className="form-input" required value={form.codeChampDate}
-                        onChange={e => setForm(f => ({ ...f, codeChampDate: e.target.value.toUpperCase() }))}
-                        placeholder="ex: DATE_FIN_GARANTIE" />
-                      <span style={{ fontSize: '12px', color: '#9ca3af', alignSelf: 'center', whiteSpace: 'nowrap' }}>Aucun champ DATE trouvé</span>
-                    </div>
-                  )}
+                  <label className="form-label">Colonne date à surveiller *</label>
+                  <select required className="form-input" value={form.codeChampDate} onChange={e => setForm(f => ({ ...f, codeChampDate: e.target.value }))}>
+                    <option value="">— Choisir —</option>
+                    {COLONNES_DATE.map(c => <option key={c.key} value={c.key}>{c.label} ({c.key})</option>)}
+                  </select>
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
@@ -291,10 +270,10 @@ export default function AdminReglesAlerte({ embedded }: { embedded?: boolean } =
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {form.champsAutoFill.map((af, idx) => (
                       <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <select className="form-input" style={{ flex: 1 }} value={af.codeChamp}
-                          onChange={e => updateAutoFill(idx, 'codeChamp', e.target.value)}>
-                          <option value="">— Champ —</option>
-                          {tousChamps.map(c => <option key={c.id} value={c.code}>{c.label}</option>)}
+                        <select className="form-input" style={{ flex: 1 }} value={af.colonne}
+                          onChange={e => updateAutoFill(idx, 'colonne', e.target.value)}>
+                          <option value="">— Colonne —</option>
+                          {COLONNES_INVENTAIRE.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                         </select>
                         <span style={{ color: '#6b7280', flexShrink: 0 }}>=</span>
                         <input className="form-input" style={{ flex: 1 }} placeholder="Valeur à écrire"

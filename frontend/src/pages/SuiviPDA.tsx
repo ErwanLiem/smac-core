@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Package } from 'lucide-react'
 import { get } from '../api/client'
-import { inventaireApi } from '../api/inventaire'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
-import EmplacementCell from '../components/EmplacementCell'
 import { getSiteId } from '../utils/permissions'
 import { usePeriodeMensuelle } from '../hooks/usePeriodeMensuelle'
 
@@ -11,15 +9,12 @@ interface Semaine { numero: number; label: string }
 
 interface LignePDA {
   articleId: number
-  inventaireId: number | null
   reference: string
-  location: string
   additionalReference: string
   wording: string
   range: string
   stockQty: number
   hebdo: Record<number, number>
-  transfer: number
   monthlyConsumption: number
   supply: number
 }
@@ -29,8 +24,6 @@ interface SuiviPDAData {
   mois: number
   estMoisCourant: boolean
   semaines: Semaine[]
-  champTransferId: number
-  champEmplacementId: number | null
   rows: LignePDA[]
 }
 
@@ -38,9 +31,6 @@ export default function SuiviPDA() {
   const siteId = getSiteId()
   const [data, setData] = useState<SuiviPDAData | null>(null)
   const [chargement, setChargement] = useState(true)
-  const [transferts, setTransferts] = useState<Record<number, string>>({})
-  const [emplacements, setEmplacements] = useState<Record<number, string>>({})
-  const [emplacementsEnregistres, setEmplacementsEnregistres] = useState<Record<number, string>>({})
   const { periode, moisPrecedent, moisSuivant, moisLabel, estMoisCourant } = usePeriodeMensuelle(data?.estMoisCourant)
 
   useEffect(() => { reload() }, [siteId, periode])
@@ -50,47 +40,19 @@ export default function SuiviPDA() {
     try {
       const d = await get<SuiviPDAData>(`/production/suivi-pda/${siteId}?annee=${periode.annee}&mois=${periode.mois}`)
       setData(d)
-      const init: Record<number, string> = {}
-      const initEmpl: Record<number, string> = {}
-      for (const row of d.rows) if (row.inventaireId) {
-        init[row.inventaireId] = String(row.transfer)
-        initEmpl[row.inventaireId] = row.location
-      }
-      setTransferts(init)
-      setEmplacements(initEmpl)
-      setEmplacementsEnregistres(initEmpl)
     } finally {
       setChargement(false)
     }
   }
 
-  async function validerTransfer(inventaireId: number) {
-    if (!data) return
-    const valeur = transferts[inventaireId] ?? '0'
-    await inventaireApi.updateValeurChamp(inventaireId, data.champTransferId, valeur)
-  }
-
-  async function validerEmplacement(inventaireId: number) {
-    if (!data || !data.champEmplacementId) return
-    const valeur = emplacements[inventaireId] ?? ''
-    await inventaireApi.updateValeurChamp(inventaireId, data.champEmplacementId, valeur)
-    setEmplacementsEnregistres(f => ({ ...f, [inventaireId]: valeur }))
-  }
-
-  function annulerEmplacement(inventaireId: number) {
-    setEmplacements(f => ({ ...f, [inventaireId]: emplacementsEnregistres[inventaireId] ?? '' }))
-  }
-
   // Colonnes proposées pour l'export Excel
   const colonnesExport: ExportColumn[] = [
     { key: 'reference', label: 'Reference' },
-    { key: 'location', label: 'Code Stock Location' },
     { key: 'additionalReference', label: 'Additional references' },
     { key: 'wording', label: 'Wording' },
     { key: 'range', label: 'Range' },
     { key: 'stockQty', label: 'Stock QTY' },
     ...(data?.semaines.map(s => ({ key: `s${s.numero}`, label: s.label })) ?? []),
-    { key: 'transfer', label: 'Transfer' },
     { key: 'monthlyConsumption', label: 'Monthly consumption' },
     { key: 'supply', label: 'Supply' }
   ]
@@ -102,12 +64,10 @@ export default function SuiviPDA() {
     }
     switch (key) {
       case 'reference': return row.reference
-      case 'location': return row.inventaireId ? (emplacements[row.inventaireId] ?? row.location) : row.location
       case 'additionalReference': return row.additionalReference
       case 'wording': return row.wording
       case 'range': return row.range
       case 'stockQty': return row.stockQty
-      case 'transfer': return row.inventaireId ? Number(transferts[row.inventaireId] ?? row.transfer ?? 0) : row.transfer
       case 'monthlyConsumption': return row.monthlyConsumption
       case 'supply': return row.supply
       default: return ''
@@ -155,7 +115,6 @@ export default function SuiviPDA() {
             <thead>
               <tr>
                 <th>Reference</th>
-                <th>Code Stock Location</th>
                 <th>Additional references</th>
                 <th>Wording</th>
                 <th>Range</th>
@@ -163,7 +122,6 @@ export default function SuiviPDA() {
                 {data.semaines.map(s => (
                   <th key={s.numero} style={{ textAlign: 'center' }}>{s.label}</th>
                 ))}
-                <th style={{ textAlign: 'center' }}>Transfer</th>
                 <th style={{ textAlign: 'center' }}>Monthly consumption</th>
                 <th style={{ textAlign: 'center' }}>Supply</th>
               </tr>
@@ -172,22 +130,6 @@ export default function SuiviPDA() {
               {data.rows.map(row => (
                 <tr key={row.articleId}>
                   <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{row.reference || '—'}</td>
-                  <td>
-                    {row.inventaireId && data.champEmplacementId ? (() => {
-                      const id = row.inventaireId!
-                      const valeur = emplacements[id] ?? ''
-                      const modifie = valeur !== (emplacementsEnregistres[id] ?? '')
-                      return (
-                        <EmplacementCell
-                          valeur={valeur}
-                          modifie={modifie}
-                          onChange={v => setEmplacements(f => ({ ...f, [id]: v }))}
-                          onValider={() => validerEmplacement(id)}
-                          onAnnuler={() => annulerEmplacement(id)}
-                        />
-                      )
-                    })() : (row.location || '—')}
-                  </td>
                   <td>{row.additionalReference || '—'}</td>
                   <td>{row.wording || '—'}</td>
                   <td>{row.range || '—'}</td>
@@ -195,18 +137,6 @@ export default function SuiviPDA() {
                   {data.semaines.map(s => (
                     <td key={s.numero} style={{ textAlign: 'center' }}>{row.hebdo[s.numero] || 0}</td>
                   ))}
-                  <td style={{ textAlign: 'center' }}>
-                    {row.inventaireId ? (
-                      <input
-                        type="number"
-                        className="form-input"
-                        style={{ width: '70px', textAlign: 'center', padding: '4px 6px' }}
-                        value={transferts[row.inventaireId] ?? '0'}
-                        onChange={e => setTransferts(f => ({ ...f, [row.inventaireId!]: e.target.value }))}
-                        onBlur={() => validerTransfer(row.inventaireId!)}
-                      />
-                    ) : '—'}
-                  </td>
                   <td style={{ textAlign: 'center', fontWeight: 600 }}>{row.monthlyConsumption}</td>
                   <td style={{ textAlign: 'center', fontWeight: 600, color: '#4ade80' }}>{row.supply}</td>
                 </tr>

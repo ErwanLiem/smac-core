@@ -4,50 +4,37 @@ import { inventaireApi } from '../api/inventaire'
 import { get } from '../api/client'
 import { getSiteId } from '../utils/permissions'
 import { jouerSonAlerte } from '../utils/sons'
-import EmplacementSelect from '../components/EmplacementSelect'
+import { COLONNES_INVENTAIRE } from '../constants/colonnesInventaire'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function normalize(str: string): string {
   return str.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
 }
 
-function parseOptions(raw: string | null): string[] {
-  if (!raw) return []
-  try { return JSON.parse(raw) } catch { return [] }
-}
-
-function findChampId(champs: Champ[], codes: string[]): number | null {
-  const norm = codes.map(normalize)
-  const c = champs.find(ch => norm.includes(normalize(ch.code)))
-  return c ? c.id : null
-}
-
 // ─── Constantes ───────────────────────────────────────────────────────────────
 const CODES_PN          = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO']
 const CODES_DESIGNATION = ['DESIGNATION', 'DESIG', 'NOM', 'LIBELLE', 'DESCRIPTION']
-const CODES_TYPE        = ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE']  // articles ET inventaire
+const CODES_TYPE        = ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE']
 const CODES_SUIVI       = ['SUIVI', 'MODE_SUIVI', 'TRACKING']
-const CODES_CLIENT      = ['CLIENT', 'CLIENTS']
-const CODES_PLATEFORME  = ['PLATEFORME', 'PLATEFORMES']
-const CODES_EMPLACEMENT = ['EMPLACEMENT']
-const CODES_NOM         = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
+
+// Champs de réception (communs à toutes les lignes du lot)
+const CHAMPS_RECEPTION_SN  = COLONNES_INVENTAIRE.filter(c => c.receptionSN && c.key !== 'serialNumber')
+const CHAMPS_RECEPTION_QTE = COLONNES_INVENTAIRE.filter(c => c.receptionQTE)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-interface Champ {
-  id: number; code: string; label: string; type: string
-  options: string | null; obligatoire: boolean
-  visibleReceptionSN: boolean; visibleReceptionQTE: boolean; actif: boolean
+interface ChampArticle {
+  id: number; code: string; label: string; type: string; actif: boolean
 }
 interface Article {
   id: number
-  valeurs: { champId: number; valeur: string | null; champ: Champ }[]
+  valeurs: { champId: number; valeur: string | null; champ: ChampArticle }[]
 }
 interface Statut { id: number; label: string; couleur: string; code?: string }
 interface LigneSN { sn: string; accessoires: number[]; panneClient: string }
 interface LotPrepare {
   id: number; articleId: number; articleLabel: string
   modesuivi: 'SN' | 'QTE' | 'AUTRE'
-  champsCommuns: Record<number, string>
+  champsCommuns: Record<string, string>
   lignes: { sn: string; accessoiresIds: number[]; accessoiresLabels: string[]; panneClient: string }[]
   quantite: number; statut: string | null; statutId: number | null
   caisse: string | null
@@ -59,14 +46,9 @@ export default function Reception() {
   const snInputRef = useRef<HTMLInputElement>(null)
 
   const [chargement, setChargement] = useState(true)
-  const [champsArticles, setChampsArticles] = useState<Champ[]>([])
-  const [champsInv, setChampsInv]           = useState<Champ[]>([])
-  const [champsClients, setChampsClients]   = useState<Champ[]>([])
-  const [champsPlateformes, setChampsPlateformes] = useState<Champ[]>([])
+  const [champsArticles, setChampsArticles] = useState<ChampArticle[]>([])
   const [articles, setArticles]             = useState<Article[]>([])
   const [articlesAccessoires, setArticlesAccessoires] = useState<Article[]>([])
-  const [clients, setClients]               = useState<any[]>([])
-  const [plateformes, setPlateformes]       = useState<any[]>([])
   const [statuts, setStatuts]               = useState<Statut[]>([])
 
   const [lotsEnAttente, setLotsEnAttente]   = useState<LotPrepare[]>([])
@@ -75,7 +57,7 @@ export default function Reception() {
 
   const [infosValidees, setInfosValidees] = useState(false)
   const [articleId, setArticleId]         = useState<number>(0)
-  const [champsCommuns, setChampsCommuns] = useState<Record<number, string>>({})
+  const [champsCommuns, setChampsCommuns] = useState<Record<string, string>>({})
   const [lignesSN, setLignesSN]           = useState<LigneSN[]>([])
   const [snCurrent, setSnCurrent]         = useState('')
   const [caisseActive, setCaisseActive]   = useState('')
@@ -85,33 +67,16 @@ export default function Reception() {
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
-    const [ca, ci, cc, cp, a, cl, pl, s] = await Promise.all([
-      get<Champ[]>(`/articles/${siteId}/champs`),
-      inventaireApi.getChamps(siteId),
-      get<Champ[]>(`/clients/${siteId}/champs`),
-      get<Champ[]>(`/plateformes/${siteId}/champs`),
+    const [ca, a, s] = await Promise.all([
+      get<ChampArticle[]>(`/articles/${siteId}/champs`),
       get<Article[]>(`/articles/${siteId}`),
-      get<any[]>(`/clients/${siteId}`),
-      get<any[]>(`/plateformes/${siteId}`),
       get<Statut[]>(`/workflow/${siteId}/statuts`)
     ])
 
     setChampsArticles(ca.filter(c => c.actif))
-    setChampsClients(cc.filter(c => c.actif))
-    setChampsPlateformes(cp.filter(c => c.actif))
-    setClients(cl); setPlateformes(pl); setStatuts(s)
+    setStatuts(s)
 
-    const champsActifs = ci.filter(c => c.actif)
-    setChampsInv(champsActifs)
-
-    // Pré-remplir DATE_TODAY
-    const today = new Date().toISOString().split('T')[0]
-    const preRemplis: Record<number, string> = {}
-    champsActifs.forEach(c => { if (c.type === 'DATE_TODAY') preRemplis[c.id] = today })
-    if (Object.keys(preRemplis).length > 0) setChampsCommuns(f => ({ ...preRemplis, ...f }))
-
-    // Séparer articles normaux et accessoires
-    const champsTypeIds = ca.filter(c => CODES_TYPE.some(code => normalize(c.code) === normalize(code))).map(c => c.id)
+    const champsTypeIds = ca.filter(c => ['TYPE', 'TYPE_PRODUIT', 'CATEGORIE'].some(code => normalize(c.code) === code)).map(c => c.id)
     const estAccessoire = (art: Article) => art.valeurs.some(v => champsTypeIds.includes(v.champId) && normalize(String(v.valeur ?? '')) === 'ACCESSOIRE')
     setArticlesAccessoires(a.filter(estAccessoire))
     setArticles(a.filter(art => !estAccessoire(art)))
@@ -128,12 +93,6 @@ export default function Reception() {
   function getArticleLabelById(id: number): string {
     const art = [...articles, ...articlesAccessoires].find(a => a.id === id)
     return art ? getArticleLabel(art) : `#${id}`
-  }
-
-  function getEntiteLabel(entite: any, champs: Champ[]): string {
-    const champNom = champs.find(c => CODES_NOM.includes(normalize(c.code)))
-    const val = champNom ? entite.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur : null
-    return val || champs.map(c => entite.valeurs?.find((v: any) => v.champId === c.id)?.valeur).filter(Boolean)[0] || `#${entite.id}`
   }
 
   // ─── Mode suivi ───────────────────────────────────────────────────────────
@@ -154,8 +113,7 @@ export default function Reception() {
   const articleSelectionne = articles.find(a => a.id === articleId)
   const modeSuivi = getModesuivi()
 
-  // ─── Champs visibles en réception ─────────────────────────────────────────
-  const champsVisibles = champsInv.filter(c => modeSuivi === 'QTE' ? c.visibleReceptionQTE : c.visibleReceptionSN)
+  const champsVisibles = modeSuivi === 'QTE' ? CHAMPS_RECEPTION_QTE : CHAMPS_RECEPTION_SN
 
   // ─── S/N ──────────────────────────────────────────────────────────────────
   async function addSN() {
@@ -218,11 +176,6 @@ export default function Reception() {
     if (modeSuivi === 'QTE' && quantite < 1) { setErreur('La quantité doit être supérieure à 0'); return }
     setErreur(null)
 
-    // Assurer DATE_TODAY
-    const today = new Date().toISOString().split('T')[0]
-    const champsAvecDateToday = { ...champsCommuns }
-    champsInv.forEach(c => { if (c.type === 'DATE_TODAY' && !champsAvecDateToday[c.id]) champsAvecDateToday[c.id] = today })
-
     const art = articles.find(a => a.id === articleId)!
     const statutId = modeSuivi === 'SN' ? getStatutStock() : null
 
@@ -231,7 +184,7 @@ export default function Reception() {
       articleId,
       articleLabel: getArticleLabel(art),
       modesuivi: modeSuivi,
-      champsCommuns: champsAvecDateToday,
+      champsCommuns,
       lignes: modeSuivi === 'SN'
         ? lignesSN.map(l => ({ sn: l.sn, accessoiresIds: l.accessoires, accessoiresLabels: l.accessoires.map(id => getArticleLabelById(id)), panneClient: l.panneClient }))
         : [{ sn: '', accessoiresIds: [], accessoiresLabels: [], panneClient: '' }],
@@ -241,8 +194,6 @@ export default function Reception() {
       caisse: caisseActive || null
     }])
 
-    // Garder l'article sélectionné et les infos communes : l'utilisateur peut
-    // enchaîner une nouvelle saisie (autre quantité ou nouveaux S/N) sans tout ressaisir.
     setLignesSN([])
     setQuantite(1)
     setSnCurrent('')
@@ -254,47 +205,33 @@ export default function Reception() {
     if (lotsEnAttente.length === 0) return
     setErreur(null)
     try {
-      const idPN     = findChampId(champsInv, CODES_PN)
-      const idDesig  = findChampId(champsInv, CODES_DESIGNATION)
-      const idType   = findChampId(champsInv, CODES_TYPE)
-      const idSN     = findChampId(champsInv, ['SN', 'S_N', 'NUMERO_SERIE', 'NUMÉRO DE SÉRIE'])
-      const idAcc    = findChampId(champsInv, ['ACCESSOIRES', 'ACCESSOIRE'])
-      const idPanne  = findChampId(champsInv, ['PANNE_CLIENT', 'PANNE', 'PANNE_DECLARE', 'PANNE_DECLAREE'])
-      const idQte    = findChampId(champsInv, ['QUANTITE', 'QTE', 'QUANTITY'])
-      const idCaisse = findChampId(champsInv, ['CAISSE'])
-
-      const inventaireExistant: any[] = await inventaireApi.getAll(siteId)
-
       for (const lot of lotsEnAttente) {
         const artSource = [...articles, ...articlesAccessoires].find(a => a.id === lot.articleId)
-        const pnValeur    = artSource?.valeurs.find(v => CODES_PN.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur ?? ''
-        const desigValeur = artSource?.valeurs.find(v => CODES_DESIGNATION.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur ?? ''
-        const typeValeur  = artSource?.valeurs.find(v => CODES_TYPE.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur ?? ''
 
-        const valeursCommunes: { champId: number; valeur: string }[] = []
-        if (idPN && pnValeur)       valeursCommunes.push({ champId: idPN, valeur: pnValeur })
-        if (idDesig && desigValeur) valeursCommunes.push({ champId: idDesig, valeur: desigValeur })
-        if (idType && typeValeur)   valeursCommunes.push({ champId: idType, valeur: typeValeur })
-        for (const [champId, valeur] of Object.entries(lot.champsCommuns)) {
-          if (valeur) valeursCommunes.push({ champId: Number(champId), valeur })
+        // Extraire les valeurs de l'article (PN, désignation) depuis les champs articles
+        const pnValeur = artSource?.valeurs.find(v => CODES_PN.some(c => normalize(v.champ?.code ?? '') === normalize(c)))?.valeur ?? ''
+
+        // Champs communs du formulaire (champsCommuns keyed par nom de colonne)
+        const baseData: Record<string, any> = {
+          articleId: lot.articleId,
+          statutId: lot.statutId,
+          partNumber: pnValeur || lot.champsCommuns.partNumber || null,
+        }
+
+        // Merge les champs communs (tous sauf partNumber déjà géré)
+        for (const [key, val] of Object.entries(lot.champsCommuns)) {
+          if (key !== 'partNumber' && val) baseData[key] = val
         }
 
         if (lot.modesuivi === 'QTE') {
-          const ligneExistante = inventaireExistant.find(inv => inv.articleId === lot.articleId)
-          if (ligneExistante) {
-            if (idQte) await inventaireApi.receptionQte(ligneExistante.id, { champId: idQte, quantite: lot.quantite })
-          } else {
-            const valeurs = [...valeursCommunes, ...(idQte ? [{ champId: idQte, valeur: String(lot.quantite) }] : [])]
-            await inventaireApi.create(siteId, { articleId: lot.articleId, statutId: lot.statutId, valeurs })
-          }
+          await inventaireApi.create(siteId, baseData)
         } else {
           for (const ligne of lot.lignes) {
-            const valeurs = [...valeursCommunes]
-            if (idSN && ligne.sn)                            valeurs.push({ champId: idSN,    valeur: ligne.sn })
-            if (idAcc && ligne.accessoiresLabels.length > 0) valeurs.push({ champId: idAcc,   valeur: ligne.accessoiresLabels.join(', ') })
-            if (idPanne && ligne.panneClient)                valeurs.push({ champId: idPanne, valeur: ligne.panneClient })
-            if (idCaisse && lot.caisse)                      valeurs.push({ champId: idCaisse, valeur: lot.caisse })
-            await inventaireApi.create(siteId, { articleId: lot.articleId, statutId: lot.statutId, valeurs })
+            const lineData = { ...baseData, serialNumber: ligne.sn || null }
+            if (ligne.panneClient) lineData.defectFromCustomer = ligne.panneClient
+            if (lot.caisse) lineData.genericNotes = lot.caisse  // stocker la caisse dans notes si pas de champ dédié
+            if (ligne.accessoiresLabels.length > 0) lineData.genericNotes = [lot.caisse, ligne.accessoiresLabels.join(', ')].filter(Boolean).join(' | ')
+            await inventaireApi.create(siteId, lineData)
           }
         }
       }
@@ -305,23 +242,18 @@ export default function Reception() {
 
   async function handleConfirmerReception() {
     await handleValider()
-    // Reset complet
     setArticleId(0); setChampsCommuns({}); setLignesSN([]); setSnCurrent('')
     setQuantite(1); setLotsEnAttente([]); setInfosValidees(false); setShowConfirmation(false)
   }
 
-  function handleAnnulerConfirmation() {
-    setShowConfirmation(false)
-  }
+  function handleAnnulerConfirmation() { setShowConfirmation(false) }
 
   function handleValiderInfos(e: React.FormEvent) {
     e.preventDefault()
     setInfosValidees(true)
   }
 
-  function handleModifierInfos() {
-    setInfosValidees(false)
-  }
+  function handleModifierInfos() { setInfosValidees(false) }
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -343,7 +275,7 @@ export default function Reception() {
         <div className="card">
           <form onSubmit={infosValidees ? handlePreparer : handleValiderInfos}>
 
-            {/* ── Étape 1 : choix de l'article ── */}
+            {/* Article */}
             <div className="form-group" style={{ marginBottom: '12px' }}>
               <label className="form-label">Article *</label>
               <select
@@ -356,8 +288,6 @@ export default function Reception() {
                   setLignesSN([])
                   setQuantite(1)
                   setSnCurrent('')
-                  // Si on revient à "— Choisir —" : reset complet
-                  // Si on change juste d'article : garder les infos communes et l'état de validation
                   if (id === 0) { setInfosValidees(false); setChampsCommuns({}) }
                 }}
               >
@@ -366,7 +296,7 @@ export default function Reception() {
               </select>
             </div>
 
-            {/* Infos article sélectionné */}
+            {/* Infos article */}
             {articleSelectionne && (
               <div style={{ background: '#141720', border: '1px solid #2d3148', borderRadius: '8px', padding: '8px 12px', marginBottom: '12px', fontSize: '12px' }}>
                 {champsArticles.map(c => {
@@ -389,16 +319,10 @@ export default function Reception() {
               </div>
             )}
 
-            {/* ── Étape 2 : champs de réception (affichés une fois l'article choisi) ── */}
             {articleId > 0 && <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '4px 0 12px' }} />}
 
-            {articleId > 0 && champsVisibles.length === 0 && (
-              <p style={{ color: '#f59e0b', fontSize: '12px', marginBottom: '12px' }}>
-                ⚠️ Aucun champ de réception configuré. Allez dans Configuration → Structure inventaire.
-              </p>
-            )}
+            {/* Champs communs */}
             {articleId > 0 && champsVisibles.length > 0 && (infosValidees ? (
-              /* Mode lecture seule */
               <div style={{ background: '#1e3a1e', border: '1px solid #86efac', borderRadius: '8px', padding: '12px', marginBottom: '4px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a' }}>✓ Informations validées</span>
@@ -407,63 +331,42 @@ export default function Reception() {
                     Modifier
                   </button>
                 </div>
-                {champsVisibles.map(c => champsCommuns[c.id] ? (
-                  <div key={c.id} style={{ display: 'flex', gap: '8px', fontSize: '12px', marginBottom: '2px' }}>
+                {champsVisibles.map(c => champsCommuns[c.key] ? (
+                  <div key={c.key} style={{ display: 'flex', gap: '8px', fontSize: '12px', marginBottom: '2px' }}>
                     <span style={{ color: '#6b7280', minWidth: '100px' }}>{c.label} :</span>
-                    <span style={{ fontWeight: 500 }}>{champsCommuns[c.id]}</span>
+                    <span style={{ fontWeight: 500 }}>{champsCommuns[c.key]}</span>
                   </div>
                 ) : null)}
               </div>
             ) : (
-              /* Mode saisie */
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {champsVisibles.map(c => {
-                  const opts = parseOptions(c.options)
-                  return (
-                    <div key={c.id} className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">{c.label} <span style={{ color: '#dc2626' }}>*</span></label>
-                      {CODES_EMPLACEMENT.includes(normalize(c.code)) ? (
-                        <EmplacementSelect required value={champsCommuns[c.id] ?? ''} onChange={val => setChampsCommuns(f => ({ ...f, [c.id]: val }))} />
-                      ) : CODES_CLIENT.includes(normalize(c.code)) ? (
-                        <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
-                          <option value="">— Choisir un client —</option>
-                          {clients.map(cl => <option key={cl.id} value={getEntiteLabel(cl, champsClients)}>{getEntiteLabel(cl, champsClients)}</option>)}
-                        </select>
-                      ) : CODES_PLATEFORME.includes(normalize(c.code)) ? (
-                        <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
-                          <option value="">— Choisir une plateforme —</option>
-                          {plateformes.map(pl => <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>{getEntiteLabel(pl, champsPlateformes)}</option>)}
-                        </select>
-                      ) : c.type === 'SELECT' ? (
-                        <select required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))}>
-                          <option value="">— Choisir —</option>
-                          {opts.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      ) : (c.type === 'DATE' || c.type === 'DATE_TODAY') ? (
-                        <input type="date" required className="form-input"
-                          value={champsCommuns[c.id] ?? (c.type === 'DATE_TODAY' ? new Date().toISOString().split('T')[0] : '')}
-                          onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
-                      ) : c.type === 'NUMBER' ? (
-                        <input type="number" required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
-                      ) : (
-                        <input type="text" required className="form-input" value={champsCommuns[c.id] ?? ''} onChange={e => setChampsCommuns(f => ({ ...f, [c.id]: e.target.value }))} />
-                      )}
-                    </div>
-                  )
-                })}
+                {champsVisibles.map(c => (
+                  <div key={c.key} className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">{c.label}</label>
+                    {c.type === 'date' ? (
+                      <input type="date" className="form-input"
+                        value={champsCommuns[c.key] ?? ''}
+                        onChange={e => setChampsCommuns(f => ({ ...f, [c.key]: e.target.value }))} />
+                    ) : (
+                      <input type="text" className="form-input"
+                        value={champsCommuns[c.key] ?? ''}
+                        onChange={e => setChampsCommuns(f => ({ ...f, [c.key]: e.target.value }))} />
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
 
             {articleId > 0 && <hr style={{ border: 'none', borderTop: '1px solid #f1f5f9', margin: '12px 0' }} />}
 
-            {/* Bouton valider infos — avant validation */}
+            {/* Bouton valider infos */}
             {articleId > 0 && !infosValidees && (
               <button type="submit" className="btn btn-primary" style={{ width: '100%', marginBottom: '4px' }}>
                 ✓ Valider les informations
               </button>
             )}
 
-            {/* Mode QTE — seulement si infos validées */}
+            {/* QTE */}
             {infosValidees && articleId > 0 && modeSuivi === 'QTE' && (
               <div className="form-group">
                 <label className="form-label">Quantité *</label>
@@ -472,10 +375,9 @@ export default function Reception() {
               </div>
             )}
 
-            {/* Mode SN — seulement si infos validées */}
+            {/* SN */}
             {infosValidees && articleId > 0 && (modeSuivi === 'SN' || modeSuivi === 'AUTRE') && (
               <>
-                {/* Caisse active */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '8px 12px', background: caisseActive ? '#1c2a1c' : '#1a1d27', border: `1px solid ${caisseActive ? '#4ade80' : '#374151'}`, borderRadius: '8px' }}>
                   <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>📦 Caisse <span style={{ color: '#dc2626' }}>*</span> :</span>
                   <input
@@ -550,7 +452,6 @@ export default function Reception() {
               </div>
             )}
 
-            {/* Sélection article + bouton préparer — seulement si infos validées */}
             {infosValidees && (
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }}
                 disabled={!articleId || (modeSuivi === 'SN' && lignesSN.length === 0) || (modeSuivi === 'QTE' && quantite < 1)}>
@@ -573,7 +474,6 @@ export default function Reception() {
             )}
           </div>
 
-
           {lotsEnAttente.length === 0 ? (
             <p style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center', padding: '48px 0' }}>
               Préparez des articles pour les voir apparaître ici
@@ -586,7 +486,7 @@ export default function Reception() {
                     <div>
                       <span style={{ fontWeight: 600, fontSize: '13px' }}>{lot.articleLabel}</span>
                       <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
-                        {champsInv.filter(c => lot.champsCommuns[c.id]).map(c => `${c.label} : ${lot.champsCommuns[c.id]}`).join(' · ')}
+                        {CHAMPS_RECEPTION_SN.filter(c => lot.champsCommuns[c.key]).map(c => `${c.label} : ${lot.champsCommuns[c.key]}`).join(' · ')}
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -660,7 +560,7 @@ export default function Reception() {
       </div>
     )}
 
-    {/* Modal confirmation réception */}
+    {/* Modal confirmation */}
     {showConfirmation && (
       <div className="modal-overlay">
         <div style={{ background: '#1a1d27', borderRadius: '12px', padding: '28px', maxWidth: '440px', width: '100%' }}>

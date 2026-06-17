@@ -4,15 +4,12 @@ import { Plus, Upload, FileText, Lock, Clock, Trash2 } from 'lucide-react'
 import { attendusApi } from '../api/attendus'
 import { get } from '../api/client'
 import { getSiteId } from '../utils/permissions'
+import { COLONNES_INVENTAIRE, getLabelColonne } from '../constants/colonnesInventaire'
 
 interface Attendu {
   id: number; rma: string | null; bt: string | null; statut: string
   createdAt: string; closedAt: string | null; _count: { lignes: number }
   donneesCommunes: string | null
-}
-
-interface ChampInv {
-  id: number; code: string; label: string; type: string; options: string | null
 }
 
 const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
@@ -31,7 +28,6 @@ export default function Attendus() {
 
   const [chargement, setChargement] = useState(true)
   const [attendus, setAttendus] = useState<Attendu[]>([])
-  const [champsInv, setChampsInv] = useState<ChampInv[]>([])
   const [clients, setClients] = useState<any[]>([])
   const [champsClients, setChampsClients] = useState<any[]>([])
   const [plateformes, setPlateformes] = useState<any[]>([])
@@ -49,9 +45,8 @@ export default function Attendus() {
   useEffect(() => { reload() }, [siteId])
 
   async function reload() {
-    const [data, ci, cl, cc, pl, cp, cfg] = await Promise.all([
+    const [data, cl, cc, pl, cp, cfg] = await Promise.all([
       attendusApi.getAll(siteId),
-      get<ChampInv[]>(`/inventaire/${siteId}/champs`),
       get<any[]>(`/clients/${siteId}`),
       get<any[]>(`/clients/${siteId}/champs`),
       get<any[]>(`/plateformes/${siteId}`),
@@ -59,7 +54,6 @@ export default function Attendus() {
       get<any>(`/config-attendus/${siteId}`)
     ])
     setAttendus(data)
-    setChampsInv(ci.filter((c: any) => c.actif))
     setClients(cl); setChampsClients(cc.filter((c: any) => c.actif))
     setPlateformes(pl); setChampsPlateformes(cp.filter((c: any) => c.actif))
     if (cfg?.config?.champsAttendu) {
@@ -143,10 +137,9 @@ export default function Attendus() {
             <thead>
               <tr>
                 <th>Statut</th>
-                {colonnesListe.map(c => {
-                  const champ = champsInv.find(ci => ci.code === c.code)
-                  return <th key={c.code}>{champ?.label ?? c.code}</th>
-                })}
+                {colonnesListe.map(c => (
+                  <th key={c.code}>{getLabelColonne(c.code)}</th>
+                ))}
                 <th>Lignes</th>
                 <th>Date import</th>
                 <th></th>
@@ -206,14 +199,14 @@ export default function Attendus() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {/* Champs inventaire configurés */}
                 {configChamps.filter(cc => cc.visible).map(cc => {
-                  const champ = champsInv.find(c => c.code === cc.code)
-                  if (!champ) return null
-                  const opts = parseOptions(champ.options)
-                  const isClient = CODES_CLIENT.includes(champ.code.toUpperCase())
-                  const isPlateforme = CODES_PLATEFORME.includes(champ.code.toUpperCase())
+                  const colDef = COLONNES_INVENTAIRE.find(c => c.key === cc.code)
+                  const label = colDef?.label ?? getLabelColonne(cc.code)
+                  const isClient = CODES_CLIENT.includes(cc.code.toUpperCase())
+                  const isPlateforme = CODES_PLATEFORME.includes(cc.code.toUpperCase())
+                  const isDate = colDef?.type === 'date'
                   return (
                     <div key={cc.code} className="form-group" style={{ margin: 0 }}>
-                      <label className="form-label">{champ.label}{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
+                      <label className="form-label">{label}{cc.obligatoire && <span style={{ color: '#dc2626' }}> *</span>}</label>
                       {isClient ? (
                         <select required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))}>
                           <option value="">— Choisir un client —</option>
@@ -224,17 +217,10 @@ export default function Attendus() {
                           <option value="">— Choisir une plateforme —</option>
                           {plateformes.map(pl => <option key={pl.id} value={getEntiteLabel(pl, champsPlateformes)}>{getEntiteLabel(pl, champsPlateformes)}</option>)}
                         </select>
-                      ) : champ.type === 'SELECT' ? (
-                        <select required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))}>
-                          <option value="">— Choisir —</option>
-                          {opts.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      ) : (champ.type === 'DATE' || champ.type === 'DATE_TODAY') ? (
+                      ) : isDate ? (
                         <input type="date" required={cc.obligatoire} className="form-input"
-                          value={donneesCommunes[cc.code] ?? (champ.type === 'DATE_TODAY' ? new Date().toISOString().split('T')[0] : '')}
+                          value={donneesCommunes[cc.code] ?? ''}
                           onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))} />
-                      ) : champ.type === 'NUMBER' ? (
-                        <input type="number" required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))} />
                       ) : (
                         <input type="text" required={cc.obligatoire} className="form-input" value={donneesCommunes[cc.code] ?? ''} onChange={e => setDonneesCommunes(d => ({ ...d, [cc.code]: e.target.value }))} />
                       )}

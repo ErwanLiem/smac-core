@@ -3,6 +3,7 @@ import { Trash2, Plus, Pencil, Check, X } from 'lucide-react'
 import Tabs from '../components/Tabs'
 import { get, post, put, del } from '../api/client'
 import { getPermissions, getSiteId } from '../utils/permissions'
+import { COLONNES_INVENTAIRE, getLabelColonne } from '../constants/colonnesInventaire'
 
 
 interface ChampAttenduConfig {
@@ -24,15 +25,9 @@ interface ConfigAttendus {
 interface Mapping {
   id: number
   colonneExcel: string
-  champInventaireCode: string
+  colonneInventaire: string
   roleSpecial: string | null
   actif: boolean
-}
-
-interface ChampInv {
-  id: number
-  code: string
-  label: string
 }
 
 interface Statut {
@@ -49,11 +44,10 @@ export default function AdminAttendus() {
   const [chargement, setChargement] = useState(true)
   const [config, setConfig] = useState<ConfigAttendus>({ nomOnglet: 'Terminal Details', obligatoirePNcatalogue: true, statutCloture: null, champsAttendu: defaultChampsAttendu })
   const [mappings, setMappings] = useState<Mapping[]>([])
-  const [champsInv, setChampsInv] = useState<ChampInv[]>([])
   const [statuts, setStatuts] = useState<Statut[]>([])
   const [editId, setEditId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState<Partial<Mapping>>({})
-  const [newMapping, setNewMapping] = useState({ colonneExcel: '', champInventaireCode: '', roleSpecial: '' })
+  const [newMapping, setNewMapping] = useState({ colonneExcel: '', colonneInventaire: '', roleSpecial: '' })
   const [configModifiee, setConfigModifiee] = useState(false)
   const [succes, setSucces] = useState(false)
 
@@ -73,7 +67,6 @@ export default function AdminAttendus() {
       setConfig(cfg)
     }
     setMappings(data.mappings)
-    setChampsInv(data.champsInv)
     setStatuts(s)
     setConfigModifiee(false)
     setChargement(false)
@@ -98,13 +91,13 @@ export default function AdminAttendus() {
 
   async function handleAddMapping(e: React.FormEvent) {
     e.preventDefault()
-    if (!newMapping.colonneExcel || !newMapping.champInventaireCode) return
+    if (!newMapping.colonneExcel || !newMapping.colonneInventaire) return
     await post(`/config-attendus/${siteId}/mappings`, {
       colonneExcel: newMapping.colonneExcel,
-      champInventaireCode: newMapping.champInventaireCode,
+      colonneInventaire: newMapping.colonneInventaire,
       roleSpecial: newMapping.roleSpecial || null
     })
-    setNewMapping({ colonneExcel: '', champInventaireCode: '', roleSpecial: '' })
+    setNewMapping({ colonneExcel: '', colonneInventaire: '', roleSpecial: '' })
     reload()
   }
 
@@ -151,18 +144,17 @@ export default function AdminAttendus() {
             </tr>
           </thead>
           <tbody>
-            {champsInv.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', padding: '32px' }}>Aucun champ inventaire configuré</td></tr>}
-            {champsInv.map(champ => {
-              const cfg = config.champsAttendu?.find(c => c.code === champ.code) ?? { code: champ.code, visible: false, obligatoire: false, visibleListe: false }
+            {COLONNES_INVENTAIRE.map(champ => {
+              const cfg = config.champsAttendu?.find(c => c.code === champ.key) ?? { code: champ.key, visible: false, obligatoire: false, visibleListe: false }
               return (
-                <tr key={champ.code}>
+                <tr key={champ.key}>
                   <td style={{ fontWeight: 500 }}>{champ.label}</td>
-                  <td><code style={{ fontSize: '11px', background: '#1e3a5f', color: '#2563eb', padding: '1px 6px', borderRadius: '4px' }}>{champ.code}</code></td>
+                  <td><code style={{ fontSize: '11px', background: '#1e3a5f', color: '#2563eb', padding: '1px 6px', borderRadius: '4px' }}>{champ.key}</code></td>
                   <td style={{ textAlign: 'center' }}>
-                    <input type="checkbox" checked={cfg.visible} disabled={!isAdmin} onChange={e => updateChamp(champ.code, { visible: e.target.checked, obligatoire: e.target.checked ? cfg.obligatoire : false })} />
+                    <input type="checkbox" checked={cfg.visible} disabled={!isAdmin} onChange={e => updateChamp(champ.key, { visible: e.target.checked, obligatoire: e.target.checked ? cfg.obligatoire : false })} />
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    <input type="checkbox" checked={cfg.obligatoire} disabled={!cfg.visible || !isAdmin} onChange={e => updateChamp(champ.code, { obligatoire: e.target.checked })} />
+                    <input type="checkbox" checked={cfg.obligatoire} disabled={!cfg.visible || !isAdmin} onChange={e => updateChamp(champ.key, { obligatoire: e.target.checked })} />
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <input
@@ -170,11 +162,11 @@ export default function AdminAttendus() {
                       title="Bloquer la clôture de l'attendu tant que ce champ n'est pas renseigné via 'Modifier infos'"
                       checked={cfg.obligatoireCloture ?? false}
                       disabled={!cfg.visible || !isAdmin}
-                      onChange={e => updateChamp(champ.code, { obligatoireCloture: e.target.checked })}
+                      onChange={e => updateChamp(champ.key, { obligatoireCloture: e.target.checked })}
                     />
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    <input type="checkbox" checked={cfg.visibleListe ?? false} disabled={!isAdmin} onChange={e => updateChamp(champ.code, { visibleListe: e.target.checked })} />
+                    <input type="checkbox" checked={cfg.visibleListe ?? false} disabled={!isAdmin} onChange={e => updateChamp(champ.key, { visibleListe: e.target.checked })} />
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <input
@@ -182,7 +174,7 @@ export default function AdminAttendus() {
                       title="Bloquer la création si cette valeur existe déjà dans un attendu non clôturé"
                       checked={cfg.uniqueValeur ?? false}
                       disabled={!isAdmin || !cfg.visible}
-                      onChange={e => updateChamp(champ.code, { uniqueValeur: e.target.checked })}
+                      onChange={e => updateChamp(champ.key, { uniqueValeur: e.target.checked })}
                     />
                   </td>
                 </tr>
@@ -248,9 +240,9 @@ export default function AdminAttendus() {
                 <tr key={m.id}>
                   <td><input className="form-input" value={editForm.colonneExcel ?? ''} onChange={e => setEditForm(f => ({ ...f, colonneExcel: e.target.value }))} /></td>
                   <td>
-                    <select className="form-input" value={editForm.champInventaireCode ?? ''} onChange={e => setEditForm(f => ({ ...f, champInventaireCode: e.target.value }))}>
+                    <select className="form-input" value={editForm.colonneInventaire ?? ''} onChange={e => setEditForm(f => ({ ...f, colonneInventaire: e.target.value }))}>
                       <option value="">— Choisir —</option>
-                      {champsInv.map(c => <option key={c.id} value={c.code}>{c.label} ({c.code})</option>)}
+                      {COLONNES_INVENTAIRE.map(c => <option key={c.key} value={c.key}>{c.label} ({c.key})</option>)}
                     </select>
                   </td>
                   <td>
@@ -270,8 +262,8 @@ export default function AdminAttendus() {
                 <tr key={m.id}>
                   <td style={{ fontFamily: 'monospace', fontSize: '13px' }}>{m.colonneExcel}</td>
                   <td>
-                    <code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{m.champInventaireCode}</code>
-                    <span style={{ fontSize: '12px', color: '#9ca3af', marginLeft: '6px' }}>{champsInv.find(c => c.code === m.champInventaireCode)?.label}</span>
+                    <code style={{ fontSize: '12px', background: '#1e3a5f', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa' }}>{m.colonneInventaire}</code>
+                    <span style={{ fontSize: '12px', color: '#9ca3af', marginLeft: '6px' }}>{getLabelColonne(m.colonneInventaire)}</span>
                   </td>
                   <td>
                     {m.roleSpecial ? (
@@ -286,7 +278,7 @@ export default function AdminAttendus() {
                   <td style={{ display: 'flex', gap: '6px' }}>
                     {isAdmin && (
                       <>
-                        <button className="btn btn-secondary btn-icon" onClick={() => { setEditId(m.id); setEditForm({ colonneExcel: m.colonneExcel, champInventaireCode: m.champInventaireCode, roleSpecial: m.roleSpecial ?? '', actif: m.actif }) }}><Pencil size={14} /></button>
+                        <button className="btn btn-secondary btn-icon" onClick={() => { setEditId(m.id); setEditForm({ colonneExcel: m.colonneExcel, colonneInventaire: m.colonneInventaire, roleSpecial: m.roleSpecial ?? '', actif: m.actif }) }}><Pencil size={14} /></button>
                         <button className="btn btn-danger btn-icon" onClick={() => handleDelete(m.id)}><Trash2 size={14} /></button>
                       </>
                     )}
@@ -308,10 +300,10 @@ export default function AdminAttendus() {
                   value={newMapping.colonneExcel} onChange={e => setNewMapping(m => ({ ...m, colonneExcel: e.target.value }))} />
               </div>
               <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '200px' }}>
-                <label className="form-label">Champ inventaire *</label>
-                <select required className="form-input" value={newMapping.champInventaireCode} onChange={e => setNewMapping(m => ({ ...m, champInventaireCode: e.target.value }))}>
+                <label className="form-label">Colonne inventaire *</label>
+                <select required className="form-input" value={newMapping.colonneInventaire} onChange={e => setNewMapping(m => ({ ...m, colonneInventaire: e.target.value }))}>
                   <option value="">— Choisir —</option>
-                  {champsInv.map(c => <option key={c.id} value={c.code}>{c.label} ({c.code})</option>)}
+                  {COLONNES_INVENTAIRE.map(c => <option key={c.key} value={c.key}>{c.label} ({c.key})</option>)}
                 </select>
               </div>
               <div className="form-group" style={{ margin: 0 }}>
