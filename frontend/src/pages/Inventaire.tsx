@@ -35,6 +35,14 @@ interface Statut {
   couleur: string
 }
 
+interface PieceUtilisee {
+  id: number
+  pn: string | null
+  pnType: string | null
+  sp: string | null
+  status: string | null
+}
+
 interface Inventaire {
   id: number
   articleId: number
@@ -43,6 +51,7 @@ interface Inventaire {
   statut: Statut | null
   couleurAlerte: string | null
   createdAt: string
+  pieces: PieceUtilisee[]
   [key: string]: any
 }
 
@@ -133,15 +142,38 @@ export default function Inventaire() {
     .filter(Boolean) as typeof COLONNES_INVENTAIRE
   const colonnesAffichees = colonnesOrdonnees.filter(c => !colonnesCachees.has(c.key))
 
+  const maxPieces = Math.max(0, ...inventaires.map(i => (i.pieces ?? []).length))
+
+  const colonnesPieces: ExportColumn[] = []
+  for (let i = 0; i < maxPieces; i++) {
+    colonnesPieces.push(
+      { key: `p${i}_pn`,     label: `PN_${i + 1}` },
+      { key: `p${i}_pnType`, label: `PN Type${i + 1}` },
+      { key: `p${i}_sp`,     label: `SP_${i + 1}` },
+      { key: `p${i}_status`, label: `P/N Status ${i + 1}` },
+    )
+  }
+
   const colonnesExport: ExportColumn[] = [
     { key: 'statut', label: 'Statut' },
     { key: 'article', label: 'Article' },
-    ...colonnesOrdonnees.map(c => ({ key: c.key, label: c.label }))
+    ...colonnesOrdonnees.map(c => ({ key: c.key, label: c.label })),
+    ...colonnesPieces,
   ]
 
   function valeurExport(item: Inventaire, key: string): string {
     if (key === 'statut') return item.statut?.label ?? ''
     if (key === 'article') return getArticleLabel(item.articleId)
+    if (key.startsWith('p') && key.includes('_')) {
+      const [idxPart, field] = key.split('_')
+      const idx = Number(idxPart.slice(1))
+      const piece = (item.pieces ?? [])[idx]
+      if (!piece) return ''
+      if (field === 'pn') return piece.pn ?? ''
+      if (field === 'pnType') return piece.pnType ?? ''
+      if (field === 'sp') return piece.sp ?? ''
+      if (field === 'status') return piece.status ?? ''
+    }
     const v = getValeur(item, key)
     return v === '—' ? '' : v
   }
@@ -352,7 +384,25 @@ export default function Inventaire() {
                     {c.label} <span style={{ color: '#bfdbfe', fontSize: '10px' }}>⠿</span>
                   </th>
                 ))}
+                {Array.from({ length: maxPieces }, (_, i) => (
+                  <th key={`pieces_${i}`} colSpan={4} style={{ textAlign: 'center', borderLeft: '2px solid #2d3148', whiteSpace: 'nowrap', background: '#1a1d2f' }}>
+                    Pièce {i + 1}
+                  </th>
+                ))}
               </tr>
+              {maxPieces > 0 && (
+                <tr style={{ background: '#141720' }}>
+                  <td colSpan={3 + colonnesAffichees.length} />
+                  {Array.from({ length: maxPieces }, (_, i) => (
+                    <>
+                      <td key={`p${i}_pn_h`} style={{ padding: '4px 8px', borderLeft: '2px solid #2d3148', fontSize: '11px', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>PN_{i + 1}</td>
+                      <td key={`p${i}_pnType_h`} style={{ padding: '4px 8px', fontSize: '11px', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>Type</td>
+                      <td key={`p${i}_sp_h`} style={{ padding: '4px 8px', fontSize: '11px', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>SP</td>
+                      <td key={`p${i}_status_h`} style={{ padding: '4px 8px', fontSize: '11px', color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>Statut</td>
+                    </>
+                  ))}
+                </tr>
+              )}
               <tr style={{ background: '#141720' }}>
                 <td style={{ padding: '4px 8px' }}></td>
                 <td style={{ padding: '4px 8px' }}></td>
@@ -369,6 +419,9 @@ export default function Inventaire() {
                       onChange={e => setFiltres(f => ({ ...f, [c.key]: e.target.value }))}
                       style={{ fontSize: '12px', padding: '3px 6px', minWidth: '80px' }} />
                   </td>
+                ))}
+                {Array.from({ length: maxPieces * 4 }, (_, i) => (
+                  <td key={`pf_${i}`} style={{ padding: '4px 8px' }} />
                 ))}
               </tr>
             </thead>
@@ -415,6 +468,17 @@ export default function Inventaire() {
                       }
                     </td>
                   ))}
+                  {Array.from({ length: maxPieces }, (_, i) => {
+                    const piece = (item.pieces ?? [])[i]
+                    return (
+                      <>
+                        <td key={`p${i}_pn`} style={{ padding: '4px 10px', borderLeft: '2px solid #2d3148', fontFamily: 'monospace', fontSize: '11px' }}>{piece?.pn ?? <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                        <td key={`p${i}_pnType`} style={{ padding: '4px 10px', fontSize: '11px' }}>{piece?.pnType ?? <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                        <td key={`p${i}_sp`} style={{ padding: '4px 10px', fontFamily: 'monospace', fontSize: '11px' }}>{piece?.sp ?? <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                        <td key={`p${i}_status`} style={{ padding: '4px 10px', fontSize: '11px' }}>{piece?.status ?? <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                      </>
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>
