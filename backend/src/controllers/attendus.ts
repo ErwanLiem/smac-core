@@ -14,12 +14,6 @@ const COL_PN       = ['part number', 'p/n', 'pn', 'partnumber']
 const COL_PANNE    = ['reported problem', 'panne', 'problem', 'description']
 const COL_GARANTIE = ['status', 'statut', 'warranty']
 
-const CODES_SN = [
-  'SN', 'S_N', 'SERIAL', 'SERIAL_NUMBER',
-  'NUMERO_SERIE', 'NUMERO DE SERIE', 'NUMERO_DE_SERIE',
-  'NUMÉRO DE SÉRIE', 'NUMÉRO_DE_SÉRIE'
-]
-
 // ─── Helpers normalization ────────────────────────────────────────────────────
 function normalize(s: string): string {
   return String(s ?? '').toLowerCase().trim()
@@ -41,28 +35,12 @@ function findHeaderRow(data: any[][]): number {
   return 0
 }
 
-// ─── Helper : IDs des champs SN dans l'inventaire ────────────────────────────
-function getIdsSN(champsInv: any[]): number[] {
-  const trouvés = champsInv.filter(c => {
-    const n  = normalizeCode(c.code).replace(/\s+/g, '_')
-    const ns = normalizeCode(c.code).replace(/\s+/g, ' ')
-    return CODES_SN.includes(n) || CODES_SN.includes(ns) || CODES_SN.includes(normalizeCode(c.code))
-  })
-  return trouvés.length > 0 ? trouvés.map(c => c.id) : champsInv.map(c => c.id)
-}
-
-// ─── Helper : findChampId dans une liste de champs ───────────────────────────
-function makeChampFinder(champs: any[]) {
-  return function findChampId(codes: string[]): number | null {
-    const c = champs.find(ch =>
-      codes.some(code =>
-        normalizeCode(ch.code).replace(/\s+/g, '_') === normalizeCode(code).replace(/\s+/g, '_') ||
-        normalizeCode(ch.code).replace(/\s+/g, ' ') === normalizeCode(code).replace(/\s+/g, ' ')
-      )
-    )
-    return c ? c.id : null
-  }
-}
+/** Colonnes fixes autorisées sur inventaire */
+const COLONNES_FIXES = [
+  'serialNumber', 'partNumber', 'rma', 'customer', 'productFamily', 'mercurySn',
+  'warranty', 'rmaCreationDate', 'dateRic', 'defectFromCustomer', 'descrCode',
+  'repaireNotes', 'genericNotes',
+]
 
 // ─── Helper : injection d'une ligne dans l'inventaire ────────────────────────
 async function creerEntreeInventaire(params: {
@@ -70,120 +48,82 @@ async function creerEntreeInventaire(params: {
   ligne: any
   attendu: any
   article: any | null
-  champsInv: any[]
-  champsArticle: any[]
+  mappings: any[]
   statutStockId: number | null
-  dateAujourdhui: string
   userId?: number
 }) {
-  const { siteId, ligne, attendu, article, champsInv, champsArticle, statutStockId, dateAujourdhui, userId } = params
-  const findChampId = makeChampFinder(champsInv)
+  const { siteId, ligne, attendu, article, mappings, statutStockId, userId } = params
 
-  const idSN          = findChampId(['SN', 'NUMERO_SERIE', 'NUMERO DE SERIE'])
-  const idPN          = findChampId(['PN', 'P_N', 'PART_NUMBER', 'PART_NO'])
-  const idGarantie    = findChampId(['GARANTIE'])
-  const idPanneClient = findChampId(['PANNE_CLIENT', 'PANNE'])
-  const idBL          = findChampId(['BL', 'RMA'])
-  const idBT          = findChampId(['BT', 'BT_RECEP'])
-  const idRMACreation = findChampId(['RMA_CREATION', 'DATE_CREATION_BL', 'DATE_BL'])
-  const idDateRIC     = findChampId(['DATE_RIC', 'DATE_RECEPTION', 'DATE_REC'])
-  const idPlateforme  = findChampId(['PLATEFORME', 'PLATEFORMES', 'PLATFORM'])
-  const idClient      = findChampId(['CLIENT', 'CLIENTS'])
-  const idAccessoires = findChampId(['ACCESSOIRES', 'ACCESSOIRE', 'ACCESSORIES'])
-  const idCaisse      = findChampId(['CAISSE'])
-
-  const valeurs: { champId: number; valeur: string }[] = []
-
-  // Auto-remplir depuis les champs de l'article (même code)
-  if (article) {
-    for (const valArt of article.valeurs) {
-      const champArt    = champsArticle.find((c: any) => c.id === valArt.champId)
-      if (!champArt || !valArt.valeur) continue
-      const champInvCorr = champsInv.find((c: any) => c.code.toUpperCase() === champArt.code.toUpperCase())
-      if (champInvCorr) valeurs.push({ champId: champInvCorr.id, valeur: valArt.valeur })
-    }
+  // Données fixes depuis la ligne scannée
+  const data: Record<string, any> = {
+    siteId,
+    articleId: article?.id ?? null,
+    statutId: statutStockId,
+    serialNumber: ligne.sn ?? null,
+    partNumber:   ligne.pn ?? null,
+    dateRic:      new Date(),
   }
 
-  // Champs réception fixes
-  if (idSN && ligne.sn)          valeurs.push({ champId: idSN,       valeur: ligne.sn })
-  if (idPN && ligne.pn)           valeurs.push({ champId: idPN,       valeur: ligne.pn })
-  if (idGarantie && ligne.garantie) valeurs.push({ champId: idGarantie, valeur: ligne.garantie })
-  if (idPanneClient && ligne.panneClient) valeurs.push({ champId: idPanneClient, valeur: ligne.panneClient })
-  if (idBL && attendu.rma)       valeurs.push({ champId: idBL,       valeur: attendu.rma })
-  if (idBT && attendu.bt)        valeurs.push({ champId: idBT,       valeur: attendu.bt })
-  if (idDateRIC)                 valeurs.push({ champId: idDateRIC,  valeur: dateAujourdhui })
-
-  // Champs communs saisis à la création (donneesCommunes JSON {code: valeur})
+  // Champs depuis donnéesCommunes de l'attendu (BL=rma, CLIENT=customer, etc.)
   if (attendu.donneesCommunes) {
     try {
       const donnees: Record<string, string> = JSON.parse(attendu.donneesCommunes)
       for (const [code, valeur] of Object.entries(donnees)) {
         if (!valeur) continue
-        const champInv = champsInv.find(c => c.code === code)
-        if (champInv) valeurs.push({ champId: champInv.id, valeur })
+        const codeNorm = normalizeCode(code).replace(/\s+/g, '_')
+        // Mapper codes communs vers colonnes fixes
+        if (codeNorm === 'BL' || codeNorm === 'RMA') data.rma = valeur
+        else if (codeNorm === 'CLIENT') data.customer = valeur
+        else if (codeNorm === 'GARANTIE' || codeNorm === 'WARRANTY') data.warranty = valeur
+        else if (codeNorm === 'PANNE_CLIENT') data.defectFromCustomer = valeur
+        // Mapping direct si colonneInventaire configurée
+        const mapping = mappings.find(m => normalizeCode(m.colonneExcel) === codeNorm && COLONNES_FIXES.includes(m.colonneInventaire))
+        if (mapping) data[mapping.colonneInventaire] = valeur
       }
     } catch {}
   }
-  if (idAccessoires && ligne.accessoires) {
-    try {
-      const accs: string[] = JSON.parse(ligne.accessoires)
-      if (accs.length > 0) valeurs.push({ champId: idAccessoires, valeur: accs.join(', ') })
-    } catch {}
-  }
-  if (idCaisse && ligne.caisse) valeurs.push({ champId: idCaisse, valeur: ligne.caisse })
 
-  // Dédupliquer (les champs explicites écrasent l'auto-remplissage)
-  const valeursMap = new Map<number, string>()
-  for (const v of valeurs) valeursMap.set(v.champId, v.valeur)
+  // Champs explicites de la ligne
+  if (ligne.garantie) data.warranty = ligne.garantie
+  if (ligne.panneClient) data.defectFromCustomer = ligne.panneClient
+  if (attendu.rma) data.rma = attendu.rma
 
-  // Vérifier les règles d'alerte sur l'entrée existante (statut final) pour ce S/N
-  const alerte = await verifierReglesAlerte(prisma, siteId, ligne.sn, champsInv)
-
-  // Ajouter les champs auto-fill de la règle (sans écraser les valeurs existantes)
-  if (alerte?.champsAutoFill?.length) {
+  // Règles d'alerte
+  const alerte = await verifierReglesAlerte(prisma, siteId, ligne.sn ?? null)
+  if (alerte) {
+    data.couleurAlerte = alerte.couleurAlerte
+    data.regleAlerteId = alerte.regleAlerteId
     for (const af of alerte.champsAutoFill) {
-      const champ = champsInv.find(c => c.code.toUpperCase() === af.codeChamp.toUpperCase())
-      if (champ && !valeursMap.has(champ.id)) valeursMap.set(champ.id, af.valeur)
+      if (COLONNES_FIXES.includes(af.colonne) && !(af.colonne in data)) {
+        data[af.colonne] = af.valeur
+      }
     }
   }
 
-  const valeursDedupliquees = Array.from(valeursMap.entries()).map(([champId, valeur]) => ({ champId, valeur }))
-
-  const inventaireCree = await prisma.inventaire.create({
-    data: {
-      siteId,
-      articleId: article?.id ?? null,
-      statutId: statutStockId,
-      couleurAlerte: alerte?.couleurAlerte ?? null,
-      regleAlerteId: alerte?.regleAlerteId ?? null,
-      valeurs: { create: valeursDedupliquees }
-    }
-  })
+  const inventaireCree = await prisma.inventaire.create({ data: data as any })
 
   await enregistrerOperation({
     siteId,
     inventaireId: inventaireCree.id,
-    champCode: 'OPE.RECEPTION',
     userId,
     type: 'RECEPTION',
-    details: { attenduId: attendu.id, sn: ligne.sn }
+    details: { attenduId: attendu.id, sn: ligne.sn, label: 'Réception', couleur: '#10b981' }
   })
 }
 
 // ─── Helper : trouver l'article par PN ───────────────────────────────────────
 async function chargerArticles(siteId: number) {
-  const champsPNArt = await prisma.champArticle.findMany({ where: { siteId } })
-  const champsPNIds = champsPNArt
+  const champsArticle = await prisma.champArticle.findMany({ where: { siteId } })
+  const champsPNIds = champsArticle
     .filter((c: any) => ['PN', 'P_N', 'PART_NUMBER', 'PART_NO'].includes(c.code.toUpperCase()))
     .map((c: any) => c.id)
   const articles = await prisma.article.findMany({ where: { siteId }, include: { valeurs: true } })
-  const champsArticle = await prisma.champArticle.findMany({ where: { siteId, actif: true } })
 
   function trouverParPN(pn: string) {
     return articles.find(a => a.valeurs.some((v: any) => champsPNIds.includes(v.champId) && v.valeur === pn)) ?? null
   }
 
-  return { articles, champsArticle, trouverParPN }
+  return { articles, trouverParPN }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -216,13 +156,10 @@ export async function importExcel(req: Request, res: Response, next: any) {
     const file = (req as any).file
     if (!file) return res.status(400).json({ error: 'Fichier manquant' })
 
-    // Charger la config du site
     const config = await prisma.configAttendus.findUnique({ where: { siteId: Number(siteId) } })
     const mappings = await prisma.configImportExcel.findMany({ where: { siteId: Number(siteId), actif: true } })
 
     const wb = XLSX.readFile(file.path)
-
-    // Onglet : config ou fallback sur "terminal"
     const nomOnglet = config?.nomOnglet || 'Terminal Details'
     const sheetName = wb.SheetNames.find(s => normalize(s) === normalize(nomOnglet))
       || wb.SheetNames.find(s => normalize(s).includes('terminal'))
@@ -233,7 +170,6 @@ export async function importExcel(req: Request, res: Response, next: any) {
     const headerRowIdx = findHeaderRow(data)
     const headers = (data[headerRowIdx] || []).map((h: any) => String(h ?? ''))
 
-    // Identifier les colonnes SN et PN (depuis config ou fallback)
     const colSNConfig = mappings.find(m => m.roleSpecial === 'SN')
     const colPNConfig = mappings.find(m => m.roleSpecial === 'PN')
 
@@ -244,13 +180,11 @@ export async function importExcel(req: Request, res: Response, next: any) {
       ? headers.findIndex(h => normalize(h) === normalize(colPNConfig.colonneExcel))
       : findCol(headers, COL_PN)
 
-    // Colonnes additionnelles depuis le mapping config
     const colsMappees = mappings.filter(m => !m.roleSpecial).map(m => ({
       idx: headers.findIndex(h => normalize(h) === normalize(m.colonneExcel)),
-      code: m.champInventaireCode
+      colonneInventaire: m.colonneInventaire
     })).filter(m => m.idx !== -1)
 
-    // Fallback colonnes panne et garantie si pas de config
     const iPanne    = mappings.length === 0 ? findCol(headers, COL_PANNE) : -1
     const iGarantie = mappings.length === 0 ? findCol(headers, COL_GARANTIE) : -1
 
@@ -259,7 +193,6 @@ export async function importExcel(req: Request, res: Response, next: any) {
       return res.status(400).json({ error: 'Colonnes Serial Number / Part Number introuvables. Vérifiez la configuration du mapping.' })
     }
 
-    // Extraire les lignes
     const lignesRaw: any[] = []
     for (let i = headerRowIdx + 1; i < data.length; i++) {
       const row = data[i]
@@ -268,35 +201,31 @@ export async function importExcel(req: Request, res: Response, next: any) {
       const pn = String(row[iPN]).trim()
       if (!sn || !pn) continue
 
-      // Champs additionnels depuis le mapping configuré
-      const champsSupp: Record<string, string> = {}
+      const colonnesMappees: Record<string, string> = {}
       for (const col of colsMappees) {
-        if (row[col.idx]) champsSupp[col.code] = String(row[col.idx]).trim()
+        if (row[col.idx]) colonnesMappees[col.colonneInventaire] = String(row[col.idx]).trim()
       }
 
       lignesRaw.push({
         sn, pn,
-        panneClient: champsSupp['PANNE_CLIENT'] || (iPanne !== -1 && row[iPanne] ? String(row[iPanne]).trim() : null),
-        garantie:    champsSupp['GARANTIE'] || (iGarantie !== -1 && row[iGarantie] ? String(row[iGarantie]).trim() : null),
-        champsSupp
+        panneClient: colonnesMappees['defectFromCustomer'] || (iPanne !== -1 && row[iPanne] ? String(row[iPanne]).trim() : null),
+        garantie:    colonnesMappees['warranty']           || (iGarantie !== -1 && row[iGarantie] ? String(row[iGarantie]).trim() : null),
+        colonnesMappees
       })
     }
 
-    // Vérifier les PN contre le catalogue (si obligatoire selon config)
     const obligatoirePN = config?.obligatoirePNcatalogue ?? true
     if (obligatoirePN) {
       const pnsUniques = [...new Set(lignesRaw.map(l => l.pn))]
-      const champsPNArt = await prisma.champArticle.findMany({ where: { siteId: Number(siteId) } })
-      const champsPNIds = champsPNArt
+      const champsArticle = await prisma.champArticle.findMany({ where: { siteId: Number(siteId) } })
+      const champsPNIds = champsArticle
         .filter(c => ['PN', 'P_N', 'PART_NUMBER', 'PART_NO'].includes(c.code.toUpperCase()))
         .map(c => c.id)
       const articlesExistants = await prisma.article.findMany({
         where: { siteId: Number(siteId) },
         include: { valeurs: { where: { champId: { in: champsPNIds } } } }
       })
-      const pnsCatalogue = new Set(
-        articlesExistants.flatMap(a => a.valeurs.map(v => v.valeur)).filter(Boolean)
-      )
+      const pnsCatalogue = new Set(articlesExistants.flatMap(a => a.valeurs.map(v => v.valeur)).filter(Boolean))
       const pnsInconnus = pnsUniques.filter(pn => !pnsCatalogue.has(pn))
       if (pnsInconnus.length > 0) {
         fs.unlinkSync(file.path)
@@ -308,7 +237,6 @@ export async function importExcel(req: Request, res: Response, next: any) {
     }
 
     const { donneesCommunes } = req.body
-    // donneesCommunes arrive comme string JSON via FormData — il faut le parser
     let donnees: Record<string, string> = {}
     if (donneesCommunes) {
       try { donnees = typeof donneesCommunes === 'string' ? JSON.parse(donneesCommunes) : donneesCommunes } catch {}
@@ -316,7 +244,6 @@ export async function importExcel(req: Request, res: Response, next: any) {
     const rmaAuto = Object.entries(donnees).find(([k]) => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(k)))?.[1] || null
     const btAuto  = Object.entries(donnees).find(([k]) => ['BT', 'BT_RECEP', 'BON_TRANSPORT'].includes(normalizeCode(k)))?.[1] || null
 
-    // Vérifier l'unicité des champs marqués uniqueValeur
     if (config?.champsAttendu) {
       try {
         const champsConfig: any[] = typeof config.champsAttendu === 'string' ? JSON.parse(config.champsAttendu) : (config.champsAttendu as any)
@@ -344,7 +271,7 @@ export async function importExcel(req: Request, res: Response, next: any) {
     const attendu = await prisma.attendu.create({
       data: { siteId: Number(siteId), rma: rmaAuto, bt: btAuto, donneesCommunes: Object.keys(donnees).length > 0 ? JSON.stringify(donnees) : null, statut: 'EN_COURS' }
     })
-    const lignes = lignesRaw.map(({ champsSupp, ...l }) => ({ ...l, attenduId: attendu.id, statut: 'ATTENDU' }))
+    const lignes = lignesRaw.map(({ colonnesMappees, ...l }) => ({ ...l, attenduId: attendu.id, statut: 'ATTENDU' }))
     await prisma.ligneAttendue.createMany({ data: lignes })
     fs.unlinkSync(file.path)
     res.json({ ...attendu, lignesCount: lignes.length })
@@ -389,39 +316,21 @@ export async function scannerSN(req: Request, res: Response, next: any) {
 
     const snNorm = String(sn).trim()
     const accessoiresJson = accessoires ? JSON.stringify(accessoires) : null
-
-    // Ligne attendue pour ce SN + PN
     const ligne = attendu.lignes.find(l => l.sn === snNorm && l.statut === 'ATTENDU' && (!pn || l.pn === pn))
 
-    // Vérifier présence en inventaire (statut non final = bloquant)
-    const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
-    const idsSN = getIdsSN(champsInv)
-    let dejaEnInventaire = false
-    let rmaExistant: string | null = null
-
-    const existingVals = await prisma.valeurChampInventaire.findMany({
-      where: { champId: { in: idsSN }, valeur: snNorm },
-      include: { inventaire: { include: { statut: true } } }
+    // Vérifier présence en inventaire via colonne fixe serialNumber
+    const existingActif = await prisma.inventaire.findFirst({
+      where: { siteId: attendu.siteId, serialNumber: snNorm, statut: { is: { roles: { not: { contains: 'estFinal' } } } } },
+      include: { statut: true }
     })
-
-    const existingActif = existingVals.find(e => !hasRole(e.inventaire?.statut?.roles, 'estFinal'))
-    if (existingActif) {
-      dejaEnInventaire = true
-      const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(c.code)))
-      if (champsRMA.length > 0) {
-        const valRMA = await prisma.valeurChampInventaire.findFirst({
-          where: { inventaireId: existingActif.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
-        })
-        rmaExistant = valRMA?.valeur ?? null
-      }
-    }
+    const dejaEnInventaire = !!existingActif
+    const rmaExistant = existingActif?.rma ?? null
 
     if (ligne) {
       await prisma.ligneAttendue.update({
         where: { id: ligne.id },
         data: { statut: 'RECU', snRecu: snNorm, accessoires: accessoiresJson, caisse: caisse || null }
       })
-      // Si doublon actif → créer une ligne DOUBLON_INVENTAIRE pour le rapport
       if (dejaEnInventaire) {
         await prisma.ligneAttendue.create({
           data: {
@@ -474,7 +383,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
     const attendu = await prisma.attendu.findUnique({ where: { id: Number(id) }, include: { lignes: true } })
     if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
 
-    // Vérifier que les champs obligatoires de "Modifier les informations" sont renseignés
+    // Vérifier champs obligatoires
     const configChampsCheck = await prisma.configAttendus.findUnique({ where: { siteId: attendu.siteId } })
     if (configChampsCheck?.champsAttendu) {
       const champsConfig: any[] = typeof configChampsCheck.champsAttendu === 'string' ? JSON.parse(configChampsCheck.champsAttendu) : (configChampsCheck.champsAttendu as any)
@@ -483,28 +392,26 @@ export async function cloturer(req: Request, res: Response, next: any) {
       const champsObligatoires = champsConfig.filter((c: any) => c.visible && (c.obligatoire || c.obligatoireCloture))
       const manquants = champsObligatoires.filter((c: any) => !String(donnees[c.code] ?? '').trim())
       if (manquants.length > 0) {
-        const champsInvLabels = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
-        const labels = manquants.map((c: any) => champsInvLabels.find(ci => ci.code === c.code)?.label ?? c.code)
         return res.status(400).json({
-          error: `Clôture impossible : complétez d'abord les champs obligatoires suivants via "Modifier infos" : ${labels.join(', ')}`,
-          champsManquants: labels
+          error: `Clôture impossible : complétez d'abord les champs obligatoires suivants via "Modifier infos" : ${manquants.map((c: any) => c.code).join(', ')}`,
+          champsManquants: manquants.map((c: any) => c.code)
         })
       }
     }
 
-    // Vérifier doublons actifs (statut non final)
-    const champsInvCheck = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
-    const idsSNCheck = getIdsSN(champsInvCheck)
+    // Vérifier doublons actifs via colonne fixe
     const lignesRecues = attendu.lignes.filter(l => l.statut === 'RECU')
-    const existants = lignesRecues.length > 0 ? await prisma.valeurChampInventaire.findMany({
-      where: { champId: { in: idsSNCheck }, valeur: { in: lignesRecues.map(l => l.sn) } },
-      include: { inventaire: { include: { statut: true } } }
-    }) : []
-    const doublonsActifs = existants.filter(e => !(hasRole(e.inventaire?.statut?.roles, 'estFinal')))
+    const snsRecus = lignesRecues.map(l => l.sn).filter(Boolean)
+    const doublonsActifs = snsRecus.length > 0
+      ? await prisma.inventaire.findMany({
+          where: { siteId: attendu.siteId, serialNumber: { in: snsRecus }, statut: { roles: { not: { contains: 'estFinal' } } } },
+          select: { serialNumber: true }
+        })
+      : []
     if (doublonsActifs.length > 0) {
       return res.status(400).json({
         error: `Clôture impossible : ${doublonsActifs.length} S/N déjà présent${doublonsActifs.length > 1 ? 's' : ''} en inventaire avec un statut non final.`,
-        snsEnDoublon: doublonsActifs.map(e => e.valeur)
+        snsEnDoublon: doublonsActifs.map(e => e.serialNumber)
       })
     }
 
@@ -515,32 +422,25 @@ export async function cloturer(req: Request, res: Response, next: any) {
     })
 
     // Charger données pour injection
-    const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId, actif: true } })
-    const { champsArticle, trouverParPN } = await chargerArticles(attendu.siteId)
-    // Statut de clôture : rôle estStock en priorité, sinon config, sinon fallback code STOCK
+    const mappings = await prisma.configImportExcel.findMany({ where: { siteId: attendu.siteId, actif: true } })
+    const { trouverParPN } = await chargerArticles(attendu.siteId)
     const configSite = await prisma.configAttendus.findUnique({ where: { siteId: attendu.siteId } })
-    const statutStock =
-      await (async () => {
-        const sIds = (await prisma.statut.findMany({ where: { siteId: attendu.siteId }, select: { id: true, roles: true } }))
-          .filter(s => hasRole(s.roles, 'estStock')).map(s => s.id)
-        return sIds.length > 0 ? prisma.statut.findFirst({ where: { id: { in: sIds } } }) : null
-      })()
-      ?? (configSite?.statutCloture
-        ? await prisma.statut.findFirst({ where: { siteId: attendu.siteId, code: configSite.statutCloture } })
-        : await prisma.statut.findFirst({ where: { siteId: attendu.siteId, OR: [{ code: { contains: 'STOCK' } }, { label: { contains: 'stock' } }] } })
-      )
 
-    // S/N à exclure (déjà en inventaire avec statut non final)
-    const idsSN = getIdsSN(champsInv)
-    const snsExistants = idsSN.length > 0 ? await prisma.valeurChampInventaire.findMany({
-      where: { champId: { in: idsSN } },
-      include: { inventaire: { include: { statut: true } } }
-    }) : []
-    const snsDejaPresents = new Set(
-      snsExistants.filter(v => !(hasRole(v.inventaire?.statut?.roles, 'estFinal'))).map(v => v.valeur)
+    const statutStock = await (async () => {
+      const sIds = (await prisma.statut.findMany({ where: { siteId: attendu.siteId }, select: { id: true, roles: true } }))
+        .filter(s => hasRole(s.roles, 'estStock')).map(s => s.id)
+      return sIds.length > 0 ? prisma.statut.findFirst({ where: { id: { in: sIds } } }) : null
+    })()
+    ?? (configSite?.statutCloture
+      ? await prisma.statut.findFirst({ where: { siteId: attendu.siteId, code: configSite.statutCloture } })
+      : await prisma.statut.findFirst({ where: { siteId: attendu.siteId, OR: [{ code: { contains: 'STOCK' } }, { label: { contains: 'stock' } }] } })
     )
 
-    const dateAujourdhui = new Date().toISOString().split('T')[0]
+    // S/N déjà présents (statut non final)
+    const snsDejaPresents = new Set(
+      doublonsActifs.map(e => e.serialNumber).filter(Boolean)
+    )
+
     let lignesInjectees = 0
     const snDoublons: string[] = []
 
@@ -551,7 +451,7 @@ export async function cloturer(req: Request, res: Response, next: any) {
         continue
       }
       const article = trouverParPN(ligne.pn)
-      await creerEntreeInventaire({ siteId: attendu.siteId, ligne, attendu, article, champsInv, champsArticle, statutStockId: statutStock?.id ?? null, dateAujourdhui, userId: req.user?.id })
+      await creerEntreeInventaire({ siteId: attendu.siteId, ligne, attendu, article, mappings, statutStockId: statutStock?.id ?? null, userId: req.user?.id })
       await prisma.ligneAttendue.update({ where: { id: ligne.id }, data: { statut: 'INJECTE' } })
       lignesInjectees++
     }
@@ -572,44 +472,24 @@ export async function rapport(req: Request, res: Response) {
   const lignesNormales = attendu.lignes.filter(l => l.statut !== 'DOUBLON_INVENTAIRE')
   const nonRecus   = lignesNormales.filter(l => l.statut === 'NON_RECU' || l.statut === 'ATTENDU')
   const inattendus = lignesNormales.filter(l => l.statut === 'INATTENDU')
-  // RECU = reçu mais pas encore injecté (attendu ouvert) ; INJECTE = injecté lors de la clôture
   const recus      = lignesNormales.filter(l => l.statut === 'RECU' || l.statut === 'INJECTE')
-  // On ne vérifie les doublons inventaire qu'en temps réel sur les RECU (avant clôture)
-  // Après clôture, les INJECTE sont dans l'inventaire mais ne sont PAS des doublons
   const recusNonInjectes = lignesNormales.filter(l => l.statut === 'RECU')
 
-  // Calculer doublons inventaire en temps réel
-  const champsInv = await prisma.champInventaire.findMany({ where: { siteId: attendu.siteId } })
-  const idsSN = getIdsSN(champsInv)
-  const champsRMA = champsInv.filter(c => ['BL', 'RMA', 'BON_LIVRAISON'].includes(normalizeCode(c.code)))
-
-  const valeursExistantes = recusNonInjectes.length > 0 ? await prisma.valeurChampInventaire.findMany({
-    where: { champId: { in: idsSN }, valeur: { in: recusNonInjectes.map(l => l.sn) } },
-    include: { inventaire: { include: { statut: true } } }
-  }) : []
-
-  // Garder uniquement les doublons avec statut NON final
-  const doublonsInventaire = (await Promise.all(
-    valeursExistantes
-      .filter(e => !(hasRole(e.inventaire?.statut?.roles, 'estFinal')))
-      .map(async val => {
-        const ligne = recusNonInjectes.find(l => l.sn === val.valeur)
-        if (!ligne) return null
-        let rmaExistant = null
-        if (champsRMA.length > 0) {
-          const valRMA = await prisma.valeurChampInventaire.findFirst({
-            where: { inventaireId: val.inventaireId, champId: { in: champsRMA.map(c => c.id) } }
-          })
-          rmaExistant = valRMA?.valeur ?? null
-        }
-        return {
-          ...ligne,
-          notes: rmaExistant ? `Déjà en inventaire — RMA : ${rmaExistant}` : 'Déjà en inventaire'
-        }
+  // Doublons inventaire en temps réel via colonne fixe
+  const snsNonInjectes = recusNonInjectes.map(l => l.sn).filter(Boolean)
+  const doublonsActifs = snsNonInjectes.length > 0
+    ? await prisma.inventaire.findMany({
+        where: { siteId: attendu.siteId, serialNumber: { in: snsNonInjectes }, statut: { roles: { not: { contains: 'estFinal' } } } },
+        select: { serialNumber: true, rma: true }
       })
-  )).filter((d): d is NonNullable<typeof d> => d !== null)
+    : []
 
-  // Fusionner avec les lignes DOUBLON_INVENTAIRE stockées
+  const doublonsInventaire = doublonsActifs.map(inv => {
+    const ligne = recusNonInjectes.find(l => l.sn === inv.serialNumber)
+    if (!ligne) return null
+    return { ...ligne, notes: inv.rma ? `Déjà en inventaire — RMA : ${inv.rma}` : 'Déjà en inventaire' }
+  }).filter((d): d is NonNullable<typeof d> => d !== null)
+
   const doublonsStockes = attendu.lignes.filter(l => l.statut === 'DOUBLON_INVENTAIRE')
   const tousDoublons = [
     ...doublonsInventaire,

@@ -1,20 +1,14 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
-import { normCode, valeurPour } from '../utils/pda'
 import { logActivite } from '../utils/historique'
+import { hasRole } from '../utils/roles'
 
 const prisma = new PrismaClient()
 
-async function getConfigRep(siteId: number) {
-  const config = await prisma.configProduction.findUnique({ where: { siteId } })
-  return {
-    champRMACode: config?.champRMACode ?? 'BL',
-    champPNCode:  config?.champPNCode  ?? 'PN',
-  }
-}
-
-async function getStatutsRepare(siteId: number) {
-  return prisma.statut.findMany({ where: { siteId, code: { in: ['REPARE', 'REPARER'] } } })
+/** Statuts avec rôle estRepare (machines réparées en attente MAJ/Injection) */
+async function getStatutsRepare(siteId: number): Promise<number[]> {
+  const statuts = await prisma.statut.findMany({ where: { siteId }, select: { id: true, roles: true } })
+  return statuts.filter(s => hasRole(s.roles, 'estRepare')).map(s => s.id)
 }
 
 // ─── Liste des RMA en attente de MAJ/Injection ────────────────────────────────
@@ -22,25 +16,19 @@ async function getStatutsRepare(siteId: number) {
 export async function getRmaList(req: Request, res: Response, next: any) {
   try {
     const siteId = Number(req.params.siteId)
-    const { champRMACode, champPNCode } = await getConfigRep(siteId)
-    const statutsRepare = await getStatutsRepare(siteId)
-    if (!statutsRepare.length) return res.json([])
-
-    const champsInv   = await prisma.champInventaire.findMany({ where: { siteId } })
-    const champRMA    = champsInv.find(c => normCode(c.code) === normCode(champRMACode))
-    const champPN     = champsInv.find(c => normCode(c.code) === normCode(champPNCode))
-    const champClient = champsInv.find(c => normCode(c.code) === 'CLIENT')
+    const statutIds = await getStatutsRepare(siteId)
+    if (!statutIds.length) return res.json([])
 
     const inventaires = await prisma.inventaire.findMany({
-      where: { siteId, statutId: { in: statutsRepare.map(s => s.id) } },
-      include: { valeurs: true }
+      where: { siteId, archive: false, statutId: { in: statutIds } },
+      select: { id: true, rma: true, partNumber: true, customer: true }
     })
 
     const groupes: Record<string, { rma: string; count: number; client: string; pns: string[] }> = {}
     for (const inv of inventaires) {
-      const rma    = valeurPour(inv.valeurs, champRMA) || '(Sans RMA)'
-      const pn     = valeurPour(inv.valeurs, champPN)
-      const client = valeurPour(inv.valeurs, champClient)
+      const rma    = inv.rma    || '(Sans RMA)'
+      const pn     = inv.partNumber ?? ''
+      const client = inv.customer   ?? ''
       if (!groupes[rma]) groupes[rma] = { rma, count: 0, client, pns: [] }
       groupes[rma].count++
       if (pn && !groupes[rma].pns.includes(pn)) groupes[rma].pns.push(pn)
@@ -56,37 +44,22 @@ export async function getInventairesRma(req: Request, res: Response, next: any) 
   try {
     const siteId = Number(req.params.siteId)
     const rma    = decodeURIComponent(req.params.rma)
-    const { champRMACode, champPNCode } = await getConfigRep(siteId)
-    const statutsRepare = await getStatutsRepare(siteId)
-    if (!statutsRepare.length) return res.json([])
+    const statutIds = await getStatutsRepare(siteId)
+    if (!statutIds.length) return res.json([])
 
-    const champsInv   = await prisma.champInventaire.findMany({ where: { siteId } })
-    const champRMA    = champsInv.find(c => normCode(c.code) === normCode(champRMACode))
-    const champPN     = champsInv.find(c => normCode(c.code) === normCode(champPNCode))
-    const champSN     = champsInv.find(c => normCode(c.code) === 'NUMERO_DE_SERIE' || normCode(c.code) === 'SN')
-    const champDesig  = champsInv.find(c => normCode(c.code) === 'DESIGNATION')
-    const champClient = champsInv.find(c => normCode(c.code) === 'CLIENT')
-    const champPanne  = champsInv.find(c => normCode(c.code) === 'PANNE_CLIENT')
-    const champNivRep = champsInv.find(c => normCode(c.code) === 'NIVEAU_REP')
-
+    const rmaFilter = rma === '(Sans RMA)' ? null : rma
     const inventaires = await prisma.inventaire.findMany({
-      where: { siteId, statutId: { in: statutsRepare.map(s => s.id) } },
-      include: { valeurs: true, statut: true }
+      where: { siteId, archive: false, statutId: { in: statutIds }, rma: rmaFilter ?? undefined },
+      include: { statut: true }
     })
 
-    const filtrés = inventaires.filter(inv =>
-      (valeurPour(inv.valeurs, champRMA) || '(Sans RMA)') === rma
-    )
-
-    res.json(filtrés.map(inv => ({
-      id:          inv.id,
-      pn:          valeurPour(inv.valeurs, champPN),
-      sn:          valeurPour(inv.valeurs, champSN),
-      designation: valeurPour(inv.valeurs, champDesig),
-      client:      valeurPour(inv.valeurs, champClient),
-      panneClient: valeurPour(inv.valeurs, champPanne),
-      niveauRep:   valeurPour(inv.valeurs, champNivRep),
-      statut:      inv.statut,
+    res.json(inventaires.map(inv => ({
+      id:                 inv.id,
+      pn:                 inv.partNumber         ?? '',
+      sn:                 inv.serialNumber       ?? '',
+      customer:           inv.customer           ?? '',
+      livelloRiparazione: inv.livelloRiparazione ?? '',
+      statut:             inv.statut,
     })))
   } catch (e) { next(e) }
 }
@@ -99,19 +72,13 @@ export async function scanInventaire(req: Request, res: Response, next: any) {
     const sn     = String(req.query.sn ?? '').trim()
     if (!sn) return res.status(400).json({ error: 'SN manquant' })
 
-    const statutsRepare = await getStatutsRepare(siteId)
-    if (!statutsRepare.length) return res.status(404).json({ error: 'Statut REPARE introuvable' })
-
-    const match = await prisma.valeurChampInventaire.findFirst({
-      where: {
-        valeur: sn,
-        inventaire: { siteId, statutId: { in: statutsRepare.map(s => s.id) } }
-      },
-      include: { inventaire: true }
+    const statutIds = await getStatutsRepare(siteId)
+    const inv = await prisma.inventaire.findFirst({
+      where: { siteId, archive: false, serialNumber: sn, statutId: { in: statutIds } }
     })
 
-    if (!match) return res.status(404).json({ error: 'Aucune machine trouvée pour ce SN' })
-    res.json({ inventaireId: match.inventaireId })
+    if (!inv) return res.status(404).json({ error: 'Aucune machine trouvée pour ce SN' })
+    res.json({ inventaireId: inv.id })
   } catch (e) { next(e) }
 }
 
@@ -121,24 +88,13 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
   try {
     const siteId       = Number(req.params.siteId)
     const inventaireId = Number(req.params.id)
-    const { champRMACode, champPNCode } = await getConfigRep(siteId)
-
-    const champsInv   = await prisma.champInventaire.findMany({ where: { siteId } })
-    const champRMA    = champsInv.find(c => normCode(c.code) === normCode(champRMACode))
-    const champPN     = champsInv.find(c => normCode(c.code) === normCode(champPNCode))
-    const champSN     = champsInv.find(c => normCode(c.code) === 'NUMERO_DE_SERIE' || normCode(c.code) === 'SN')
-    const champDesig  = champsInv.find(c => normCode(c.code) === 'DESIGNATION')
-    const champClient = champsInv.find(c => normCode(c.code) === 'CLIENT')
-    const champPanne  = champsInv.find(c => normCode(c.code) === 'PANNE_CLIENT')
-    const champNivRep = champsInv.find(c => normCode(c.code) === 'NIVEAU_REP')
 
     const inv = await prisma.inventaire.findUnique({
       where: { id: inventaireId },
-      include: { valeurs: true, statut: true }
+      include: { statut: true, pieces: true }
     })
     if (!inv) return res.status(404).json({ error: 'Inventaire introuvable' })
 
-    // Historique uniquement par inventaireId
     const hActivites = await prisma.historiqueActivite.findMany({
       where: { siteId, entite: 'inventaire', entiteId: inventaireId },
       orderBy: { createdAt: 'asc' }
@@ -161,24 +117,23 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
       }
     })
 
-    const [statutMajInjection, statutAttenteRep] = await Promise.all([
-      prisma.statut.findFirst({ where: { siteId, code: 'MAJINJECTION' } }),
-      prisma.statut.findFirst({ where: { siteId, code: 'ATTENTE_REP' } }),
-    ])
+    // Statut suivant dans le workflow (premier statut qui suit estRepare)
+    const tousStatuts = await prisma.statut.findMany({ where: { siteId } })
+    const statutsMaj  = tousStatuts.filter(s => hasRole(s.roles, 'estMajInjection'))
+    const statutsRep  = tousStatuts.filter(s => hasRole(s.roles, 'estRepare'))
 
     res.json({
-      id:          inv.id,
-      pn:          valeurPour(inv.valeurs, champPN),
-      sn:          valeurPour(inv.valeurs, champSN),
-      rma:         valeurPour(inv.valeurs, champRMA),
-      designation: valeurPour(inv.valeurs, champDesig),
-      client:      valeurPour(inv.valeurs, champClient),
-      panneClient: valeurPour(inv.valeurs, champPanne),
-      niveauRep:   valeurPour(inv.valeurs, champNivRep),
-      statut:      inv.statut,
+      id:                 inv.id,
+      serialNumber:       inv.serialNumber       ?? '',
+      partNumber:         inv.partNumber         ?? '',
+      rma:                inv.rma                ?? '',
+      customer:           inv.customer           ?? '',
+      livelloRiparazione: inv.livelloRiparazione ?? '',
+      statut:             inv.statut,
+      pieces:             inv.pieces,
       historique,
-      statutMajInjection: statutMajInjection ?? null,
-      statutAttenteRep:   statutAttenteRep   ?? null,
+      statutsMajInjection: statutsMaj,
+      statutsRetour:       statutsRep,
     })
   } catch (e) { next(e) }
 }
@@ -189,48 +144,20 @@ export async function validerMajInjection(req: Request, res: Response, next: any
   try {
     const siteId       = Number(req.params.siteId)
     const inventaireId = Number(req.params.id)
+    const { statutId } = req.body
     const userId       = req.user?.id ?? null
 
-    const statut = await prisma.statut.findFirst({ where: { siteId, code: 'MAJINJECTION' } })
-    if (!statut) return res.status(404).json({ error: 'Statut MAJINJECTION introuvable' })
-
-    const invActuel = await prisma.inventaire.findUnique({ where: { id: inventaireId }, include: { statut: true } })
+    const [statut, invActuel] = await Promise.all([
+      prisma.statut.findUnique({ where: { id: Number(statutId) } }),
+      prisma.inventaire.findUnique({ where: { id: inventaireId }, include: { statut: true } })
+    ])
+    if (!statut) return res.status(404).json({ error: 'Statut introuvable' })
     const labelSource = invActuel?.statut?.label ?? '?'
 
     await prisma.inventaire.update({
       where: { id: inventaireId },
-      data: { statutId: statut.id },
+      data: { statutId: statut.id, dateMaj: new Date() }
     })
-
-    const dateAujourdhui = new Date().toISOString().slice(0, 10)
-
-    const [champDateClean, champOpeMaj] = await Promise.all([
-      prisma.champInventaire.findFirst({ where: { siteId, code: 'DATE_CLEAN' } }),
-      prisma.champInventaire.findFirst({ where: { siteId, code: 'OPE.MAJ' } }),
-    ])
-
-    const upserts: Promise<any>[] = []
-
-    if (champDateClean) {
-      upserts.push(prisma.valeurChampInventaire.upsert({
-        where: { inventaireId_champId: { inventaireId, champId: champDateClean.id } },
-        create: { inventaireId, champId: champDateClean.id, valeur: dateAujourdhui },
-        update: { valeur: dateAujourdhui },
-      }))
-    }
-
-    if (champOpeMaj && userId) {
-      const utilisateur = await prisma.utilisateur.findUnique({ where: { id: userId }, select: { login: true } })
-      if (utilisateur) {
-        upserts.push(prisma.valeurChampInventaire.upsert({
-          where: { inventaireId_champId: { inventaireId, champId: champOpeMaj.id } },
-          create: { inventaireId, champId: champOpeMaj.id, valeur: utilisateur.login },
-          update: { valeur: utilisateur.login },
-        }))
-      }
-    }
-
-    await Promise.all(upserts)
 
     await logActivite({
       siteId, userId: userId ?? undefined, type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inventaireId,
@@ -241,20 +168,20 @@ export async function validerMajInjection(req: Request, res: Response, next: any
   } catch (e) { next(e) }
 }
 
-// ─── Retour technicien (→ ATTENTE_REP) ───────────────────────────────────────
+// ─── Retour en réparation ─────────────────────────────────────────────────────
 
 export async function changerStatut(req: Request, res: Response, next: any) {
   try {
     const siteId       = Number(req.params.siteId)
     const inventaireId = Number(req.params.id)
-    const { statutCode } = req.body
+    const { statutId } = req.body
     const userId = req.user?.id ?? null
 
     const [statut, invActuel] = await Promise.all([
-      prisma.statut.findFirst({ where: { siteId, code: statutCode } }),
+      prisma.statut.findUnique({ where: { id: Number(statutId) } }),
       prisma.inventaire.findUnique({ where: { id: inventaireId }, include: { statut: true } })
     ])
-    if (!statut) return res.status(404).json({ error: `Statut ${statutCode} introuvable` })
+    if (!statut) return res.status(404).json({ error: 'Statut introuvable' })
     const labelSource = invActuel?.statut?.label ?? '?'
 
     await prisma.inventaire.update({ where: { id: inventaireId }, data: { statutId: statut.id } })

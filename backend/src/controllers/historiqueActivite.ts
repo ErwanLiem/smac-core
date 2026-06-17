@@ -1,6 +1,5 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
-import { normCode } from '../utils/pda'
 
 const prisma = new PrismaClient()
 
@@ -40,23 +39,16 @@ export async function getHistorique(req: Request, res: Response, next: any) {
       : []
     const userMap = Object.fromEntries(users.map(u => [u.id, u]))
 
-    // Résoudre le SN pour les lignes de type entite=inventaire
+    // Résoudre le SN pour les lignes entite=inventaire via colonne fixe
     const invIds = [...new Set(lignes.filter(l => l.entite === 'inventaire' && l.entiteId).map(l => l.entiteId!))]
     const snMap: Record<number, string> = {}
     if (invIds.length) {
-      const champsInv = await prisma.champInventaire.findMany({ where: { siteId } })
-      const champSN = champsInv.find(c =>
-        normCode(c.code) === 'NUMERO_DE_SERIE' ||
-        normCode(c.code) === 'SN'
-      )
-      if (champSN) {
-        const valeurs = await prisma.valeurChampInventaire.findMany({
-          where: { inventaireId: { in: invIds }, champId: champSN.id },
-          select: { inventaireId: true, valeur: true }
-        })
-        for (const v of valeurs) {
-          if (v.valeur) snMap[v.inventaireId] = v.valeur
-        }
+      const inventaires = await prisma.inventaire.findMany({
+        where: { id: { in: invIds } },
+        select: { id: true, serialNumber: true }
+      })
+      for (const inv of inventaires) {
+        if (inv.serialNumber) snMap[inv.id] = inv.serialNumber
       }
     }
 

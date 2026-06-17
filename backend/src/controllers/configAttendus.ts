@@ -8,13 +8,12 @@ export async function getConfig(req: Request, res: Response) {
   const { siteId } = req.params
   const sid = Number(siteId)
 
-  const [config, mappings, champsInv] = await Promise.all([
+  const [config, mappings] = await Promise.all([
     prisma.configAttendus.findUnique({ where: { siteId: sid } }),
     prisma.configImportExcel.findMany({ where: { siteId: sid }, orderBy: { colonneExcel: 'asc' } }),
-    prisma.champInventaire.findMany({ where: { siteId: sid, actif: true }, orderBy: { ordre: 'asc' } })
   ])
 
-  res.json({ config, mappings, champsInv })
+  res.json({ config, mappings })
 }
 
 // PUT /api/config-attendus/:siteId — sauvegarder la config globale
@@ -35,9 +34,9 @@ export async function saveConfig(req: Request, res: Response, next: any) {
 export async function addMapping(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { colonneExcel, champInventaireCode, roleSpecial } = req.body
+    const { colonneExcel, colonneInventaire, roleSpecial } = req.body
     const mapping = await prisma.configImportExcel.create({
-      data: { siteId: Number(siteId), colonneExcel, champInventaireCode, roleSpecial: roleSpecial || null }
+      data: { siteId: Number(siteId), colonneExcel, colonneInventaire, roleSpecial: roleSpecial || null }
     })
     res.json(mapping)
   } catch (e) { next(e) }
@@ -47,10 +46,10 @@ export async function addMapping(req: Request, res: Response, next: any) {
 export async function updateMapping(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
-    const { colonneExcel, champInventaireCode, roleSpecial, actif } = req.body
+    const { colonneExcel, colonneInventaire, roleSpecial, actif } = req.body
     const mapping = await prisma.configImportExcel.update({
       where: { id: Number(id) },
-      data: { colonneExcel, champInventaireCode, roleSpecial: roleSpecial || null, actif }
+      data: { colonneExcel, colonneInventaire, roleSpecial: roleSpecial || null, actif }
     })
     res.json(mapping)
   } catch (e) { next(e) }

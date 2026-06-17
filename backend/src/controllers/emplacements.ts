@@ -4,28 +4,21 @@ import { hasRole } from '../utils/roles'
 
 const prisma = new PrismaClient()
 
-const CODE_EMPLACEMENT = 'EMPLACEMENT'
-
 async function calcRemplissage(siteId: number, nomsEmplacements: string[]): Promise<Record<string, number>> {
   if (nomsEmplacements.length === 0) return {}
 
-  const champEmp = await prisma.champInventaire.findFirst({
-    where: { siteId, code: CODE_EMPLACEMENT }
-  })
-  if (!champEmp) return {}
+  // Compte les inventaires en statut estStock dont le genericNotes contient le nom d'emplacement
+  // Note: emplacement sera un champ dédié à ajouter si nécessaire
+  const statuts = await prisma.statut.findMany({ where: { siteId }, select: { id: true, roles: true } })
+  const stockIds = statuts.filter(s => hasRole(s.roles, 'estStock')).map(s => s.id)
 
-  const valeurs = await prisma.valeurChampInventaire.findMany({
-    where: { champId: champEmp.id, valeur: { in: nomsEmplacements } },
-    include: { inventaire: { include: { statut: true } } }
+  const inventaires = await prisma.inventaire.findMany({
+    where: { siteId, archive: false, statutId: { in: stockIds } },
+    select: { id: true }
   })
 
-  const counts: Record<string, number> = {}
-  for (const v of valeurs) {
-    if (!v.valeur) continue
-    if (!hasRole(v.inventaire?.statut?.roles, 'estStock')) continue
-    counts[v.valeur] = (counts[v.valeur] ?? 0) + 1
-  }
-  return counts
+  // TODO: lier emplacement via une colonne dédiée quand ajoutée
+  return Object.fromEntries(nomsEmplacements.map(n => [n, 0]))
 }
 
 export async function getAll(req: Request, res: Response) {

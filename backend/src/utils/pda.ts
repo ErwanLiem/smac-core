@@ -55,8 +55,6 @@ export async function getArticlesQTE(prisma: PrismaClient, siteId: number) {
   const config = await prisma.configProduction.findUnique({ where: { siteId } })
   const champTypeCode = config?.champTypeArticleCode ?? 'TYPE'
   const typesAutorises: string[] = config?.typesArticleQTE ? JSON.parse(config.typesArticleQTE) : []
-  const champPNCode = config?.champPNCode ?? 'PN'
-
   const champsArticle = await prisma.champArticle.findMany({ where: { siteId } })
   const champType   = champsArticle.find(c => normCode(c.code) === normCode(champTypeCode))
   const champDetail = champsArticle.find(c => normCode(c.code) === 'DETAIL')
@@ -74,5 +72,5 @@ export async function getArticlesQTE(prisma: PrismaClient, siteId: number) {
     })
   }
 
-  return { typesAutorises, champPNCode, champType, champDetail, champModel, articlesQTE }
+  return { typesAutorises, champType, champDetail, champModel, articlesQTE }
 }

@@ -30,8 +30,8 @@ model champArticle {
   siteId      Int
   code        String
   label       String
-  type        String        @default("TEXT") // TEXT, NUMBER, DATE, SELECT
-  options     String?       @db.LongText     // JSON array pour les SELECT
+  type        String        @default("TEXT")
+  options     String?       @db.LongText
   obligatoire Boolean       @default(false)
   ordre       Int           @default(0)
   actif       Boolean       @default(true)
@@ -137,73 +137,110 @@ model valeurChampPlateforme {
   @@index([champId], map: "ValeurChampPlateforme_champId_fkey")
 }
 
+// ─── Inventaire ───────────────────────────────────────────────────────────────
+
 model inventaire {
-  id               Int                @id @default(autoincrement())
-  siteId           Int
-  articleId        Int?
-  statutId         Int?
-  couleurAlerte    String?
-  regleAlerteId    Int?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  site             site               @relation(fields: [siteId], references: [id], map: "Inventaire_siteId_fkey")
-  article          article?           @relation(fields: [articleId], references: [id], map: "Inventaire_articleId_fkey")
-  statut           statut?            @relation(fields: [statutId], references: [id], onDelete: Cascade, map: "Inventaire_statutId_fkey")
-  regleAlerte      regleAlerte?       @relation(fields: [regleAlerteId], references: [id], map: "Inventaire_regleAlerteId_fkey")
-  valeurs          valeurChampInventaire[]
-  lignesTransfert  ligneDemandeTransfert[]
-  ligneMasterBox   ligneMasterBox?
+  id                 Int       @id @default(autoincrement())
+  siteId             Int
+  articleId          Int?
+  statutId           Int?
+
+  // Identification
+  serialNumber       String?
+  partNumber         String?
+  rma                String?
+  customer           String?
+  productFamily      String?
+  mercurySn          String?
+  warranty           String?
+  rmaCreationDate    DateTime? @db.Date
+
+  // Réception
+  dateRic            DateTime? @db.Date
+  defectFromCustomer String?
+  descrCode          String?
+  repaireNotes       String?
+  genericNotes       String?
+
+  // Réparation
+  dateRip            DateTime? @db.Date
+  techLabo           String?
+  livelloRiparazione String?
+  dateLav            DateTime? @db.Date
+  dateAsp            DateTime? @db.Date
+  dateLab            DateTime? @db.Date
+  datePrv            DateTime? @db.Date
+  datePrr            DateTime? @db.Date
+  datePrf            DateTime? @db.Date
+  datePra            DateTime? @db.Date
+  dateEng            DateTime? @db.Date
+  dateAsw            DateTime? @db.Date
+  dateBsf            DateTime? @db.Date
+  dateBsfn           DateTime? @db.Date
+  dateNlv            DateTime? @db.Date
+
+  // MAJ / Injection
+  dateMaj            DateTime? @db.Date
+
+  // Contrôle qualité
+  dateTest           DateTime? @db.Date
+
+  // Logistique sortante
+  datePack           DateTime? @db.Date
+  dateCls            DateTime? @db.Date
+  dateSHP            DateTime? @db.Date
+
+  // Méta
+  archive            Boolean   @default(false)
+  couleurAlerte      String?
+  regleAlerteId      Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  site               site                    @relation(fields: [siteId], references: [id], map: "Inventaire_siteId_fkey")
+  article            article?                @relation(fields: [articleId], references: [id], map: "Inventaire_articleId_fkey")
+  statut             statut?                 @relation(fields: [statutId], references: [id], onDelete: Cascade, map: "Inventaire_statutId_fkey")
+  regleAlerte        regleAlerte?            @relation(fields: [regleAlerteId], references: [id], map: "Inventaire_regleAlerteId_fkey")
+  pieces             piecesUtilisees[]
+  lignesTransfert    ligneDemandeTransfert[]
+  ligneMasterBox     ligneMasterBox?
 
   @@index([siteId], map: "Inventaire_siteId_fkey")
   @@index([articleId], map: "Inventaire_articleId_fkey")
   @@index([statutId], map: "Inventaire_statutId_fkey")
   @@index([regleAlerteId], map: "Inventaire_regleAlerteId_fkey")
+  @@index([siteId, archive])
+  @@index([serialNumber])
+  @@index([rma])
 }
 
-model champInventaire {
-  id                 Int                     @id @default(autoincrement())
-  siteId             Int
-  code               String
-  label              String
-  type               String                  @default("TEXT") // TEXT, NUMBER, DATE, SELECT
-  options            String?                 @db.LongText     // JSON array pour les SELECT
-  obligatoire        Boolean                 @default(false)
-  ordre              Int                     @default(0)
-  actif              Boolean                 @default(true)
-  visibleReceptionSN      Boolean             @default(false)
-  visibleReceptionQTE     Boolean             @default(false)
-  site               site                    @relation(fields: [siteId], references: [id], map: "ChampInventaire_siteId_fkey")
-  valeurs            valeurChampInventaire[]
-
-  @@unique([siteId, code], map: "ChampInventaire_siteId_code_key")
-  @@index([siteId], map: "ChampInventaire_siteId_fkey")
-}
-
-model valeurChampInventaire {
-  id          Int              @id @default(autoincrement())
+model piecesUtilisees {
+  id           Int        @id @default(autoincrement())
   inventaireId Int
-  champId     Int
-  valeur      String?          @db.LongText
-  inventaire  inventaire       @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "ValeurChampInventaire_inventaireId_fkey")
-  champ       champInventaire  @relation(fields: [champId], references: [id], map: "ValeurChampInventaire_champId_fkey")
+  pn           String?
+  pnType       String?
+  sp           String?
+  status       String?
+  createdAt    DateTime   @default(now())
+  inventaire   inventaire @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "PiecesUtilisees_inventaireId_fkey")
 
-  @@unique([inventaireId, champId], map: "ValeurChampInventaire_inventaireId_champId_key")
-  @@index([inventaireId], map: "ValeurChampInventaire_inventaireId_fkey")
-  @@index([champId], map: "ValeurChampInventaire_champId_fkey")
+  @@index([inventaireId], map: "PiecesUtilisees_inventaireId_fkey")
 }
 
-// Module Attendus (réception sur fichier client)
+// ─── Module Attendus ──────────────────────────────────────────────────────────
+
 model attendu {
-  id          Int            @id @default(autoincrement())
-  siteId      Int
-  rma               String?        // identifiant principal (affiché dans la liste)
-  bt                String?        // identifiant secondaire
-  donneesCommunes   String?        @db.LongText // JSON {champCode: valeur} pour les champs inventaire saisis à la création
-  statut      String         @default("EN_COURS") // EN_COURS, CLOS
-  createdAt   DateTime       @default(now())
-  closedAt    DateTime?
-  site        site           @relation(fields: [siteId], references: [id], map: "Attendu_siteId_fkey")
-  lignes      ligneAttendue[]
+  id              Int             @id @default(autoincrement())
+  siteId          Int
+  rma             String?
+  bt              String?
+  donneesCommunes String?         @db.LongText // JSON {colonne: valeur} pour les champs communs saisis à la création
+  statut          String          @default("EN_COURS") // EN_COURS, CLOS
+  createdAt       DateTime        @default(now())
+  closedAt        DateTime?
+  site            site            @relation(fields: [siteId], references: [id], map: "Attendu_siteId_fkey")
+  lignes          ligneAttendue[]
 
   @@index([siteId], map: "Attendu_siteId_fkey")
 }
@@ -216,51 +253,52 @@ model ligneAttendue {
   panneClient  String?
   garantie     String?
   statut       String   @default("ATTENDU") // ATTENDU, RECU, NON_RECU, INATTENDU, DOUBLON_INVENTAIRE
-  snRecu       String?  // SN réellement scanné si différent
-  accessoires  String?  @db.LongText // JSON array des accessoires reçus
-  notes        String?  // Info complémentaire (ex: RMA existant pour DOUBLON_INVENTAIRE)
-  caisse       String?  // Numéro de caisse physique assigné lors du scan
+  snRecu       String?
+  accessoires  String?  @db.LongText
+  notes        String?
+  caisse       String?
   createdAt    DateTime @default(now())
   attendu      attendu  @relation(fields: [attenduId], references: [id], onDelete: Cascade, map: "LigneAttendue_attenduId_fkey")
 
   @@index([attenduId], map: "LigneAttendue_attenduId_fkey")
 }
 
-// Configuration globale du module Attendus par site
 model configAttendus {
-  id                       Int     @id @default(autoincrement())
-  siteId                   Int     @unique
-  nomOnglet                String  @default("Terminal Details") // nom de l'onglet Excel à lire
-  obligatoirePNcatalogue   Boolean @default(true)  // bloquer l'import si PN absent du catalogue
-  statutCloture            String? // code du statut à assigner à la clôture (ex: EN_STOCK)
-  champsAttendu            String? @db.LongText    // JSON: config des champs du formulaire de création
-  site                     site    @relation(fields: [siteId], references: [id], map: "ConfigAttendus_siteId_fkey")
+  id                     Int     @id @default(autoincrement())
+  siteId                 Int     @unique
+  nomOnglet              String  @default("Terminal Details")
+  obligatoirePNcatalogue Boolean @default(true)
+  statutCloture          String?
+  champsAttendu          String? @db.LongText
+  site                   site    @relation(fields: [siteId], references: [id], map: "ConfigAttendus_siteId_fkey")
 }
 
-// Mapping colonnes Excel → champs inventaire
+// Mapping colonnes Excel → colonnes inventaire fixes
 model configImportExcel {
-  id                  Int     @id @default(autoincrement())
-  siteId              Int
-  colonneExcel        String  // nom exact de la colonne dans le fichier Excel
-  champInventaireCode String  // code du champ inventaire cible
-  roleSpecial         String? // SN | PN | null (rôle particulier dans le traitement)
-  actif               Boolean @default(true)
-  site                site    @relation(fields: [siteId], references: [id], map: "ConfigImportExcel_siteId_fkey")
+  id               Int     @id @default(autoincrement())
+  siteId           Int
+  colonneExcel     String
+  colonneInventaire String  // nom de la colonne fixe dans inventaire (ex: serialNumber, rma, partNumber)
+  roleSpecial      String? // SN | PN | null
+  actif            Boolean @default(true)
+  site             site    @relation(fields: [siteId], references: [id], map: "ConfigImportExcel_siteId_fkey")
 
   @@unique([siteId, colonneExcel], map: "ConfigImportExcel_siteId_colonneExcel_key")
   @@index([siteId], map: "ConfigImportExcel_siteId_fkey")
 }
 
+// ─── Historique ───────────────────────────────────────────────────────────────
+
 model historiqueActivite {
-  id         Int      @id @default(autoincrement())
-  siteId     Int
-  userId     Int?
-  type       String   // RECEPTION, MODIFICATION, SUPPRESSION, TRANSITION_STATUT, etc.
-  entite     String   // inventaire, article, client, plateforme, etc.
-  entiteId   Int?
-  details    String?  @db.LongText // JSON avec les détails du mouvement
-  createdAt  DateTime @default(now())
-  site       site     @relation(fields: [siteId], references: [id], map: "HistoriqueActivite_siteId_fkey")
+  id        Int      @id @default(autoincrement())
+  siteId    Int
+  userId    Int?
+  type      String
+  entite    String
+  entiteId  Int?
+  details   String?  @db.LongText
+  createdAt DateTime @default(now())
+  site      site     @relation(fields: [siteId], references: [id], map: "HistoriqueActivite_siteId_fkey")
 
   @@index([siteId], map: "HistoriqueActivite_siteId_fkey")
   @@index([type], map: "HistoriqueActivite_type_fkey")
@@ -282,300 +320,18 @@ model historiqueStatut {
   @@map("HistoriqueStatut")
 }
 
+// ─── Accès & Utilisateurs ─────────────────────────────────────────────────────
+
 model role {
-  id              Int               @id @default(autoincrement())
-  siteId          Int
-  code            String
-  label           String
-  site            site              @relation(fields: [siteId], references: [id], map: "Role_siteId_fkey")
-  utilisateur     utilisateur[]
-  permissions     permissionRole[]
+  id          Int              @id @default(autoincrement())
+  siteId      Int
+  code        String
+  label       String
+  site        site             @relation(fields: [siteId], references: [id], map: "Role_siteId_fkey")
+  utilisateur utilisateur[]
+  permissions permissionRole[]
 
   @@unique([siteId, code], map: "Role_siteId_code_key")
-}
-
-model site {
-  id          Int           @id @default(autoincrement())
-  nom         String
-  slug        String        @unique(map: "Site_slug_key")
-  actif       Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  article              article[]
-  role                 role[]
-  statut               statut[]
-  transition           transition[]
-  utilisateur          utilisateur[]
-  champArticle         champArticle[]
-  client               client[]
-  champClient          champClient[]
-  plateforme           plateforme[]
-  champPlateforme      champPlateforme[]
-  inventaire           inventaire[]
-  champInventaire      champInventaire[]
-  historiqueActivite   historiqueActivite[]
-  attendu              attendu[]
-  configAttendus       configAttendus?
-  configImportExcel    configImportExcel[]
-  regleAlerte          regleAlerte[]
-  configSite           configSite?
-  compteurBL           compteurBL[]
-  brouillonBL          brouillonBL[]
-  configProduction     configProduction?
-  technicienProduction technicienProduction[]
-  demandeTransfert     demandeTransfert[]
-  inventaireLabo       inventaireLabo[]
-  masterBox            masterBox[]
-  exceptionCapaciteJour exceptionCapaciteJour[]
-  emplacements          emplacement[]
-}
-
-// ─── Module Production ───────────────────────────────────────────────────────
-
-// Configuration du module production par site
-model configProduction {
-  id                   Int     @id @default(autoincrement())
-  siteId               Int     @unique
-  champPNCode          String  @default("PN")    // code du champInventaire jouant le rôle P/N
-  champRMACode         String  @default("BL")    // code du champInventaire jouant le rôle RMA/BL
-  labelPN              String  @default("P/N")   // label affiché dans l'interface
-  labelRMA             String  @default("RMA")   // label affiché dans l'interface
-  champTypeArticleCode String  @default("TYPE")  // code du champArticle contenant le type
-  typesArticleQTE      String? @db.LongText      // JSON: ["PDA","TABLETTE"] — types éligibles transfert QTE
-  champsAffichageQTE   String? @db.LongText      // JSON: ["PN","DESIGNATION","TYPE"] — champs à afficher dans la liste
-  quotaSamediActif     Boolean @default(false)   // si false, la capacité du samedi est forcée à 0
-  site                 site    @relation(fields: [siteId], references: [id], map: "ConfigProduction_siteId_fkey")
-}
-
-// Techniciens affectés à la production sur un site
-model technicienProduction {
-  id               Int                  @id @default(autoincrement())
-  siteId           Int
-  userId           Int
-  quotaJournalier  Int                  @default(10)
-  actif            Boolean              @default(true)
-  site             site                 @relation(fields: [siteId], references: [id], map: "TechnicienProduction_siteId_fkey")
-  utilisateur      utilisateur          @relation(fields: [userId], references: [id], map: "TechnicienProduction_userId_fkey")
-  absences         absenceTechnicien[]
-
-  @@unique([siteId, userId], map: "TechnicienProduction_siteId_userId_key")
-  @@index([siteId], map: "TechnicienProduction_siteId_fkey")
-  @@index([userId], map: "TechnicienProduction_userId_fkey")
-}
-
-// Absences ou réductions de capacité d'un technicien
-model absenceTechnicien {
-  id             Int                  @id @default(autoincrement())
-  technicienId   Int
-  date           DateTime             @db.Date
-  motif          String?
-  quotaOverride  Int?                 // null = absent total, sinon quota réduit pour ce jour
-  technicien     technicienProduction @relation(fields: [technicienId], references: [id], onDelete: Cascade, map: "AbsenceTechnicien_technicienId_fkey")
-
-  @@unique([technicienId, date], map: "AbsenceTechnicien_technicienId_date_key")
-  @@index([technicienId], map: "AbsenceTechnicien_technicienId_fkey")
-}
-
-// Exception ponctuelle au réglage par défaut d'un jour normalement inactif (ex: samedi travaillé)
-model exceptionCapaciteJour {
-  id      Int      @id @default(autoincrement())
-  siteId  Int
-  date    DateTime @db.Date
-  actif   Boolean  // true = capacité activée pour ce jour malgré le réglage par défaut
-  site    site     @relation(fields: [siteId], references: [id], map: "ExceptionCapaciteJour_siteId_fkey")
-
-  @@unique([siteId, date], map: "ExceptionCapaciteJour_siteId_date_key")
-  @@index([siteId], map: "ExceptionCapaciteJour_siteId_idx")
-}
-
-// Demande de transfert vers la production (SN ou QTE)
-model demandeTransfert {
-  id              Int                     @id @default(autoincrement())
-  siteId          Int
-  type            String                  // 'SN' | 'QTE'
-  statut          String                  @default("EN_ATTENTE") // EN_ATTENTE | VALIDEE | ANNULEE
-  datePlanifiee   DateTime                @db.Date
-  quantite        Int
-  // Champs SN
-  pnValeur        String?                 // valeur P/N du groupe
-  rmaValeur       String?                 // valeur RMA/BL du groupe
-  clientValeur    String?                 // valeur client du groupe (isole les demandes par client)
-  // Champs QTE
-  articleId       Int?
-  createdAt       DateTime                @default(now())
-  site            site                    @relation(fields: [siteId], references: [id], map: "DemandeTransfert_siteId_fkey")
-  article         article?                @relation(fields: [articleId], references: [id], map: "DemandeTransfert_articleId_fkey")
-  lignes          ligneDemandeTransfert[]
-
-  @@index([siteId], map: "DemandeTransfert_siteId_fkey")
-  @@index([articleId], map: "DemandeTransfert_articleId_fkey")
-}
-
-// Lignes d'une demande SN : pointe vers les inventaires concernés
-model ligneDemandeTransfert {
-  id                 Int              @id @default(autoincrement())
-  demandeTransfertId Int
-  inventaireId       Int
-  demande            demandeTransfert @relation(fields: [demandeTransfertId], references: [id], onDelete: Cascade, map: "LigneDemandeTransfert_demandeId_fkey")
-  inventaire         inventaire       @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "LigneDemandeTransfert_inventaireId_fkey")
-
-  @@unique([demandeTransfertId, inventaireId], map: "LigneDemandeTransfert_demandeId_inventaireId_key")
-  @@index([demandeTransfertId], map: "LigneDemandeTransfert_demandeId_fkey")
-  @@index([inventaireId], map: "LigneDemandeTransfert_inventaireId_fkey")
-}
-
-// Master Box : carton collectif regroupant des articles "Emballé" prêts à être expédiés
-model masterBox {
-  id           Int              @id @default(autoincrement())
-  siteId       Int
-  numero       String
-  clientValeur String?
-  statut       String           @default("EN_ATTENTE") // OUVERTE (en cours de remplissage) | EN_ATTENTE (enregistrée, prête à expédier) | EXPEDIEE
-  userId       Int?
-  createdAt    DateTime         @default(now())
-  site         site             @relation(fields: [siteId], references: [id], map: "MasterBox_siteId_fkey")
-  lignes       ligneMasterBox[]
-
-  @@index([siteId, clientValeur, numero], map: "MasterBox_siteId_clientValeur_numero_idx")
-  @@index([siteId], map: "MasterBox_siteId_fkey")
-}
-
-// Lignes d'une Master Box : pointe vers les inventaires emballés qu'elle contient
-model ligneMasterBox {
-  id           Int        @id @default(autoincrement())
-  masterBoxId  Int
-  inventaireId Int
-  masterBox    masterBox  @relation(fields: [masterBoxId], references: [id], onDelete: Cascade, map: "LigneMasterBox_masterBoxId_fkey")
-  inventaire   inventaire @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "LigneMasterBox_inventaireId_fkey")
-
-  @@unique([inventaireId], map: "LigneMasterBox_inventaireId_key")
-  @@index([masterBoxId], map: "LigneMasterBox_masterBoxId_fkey")
-  @@index([inventaireId], map: "LigneMasterBox_inventaireId_fkey")
-}
-
-// Inventaire labo (articles à la quantité, ex: PDAs)
-model inventaireLabo {
-  id        Int      @id @default(autoincrement())
-  siteId    Int
-  articleId Int
-  quantite  Int      @default(0)
-  updatedAt DateTime @updatedAt
-  site      site     @relation(fields: [siteId], references: [id], map: "InventaireLabo_siteId_fkey")
-  article   article  @relation(fields: [articleId], references: [id], map: "InventaireLabo_articleId_fkey")
-
-  @@unique([siteId, articleId], map: "InventaireLabo_siteId_articleId_key")
-  @@index([siteId], map: "InventaireLabo_siteId_fkey")
-  @@index([articleId], map: "InventaireLabo_articleId_fkey")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-model emplacement {
-  id          Int      @id @default(autoincrement())
-  siteId      Int
-  nom         String
-  capaciteMax Int
-  description String?  @db.LongText
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  site        site     @relation(fields: [siteId], references: [id], map: "Emplacement_siteId_fkey")
-
-  @@unique([siteId, nom], map: "Emplacement_siteId_nom_key")
-  @@index([siteId], map: "Emplacement_siteId_fkey")
-}
-
-model configSite {
-  id             Int    @id @default(autoincrement())
-  siteId         Int    @unique
-  nomSociete     String @default("")
-  adresse        String @default("")
-  ville          String @default("")
-  codePostal     String @default("")
-  pays           String @default("")
-  tel            String @default("")
-  email          String @default("")
-  siteWeb        String @default("")
-  tva            String @default("")
-  capitalSocial  String @default("")
-  site           site   @relation(fields: [siteId], references: [id], map: "ConfigSite_siteId_fkey")
-}
-
-model brouillonBL {
-  id              Int      @id @default(autoincrement())
-  siteId          Int
-  clientValeur    String?
-  numeroBL        String
-  bonTransport    String?
-  eta             String?
-  colisJson       String?  @db.LongText
-  plateformeId    Int?
-  updatedAt       DateTime @updatedAt
-  site            site     @relation(fields: [siteId], references: [id], map: "BrouillonBL_siteId_fkey")
-
-  @@unique([siteId, clientValeur], map: "BrouillonBL_siteId_clientValeur_key")
-  @@index([siteId], map: "BrouillonBL_siteId_fkey")
-}
-
-model compteurBL {
-  id      Int    @id @default(autoincrement())
-  siteId  Int
-  annee   Int
-  dernier Int    @default(0)
-  site    site   @relation(fields: [siteId], references: [id], map: "CompteurBL_siteId_fkey")
-
-  @@unique([siteId, annee], map: "CompteurBL_siteId_annee_key")
-  @@index([siteId], map: "CompteurBL_siteId_fkey")
-}
-
-model regleAlerte {
-  id             Int          @id @default(autoincrement())
-  siteId         Int
-  nom            String
-  codeChampDate  String       // code du champInventaire de type DATE à surveiller
-  seuilMois      Int          @default(3)
-  couleurAlerte  String       @default("#f59e0b")
-  champsAutoFill String?      @db.LongText // JSON: [{ codeChamp: "NOTE", valeur: "Sous garantie" }]
-  actif          Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  site           site         @relation(fields: [siteId], references: [id], map: "RegleAlerte_siteId_fkey")
-  inventaires    inventaire[]
-
-  @@index([siteId], map: "RegleAlerte_siteId_fkey")
-}
-
-model statut {
-  id                                         Int                @id @default(autoincrement())
-  siteId                                     Int
-  code                                       String
-  label                                      String
-  couleur                                    String             @default("#6b7280")
-  icone                                      String?
-  ordre                                      Int                @default(0)
-  roles                                      String             @default("[]") @db.Text
-  article                                    article[]
-  inventaire                                 inventaire[]
-  historiqueStatuts                          historiqueStatut[]
-  site                                       site               @relation(fields: [siteId], references: [id], map: "Statut_siteId_fkey")
-  transitionsFrom transition[] @relation("transition_statutFromIdTostatut")
-  transitionsTo   transition[] @relation("transition_statutToIdTostatut")
-
-  @@unique([siteId, code], map: "Statut_siteId_code_key")
-}
-
-model transition {
-  id                                     Int    @id @default(autoincrement())
-  siteId                                 Int
-  statutFromId                           Int
-  statutToId                             Int
-  labelBouton                            String
-  couleurBouton                          String @default("#3b82f6")
-  ordre                                  Int    @default(0)
-  site                                   site   @relation(fields: [siteId], references: [id], map: "Transition_siteId_fkey")
-  statutFrom statut @relation("transition_statutFromIdTostatut", fields: [statutFromId], references: [id], onDelete: Cascade, map: "Transition_statutFromId_fkey")
-  statutTo   statut @relation("transition_statutToIdTostatut", fields: [statutToId], references: [id], onDelete: Cascade, map: "Transition_statutToId_fkey")
-
-  @@index([siteId], map: "Transition_siteId_fkey")
-  @@index([statutFromId], map: "Transition_statutFromId_fkey")
-  @@index([statutToId], map: "Transition_statutToId_fkey")
 }
 
 model utilisateur {
@@ -606,4 +362,284 @@ model permissionRole {
 
   @@unique([roleId, page, action], map: "PermissionRole_roleId_page_action_key")
   @@index([roleId], map: "PermissionRole_roleId_fkey")
+}
+
+// ─── Site ─────────────────────────────────────────────────────────────────────
+
+model site {
+  id          Int           @id @default(autoincrement())
+  nom         String
+  slug        String        @unique(map: "Site_slug_key")
+  actif       Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  article              article[]
+  role                 role[]
+  statut               statut[]
+  transition           transition[]
+  utilisateur          utilisateur[]
+  champArticle         champArticle[]
+  client               client[]
+  champClient          champClient[]
+  plateforme           plateforme[]
+  champPlateforme      champPlateforme[]
+  inventaire           inventaire[]
+  historiqueActivite   historiqueActivite[]
+  attendu              attendu[]
+  configAttendus       configAttendus?
+  configImportExcel    configImportExcel[]
+  regleAlerte          regleAlerte[]
+  configSite           configSite?
+  compteurBL           compteurBL[]
+  brouillonBL          brouillonBL[]
+  configProduction     configProduction?
+  technicienProduction technicienProduction[]
+  demandeTransfert     demandeTransfert[]
+  inventaireLabo       inventaireLabo[]
+  masterBox            masterBox[]
+  exceptionCapaciteJour exceptionCapaciteJour[]
+  emplacements          emplacement[]
+}
+
+// ─── Workflow ─────────────────────────────────────────────────────────────────
+
+model statut {
+  id                Int                @id @default(autoincrement())
+  siteId            Int
+  code              String
+  label             String
+  couleur           String             @default("#6b7280")
+  icone             String?
+  ordre             Int                @default(0)
+  roles             String             @default("[]") @db.Text
+  article           article[]
+  inventaire        inventaire[]
+  historiqueStatuts historiqueStatut[]
+  site              site               @relation(fields: [siteId], references: [id], map: "Statut_siteId_fkey")
+  transitionsFrom   transition[]       @relation("transition_statutFromIdTostatut")
+  transitionsTo     transition[]       @relation("transition_statutToIdTostatut")
+
+  @@unique([siteId, code], map: "Statut_siteId_code_key")
+}
+
+model transition {
+  id            Int    @id @default(autoincrement())
+  siteId        Int
+  statutFromId  Int
+  statutToId    Int
+  labelBouton   String
+  couleurBouton String @default("#3b82f6")
+  ordre         Int    @default(0)
+  site          site   @relation(fields: [siteId], references: [id], map: "Transition_siteId_fkey")
+  statutFrom    statut @relation("transition_statutFromIdTostatut", fields: [statutFromId], references: [id], onDelete: Cascade, map: "Transition_statutFromId_fkey")
+  statutTo      statut @relation("transition_statutToIdTostatut", fields: [statutToId], references: [id], onDelete: Cascade, map: "Transition_statutToId_fkey")
+
+  @@index([siteId], map: "Transition_siteId_fkey")
+  @@index([statutFromId], map: "Transition_statutFromId_fkey")
+  @@index([statutToId], map: "Transition_statutToId_fkey")
+}
+
+// ─── Règles d'alerte ──────────────────────────────────────────────────────────
+
+model regleAlerte {
+  id             Int          @id @default(autoincrement())
+  siteId         Int
+  nom            String
+  codeChampDate  String       // nom de la colonne fixe inventaire (ex: dateRic, dateRip, dateTest)
+  seuilMois      Int          @default(3)
+  couleurAlerte  String       @default("#f59e0b")
+  champsAutoFill String?      @db.LongText // JSON: [{ colonne: "genericNotes", valeur: "Sous garantie" }]
+  actif          Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  site           site         @relation(fields: [siteId], references: [id], map: "RegleAlerte_siteId_fkey")
+  inventaires    inventaire[]
+
+  @@index([siteId], map: "RegleAlerte_siteId_fkey")
+}
+
+// ─── Module Production ────────────────────────────────────────────────────────
+
+model configProduction {
+  id                   Int     @id @default(autoincrement())
+  siteId               Int     @unique
+  champTypeArticleCode String  @default("TYPE")
+  typesArticleQTE      String? @db.LongText
+  champsAffichageQTE   String? @db.LongText
+  quotaSamediActif     Boolean @default(false)
+  site                 site    @relation(fields: [siteId], references: [id], map: "ConfigProduction_siteId_fkey")
+}
+
+model technicienProduction {
+  id              Int                 @id @default(autoincrement())
+  siteId          Int
+  userId          Int
+  quotaJournalier Int                 @default(10)
+  actif           Boolean             @default(true)
+  site            site                @relation(fields: [siteId], references: [id], map: "TechnicienProduction_siteId_fkey")
+  utilisateur     utilisateur         @relation(fields: [userId], references: [id], map: "TechnicienProduction_userId_fkey")
+  absences        absenceTechnicien[]
+
+  @@unique([siteId, userId], map: "TechnicienProduction_siteId_userId_key")
+  @@index([siteId], map: "TechnicienProduction_siteId_fkey")
+  @@index([userId], map: "TechnicienProduction_userId_fkey")
+}
+
+model absenceTechnicien {
+  id            Int                  @id @default(autoincrement())
+  technicienId  Int
+  date          DateTime             @db.Date
+  motif         String?
+  quotaOverride Int?
+  technicien    technicienProduction @relation(fields: [technicienId], references: [id], onDelete: Cascade, map: "AbsenceTechnicien_technicienId_fkey")
+
+  @@unique([technicienId, date], map: "AbsenceTechnicien_technicienId_date_key")
+  @@index([technicienId], map: "AbsenceTechnicien_technicienId_fkey")
+}
+
+model exceptionCapaciteJour {
+  id     Int      @id @default(autoincrement())
+  siteId Int
+  date   DateTime @db.Date
+  actif  Boolean
+  site   site     @relation(fields: [siteId], references: [id], map: "ExceptionCapaciteJour_siteId_fkey")
+
+  @@unique([siteId, date], map: "ExceptionCapaciteJour_siteId_date_key")
+  @@index([siteId], map: "ExceptionCapaciteJour_siteId_idx")
+}
+
+model demandeTransfert {
+  id            Int                     @id @default(autoincrement())
+  siteId        Int
+  type          String
+  statut        String                  @default("EN_ATTENTE")
+  datePlanifiee DateTime                @db.Date
+  quantite      Int
+  pnValeur      String?
+  rmaValeur     String?
+  clientValeur  String?
+  articleId     Int?
+  createdAt     DateTime                @default(now())
+  site          site                    @relation(fields: [siteId], references: [id], map: "DemandeTransfert_siteId_fkey")
+  article       article?                @relation(fields: [articleId], references: [id], map: "DemandeTransfert_articleId_fkey")
+  lignes        ligneDemandeTransfert[]
+
+  @@index([siteId], map: "DemandeTransfert_siteId_fkey")
+  @@index([articleId], map: "DemandeTransfert_articleId_fkey")
+}
+
+model ligneDemandeTransfert {
+  id                 Int              @id @default(autoincrement())
+  demandeTransfertId Int
+  inventaireId       Int
+  demande            demandeTransfert @relation(fields: [demandeTransfertId], references: [id], onDelete: Cascade, map: "LigneDemandeTransfert_demandeId_fkey")
+  inventaire         inventaire       @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "LigneDemandeTransfert_inventaireId_fkey")
+
+  @@unique([demandeTransfertId, inventaireId], map: "LigneDemandeTransfert_demandeId_inventaireId_key")
+  @@index([demandeTransfertId], map: "LigneDemandeTransfert_demandeId_fkey")
+  @@index([inventaireId], map: "LigneDemandeTransfert_inventaireId_fkey")
+}
+
+// ─── Expéditions ──────────────────────────────────────────────────────────────
+
+model masterBox {
+  id           Int              @id @default(autoincrement())
+  siteId       Int
+  numero       String
+  clientValeur String?
+  statut       String           @default("EN_ATTENTE")
+  userId       Int?
+  createdAt    DateTime         @default(now())
+  site         site             @relation(fields: [siteId], references: [id], map: "MasterBox_siteId_fkey")
+  lignes       ligneMasterBox[]
+
+  @@index([siteId, clientValeur, numero], map: "MasterBox_siteId_clientValeur_numero_idx")
+  @@index([siteId], map: "MasterBox_siteId_fkey")
+}
+
+model ligneMasterBox {
+  id           Int        @id @default(autoincrement())
+  masterBoxId  Int
+  inventaireId Int
+  masterBox    masterBox  @relation(fields: [masterBoxId], references: [id], onDelete: Cascade, map: "LigneMasterBox_masterBoxId_fkey")
+  inventaire   inventaire @relation(fields: [inventaireId], references: [id], onDelete: Cascade, map: "LigneMasterBox_inventaireId_fkey")
+
+  @@unique([inventaireId], map: "LigneMasterBox_inventaireId_key")
+  @@index([masterBoxId], map: "LigneMasterBox_masterBoxId_fkey")
+  @@index([inventaireId], map: "LigneMasterBox_inventaireId_fkey")
+}
+
+// ─── Inventaire labo (PDA) ────────────────────────────────────────────────────
+
+model inventaireLabo {
+  id        Int      @id @default(autoincrement())
+  siteId    Int
+  articleId Int
+  quantite  Int      @default(0)
+  updatedAt DateTime @updatedAt
+  site      site     @relation(fields: [siteId], references: [id], map: "InventaireLabo_siteId_fkey")
+  article   article  @relation(fields: [articleId], references: [id], map: "InventaireLabo_articleId_fkey")
+
+  @@unique([siteId, articleId], map: "InventaireLabo_siteId_articleId_key")
+  @@index([siteId], map: "InventaireLabo_siteId_fkey")
+  @@index([articleId], map: "InventaireLabo_articleId_fkey")
+}
+
+// ─── Emplacements ─────────────────────────────────────────────────────────────
+
+model emplacement {
+  id          Int      @id @default(autoincrement())
+  siteId      Int
+  nom         String
+  capaciteMax Int
+  description String?  @db.LongText
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  site        site     @relation(fields: [siteId], references: [id], map: "Emplacement_siteId_fkey")
+
+  @@unique([siteId, nom], map: "Emplacement_siteId_nom_key")
+  @@index([siteId], map: "Emplacement_siteId_fkey")
+}
+
+// ─── Configuration site ───────────────────────────────────────────────────────
+
+model configSite {
+  id            Int    @id @default(autoincrement())
+  siteId        Int    @unique
+  nomSociete    String @default("")
+  adresse       String @default("")
+  ville         String @default("")
+  codePostal    String @default("")
+  pays          String @default("")
+  tel           String @default("")
+  email         String @default("")
+  siteWeb       String @default("")
+  tva           String @default("")
+  capitalSocial String @default("")
+  site          site   @relation(fields: [siteId], references: [id], map: "ConfigSite_siteId_fkey")
+}
+
+model brouillonBL {
+  id           Int      @id @default(autoincrement())
+  siteId       Int
+  clientValeur String?
+  numeroBL     String
+  bonTransport String?
+  eta          String?
+  colisJson    String?  @db.LongText
+  plateformeId Int?
+  updatedAt    DateTime @updatedAt
+  site         site     @relation(fields: [siteId], references: [id], map: "BrouillonBL_siteId_fkey")
+
+  @@unique([siteId, clientValeur], map: "BrouillonBL_siteId_clientValeur_key")
+  @@index([siteId], map: "BrouillonBL_siteId_fkey")
+}
+
+model compteurBL {
+  id      Int    @id @default(autoincrement())
+  siteId  Int
+  annee   Int
+  dernier Int    @default(0)
+  site    site   @relation(fields: [siteId], references: [id], map: "CompteurBL_siteId_fkey")
+
+  @@unique([siteId, annee], map: "CompteurBL_siteId_annee_key")
+  @@index([siteId], map: "CompteurBL_siteId_fkey")
 }
