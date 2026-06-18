@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { logActivite } from '../utils/historique'
 import { verifierReglesAlerte } from '../utils/reglesAlerte'
 import { enregistrerOperation } from '../utils/operations'
+import { getArticlesQTE } from '../utils/pda'
 
 const prisma = new PrismaClient()
 
@@ -37,8 +38,17 @@ export async function checkSN(req: Request, res: Response) {
 
 export async function getAll(req: Request, res: Response) {
   const { siteId } = req.params
+  const site = Number(siteId)
+
+  const { articlesQTE } = await getArticlesQTE(prisma, site)
+  const idsQTE = articlesQTE.map(a => a.id)
+
   const inventaires = await prisma.inventaire.findMany({
-    where: { siteId: Number(siteId), archive: false },
+    where: {
+      siteId: site,
+      archive: false,
+      ...(idsQTE.length > 0 ? { NOT: { articleId: { in: idsQTE } } } : {})
+    },
     include: { article: true, statut: true, pieces: true },
     orderBy: { createdAt: 'desc' }
   })
