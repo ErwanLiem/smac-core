@@ -211,7 +211,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
         <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
           <table className="table" style={{ minWidth: 'max-content' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: '#141720' }}>
+            <thead>
               <tr>
                 {champsAffiches.map(c => (
                   <th key={c.id}
@@ -228,7 +228,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
                 <th>Ajouté le</th>
                 <th></th>
               </tr>
-              <tr style={{ background: '#141720' }}>
+              <tr className="table-filter-row">
                 {champsAffiches.map(c => (
                   <td key={c.id} style={{ padding: '4px 8px' }}>
                     <input className="form-input" placeholder="Filtrer..."
