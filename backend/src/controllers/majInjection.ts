@@ -5,10 +5,11 @@ import { hasRole } from '../utils/roles'
 
 const prisma = new PrismaClient()
 
-/** Statuts avec rôle estRepare (machines réparées en attente MAJ/Injection) */
-async function getStatutsRepare(siteId: number): Promise<number[]> {
+async function getStatutsMajIds(siteId: number): Promise<number[]> {
   const statuts = await prisma.statut.findMany({ where: { siteId }, select: { id: true, roles: true } })
-  return statuts.filter(s => hasRole(s.roles, 'estRepare')).map(s => s.id)
+  return statuts
+    .filter(s => hasRole(s.roles, 'estRepare') || hasRole(s.roles, 'estMaj'))
+    .map(s => s.id)
 }
 
 // ─── Liste des RMA en attente de MAJ/Injection ────────────────────────────────
@@ -16,7 +17,7 @@ async function getStatutsRepare(siteId: number): Promise<number[]> {
 export async function getRmaList(req: Request, res: Response, next: any) {
   try {
     const siteId = Number(req.params.siteId)
-    const statutIds = await getStatutsRepare(siteId)
+    const statutIds = await getStatutsMajIds(siteId)
     if (!statutIds.length) return res.json([])
 
     const inventaires = await prisma.inventaire.findMany({
@@ -44,7 +45,7 @@ export async function getInventairesRma(req: Request, res: Response, next: any) 
   try {
     const siteId = Number(req.params.siteId)
     const rma    = decodeURIComponent(req.params.rma)
-    const statutIds = await getStatutsRepare(siteId)
+    const statutIds = await getStatutsMajIds(siteId)
     if (!statutIds.length) return res.json([])
 
     const rmaFilter = rma === '(Sans RMA)' ? null : rma
@@ -72,7 +73,7 @@ export async function scanInventaire(req: Request, res: Response, next: any) {
     const sn     = String(req.query.sn ?? '').trim()
     if (!sn) return res.status(400).json({ error: 'SN manquant' })
 
-    const statutIds = await getStatutsRepare(siteId)
+    const statutIds = await getStatutsMajIds(siteId)
     const inv = await prisma.inventaire.findFirst({
       where: { siteId, archive: false, serialNumber: sn, statutId: { in: statutIds } }
     })
@@ -117,10 +118,19 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
       }
     })
 
-    // Statut suivant dans le workflow (premier statut qui suit estRepare)
     const tousStatuts = await prisma.statut.findMany({ where: { siteId } })
-    const statutsMaj  = tousStatuts.filter(s => hasRole(s.roles, 'estMajInjection'))
-    const statutsRep  = tousStatuts.filter(s => hasRole(s.roles, 'estRepare'))
+    const estRepare   = hasRole(inv.statut?.roles, 'estRepare')
+    const estMaj      = hasRole(inv.statut?.roles, 'estMaj')
+
+    // Statut cible selon l'étape courante
+    const statutCible = estRepare
+      ? tousStatuts.find(s => hasRole(s.roles, 'estMaj')) ?? null
+      : estMaj
+        ? tousStatuts.find(s => hasRole(s.roles, 'estMajInjection')) ?? null
+        : null
+
+    // Pour retour en réparation
+    const statutRetour = tousStatuts.find(s => hasRole(s.roles, 'estRepare')) ?? null
 
     res.json({
       id:                 inv.id,
@@ -129,42 +139,62 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
       rma:                inv.rma                ?? '',
       customer:           inv.customer           ?? '',
       livelloRiparazione: inv.livelloRiparazione ?? '',
-      statut:             inv.statut,
+      statut:             inv.statut ? { ...inv.statut, roles: inv.statut.roles } : null,
       pieces:             inv.pieces,
       historique,
-      statutsMajInjection: statutsMaj,
-      statutsRetour:       statutsRep,
+      estRepare,
+      estMaj,
+      statutCible,
+      statutRetour,
     })
   } catch (e) { next(e) }
 }
 
-// ─── Valider MAJ/Injection ────────────────────────────────────────────────────
+// ─── Valider MAJ ou Injection selon le statut courant ────────────────────────
 
 export async function validerMajInjection(req: Request, res: Response, next: any) {
   try {
     const siteId       = Number(req.params.siteId)
     const inventaireId = Number(req.params.id)
-    const { statutId } = req.body
     const userId       = req.user?.id ?? null
 
-    const [statut, invActuel] = await Promise.all([
-      prisma.statut.findUnique({ where: { id: Number(statutId) } }),
-      prisma.inventaire.findUnique({ where: { id: inventaireId }, include: { statut: true } })
-    ])
-    if (!statut) return res.status(404).json({ error: 'Statut introuvable' })
-    const labelSource = invActuel?.statut?.label ?? '?'
-
-    await prisma.inventaire.update({
+    const inv = await prisma.inventaire.findUnique({
       where: { id: inventaireId },
-      data: { statutId: statut.id, dateMaj: new Date() }
+      include: { statut: true }
     })
+    if (!inv) return res.status(404).json({ error: 'Inventaire introuvable' })
 
+    const tousStatuts = await prisma.statut.findMany({ where: { siteId } })
+    const estRepare   = hasRole(inv.statut?.roles, 'estRepare')
+    const estMaj      = hasRole(inv.statut?.roles, 'estMaj')
+
+    if (!estRepare && !estMaj) {
+      return res.status(400).json({ error: 'Cet article n\'est pas en attente de MAJ ou d\'Injection' })
+    }
+
+    const statutCible = estRepare
+      ? tousStatuts.find(s => hasRole(s.roles, 'estMaj')) ?? null
+      : tousStatuts.find(s => hasRole(s.roles, 'estMajInjection')) ?? null
+
+    if (!statutCible) {
+      const etape = estRepare ? 'MAJ (rôle estMaj)' : 'Injection (rôle estMajInjection)'
+      return res.status(400).json({ error: `Aucun statut ${etape} configuré dans le workflow` })
+    }
+
+    const today = new Date()
+    const data: Record<string, any> = { statutId: statutCible.id }
+    if (estRepare) data.dateMaj      = today
+    if (estMaj)   data.dateInjection = today
+
+    await prisma.inventaire.update({ where: { id: inventaireId }, data })
+
+    const labelSource = inv.statut?.label ?? '?'
     await logActivite({
       siteId, userId: userId ?? undefined, type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inventaireId,
-      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur }
+      details: { label: `${labelSource} → ${statutCible.label}`, couleur: statutCible.couleur }
     })
 
-    res.json({ success: true, statut })
+    res.json({ success: true, statut: statutCible, etape: estRepare ? 'maj' : 'injection' })
   } catch (e) { next(e) }
 }
 

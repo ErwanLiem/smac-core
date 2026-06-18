@@ -33,24 +33,23 @@ interface HistoriqueItem {
 
 interface StatutInfo {
   id: number
-  code: string
   label: string
   couleur: string
 }
 
 interface DetailInventaire {
   id: number
-  pn: string
-  sn: string
+  serialNumber: string
+  partNumber: string
   rma: string
-  designation: string
-  client: string
-  panneClient: string
-  niveauRep: string
+  customer: string
+  livelloRiparazione: string
   statut: StatutInfo | null
   historique: HistoriqueItem[]
-  statutMajInjection: StatutInfo | null
-  statutAttenteRep: StatutInfo | null
+  estRepare: boolean
+  estMaj: boolean
+  statutCible: StatutInfo | null
+  statutRetour: StatutInfo | null
 }
 
 function BadgeStatut({ statut }: { statut: { label: string; couleur: string } | null }) {
@@ -102,11 +101,12 @@ function ModalMaj({
     }
   }
 
-  async function changerStatut(statutCode: string) {
+  async function retourReparation() {
+    if (!detail?.statutRetour) return
     setActionEnCours(true)
     setErreur('')
     try {
-      await put(`/production/maj-injection/${siteId}/inventaire/${inventaireId}/statut`, { statutCode })
+      await put(`/production/maj-injection/${siteId}/inventaire/${inventaireId}/statut`, { statutId: detail.statutRetour.id })
       onStatutChange()
       onClose()
     } catch (e: any) {
@@ -129,8 +129,10 @@ function ModalMaj({
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #1f2937', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Cpu size={18} style={{ color: '#3b82f6' }} />
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#f1f5f9' }}>MAJ / Injection</span>
-            {detail && <span style={{ fontSize: '13px', color: '#6b7280' }}>— {detail.sn || detail.pn || `#${inventaireId}`}</span>}
+            <span style={{ fontSize: '16px', fontWeight: 700, color: '#f1f5f9' }}>
+              {detail ? (detail.estRepare ? 'MAJ' : 'Injection') : 'MAJ / Injection'}
+            </span>
+            {detail && <span style={{ fontSize: '13px', color: '#6b7280' }}>— {detail.serialNumber || detail.partNumber || `#${inventaireId}`}</span>}
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
             <X size={20} />
@@ -148,11 +150,10 @@ function ModalMaj({
                 <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Informations</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
                   {[
-                    { label: 'P/N',         val: detail.pn },
-                    { label: 'N° Série',    val: detail.sn },
-                    { label: 'Désignation', val: detail.designation },
-                    { label: 'Client',      val: detail.client },
-                    { label: 'RMA',         val: detail.rma },
+                    { label: 'P/N',      val: detail.partNumber },
+                    { label: 'N° Série', val: detail.serialNumber },
+                    { label: 'Client',   val: detail.customer },
+                    { label: 'RMA',      val: detail.rma },
                   ].map(({ label, val }) => (
                     <div key={label}>
                       <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>{label}</div>
@@ -163,50 +164,45 @@ function ModalMaj({
                     <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>Statut</div>
                     <BadgeStatut statut={detail.statut} />
                   </div>
-                  {detail.niveauRep && (
+                  {detail.livelloRiparazione && (
                     <div>
                       <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>Niveau réparation</div>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#8b5cf6' }}>{detail.niveauRep}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#8b5cf6' }}>{detail.livelloRiparazione}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {detail.panneClient && (
-                <div className="card" style={{ padding: '16px' }}>
-                  <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Panne client</p>
-                  <p style={{ fontSize: '13px', color: '#f1f5f9', margin: 0 }}>{detail.panneClient}</p>
-                </div>
-              )}
-
-              {/* Bouton validation */}
+              {/* Boutons action */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {detail.statutMajInjection ? (
+                {detail.statutCible ? (
                   <button
                     onClick={valider}
                     disabled={actionEnCours}
                     style={{
                       width: '100%', padding: '12px', borderRadius: '8px', cursor: 'pointer',
-                      background: detail.statutMajInjection.couleur, color: '#fff', border: 'none',
+                      background: detail.statutCible.couleur, color: '#fff', border: 'none',
                       fontSize: '14px', fontWeight: 700, letterSpacing: '0.03em',
-                      boxShadow: `0 0 12px ${detail.statutMajInjection.couleur}55`,
+                      boxShadow: `0 0 12px ${detail.statutCible.couleur}55`,
                       opacity: actionEnCours ? 0.6 : 1, transition: 'all 0.15s'
                     }}
                     onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.15)' }}
                     onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
                   >
                     <Check size={15} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
-                    MAJ / Injection OK
+                    {detail.estRepare ? 'Valider MAJ' : 'Valider Injection'}
                   </button>
                 ) : (
                   <div style={{ padding: '12px', borderRadius: '8px', background: '#1f2937', color: '#6b7280', fontSize: '13px', textAlign: 'center' }}>
-                    Statut MAJINJECTION non configuré dans le workflow.
+                    {detail.estRepare
+                      ? 'Statut MAJ (rôle estMaj) non configuré dans le workflow.'
+                      : 'Statut Injection (rôle estMajInjection) non configuré dans le workflow.'}
                   </div>
                 )}
 
-                {detail.statutAttenteRep && (
+                {detail.estMaj && detail.statutRetour && (
                   <button
-                    onClick={() => changerStatut(detail.statutAttenteRep!.code)}
+                    onClick={retourReparation}
                     disabled={actionEnCours}
                     style={{
                       width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer',
@@ -217,7 +213,7 @@ function ModalMaj({
                     onMouseEnter={e => { e.currentTarget.style.background = '#f59e0b15' }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                   >
-                    ↩ Retour technicien
+                    ↩ Retour en réparation
                   </button>
                 )}
               </div>
