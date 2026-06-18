@@ -4,7 +4,6 @@ import Dashboard from './pages/Dashboard'
 import AdminWorkflow from './pages/AdminWorkflow'
 import AdminDonnees from './pages/AdminDonnees'
 import AdminAcces from './pages/AdminAcces'
-import Suivi from './pages/Suivi'
 import Reparation from './pages/Reparation'
 import MajInjection from './pages/MajInjection'
 import ControleQualite from './pages/ControleQualite'
@@ -45,7 +44,6 @@ function App() {
         <Route element={<RoutePrivee />}>
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/suivi" element={<Suivi />} />
             <Route path="/reparation" element={<Reparation />} />
             <Route path="/maj-injection" element={<MajInjection />} />
             <Route path="/controle-qualite" element={<ControleQualite />} />
