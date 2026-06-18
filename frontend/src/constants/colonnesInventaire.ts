@@ -26,6 +26,7 @@ export const COLONNES_INVENTAIRE: ColonneInventaire[] = [
   { key: 'dateRip',            label: 'Date RIP',           type: 'date' },
   { key: 'dateTest',           label: 'Date TEST',          type: 'date' },
   { key: 'dateMaj',            label: 'Date MAJ',           type: 'date' },
+  { key: 'dateInjection',      label: 'Date Injection',     type: 'date' },
   { key: 'datePack',           label: 'Date PACK',          type: 'date' },
   { key: 'dateCls',            label: 'Date CLS',           type: 'date' },
   { key: 'dateBsf',            label: 'Date BSF',           type: 'date' },

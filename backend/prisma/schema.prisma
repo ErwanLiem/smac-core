@@ -185,6 +185,7 @@ model inventaire {
 
   // MAJ / Injection
   dateMaj            DateTime? @db.Date
+  dateInjection      DateTime? @db.Date
 
   // Contrôle qualité
   dateTest           DateTime? @db.Date

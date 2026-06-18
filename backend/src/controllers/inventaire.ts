@@ -114,7 +114,7 @@ export async function update(req: Request, res: Response, next: any) {
       'dateRip', 'techLabo', 'livelloRiparazione',
       'dateLav', 'dateAsp', 'dateLab', 'datePrv', 'datePrr', 'datePrf',
       'datePra', 'dateEng', 'dateAsw', 'dateBsf', 'dateBsfn', 'dateNlv',
-      'codeStatut', 'dateMaj', 'dateTest', 'datePack', 'dateCls', 'dateSHP', 'archive',
+      'codeStatut', 'dateMaj', 'dateInjection', 'dateTest', 'datePack', 'dateCls', 'dateSHP', 'archive',
     ]
     const data: Record<string, any> = {}
     for (const col of colonnesAutorisees) {
