@@ -26,15 +26,22 @@ interface Item {
   valeurs: ValeurChamp[]
 }
 
+interface Onglet {
+  label: string
+  champCode: string
+  valeur: string
+}
+
 interface Props {
   titre: string
   sousTitre: string
   baseUrl: string
   siteId: number
   pagePath: string
+  onglets?: Onglet[]
 }
 
-export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }: Props) {
+export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath, onglets }: Props) {
   const utilisateur = JSON.parse(localStorage.getItem('utilisateur') || 'null')
   const isAdmin = utilisateur?.role?.code === 'ADMIN'
   const permissions: string[] = utilisateur?.permissions ?? []
@@ -49,6 +56,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   const [items, setItems] = useState<Item[]>([])
   const [filtres, setFiltres] = useState<Record<string, string>>({})
   const dragColonne = useRef<number | null>(null)
+  const [ongletActif, setOngletActif] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [formValeurs, setFormValeurs] = useState<Record<number, string>>({})
   const [modal, setModal] = useState<{ id: number } | null>(null)
@@ -72,6 +80,18 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
   const hasActiveFiltres = Object.values(filtres).some(v => v.trim() !== '')
 
   const filteredItems = items.filter(item => {
+    // Filtre par onglet actif
+    if (ongletActif && onglets) {
+      const onglet = onglets.find(o => o.label === ongletActif)
+      if (onglet) {
+        const champ = champs.find(c => c.code === onglet.champCode)
+        if (champ) {
+          const valeur = item.valeurs.find(v => v.champId === champ.id)?.valeur ?? ''
+          if (valeur.toLowerCase() !== onglet.valeur.toLowerCase()) return false
+        }
+      }
+    }
+    // Filtres colonnes
     for (const [champId, val] of Object.entries(filtres)) {
       if (!val.trim()) continue
       const valeur = String(item.valeurs.find(v => v.champId === Number(champId))?.valeur ?? '')
@@ -199,6 +219,34 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath }
           )}
         </div>
       </div>
+
+      {onglets && onglets.length > 0 && (
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '16px' }}>
+          <button
+            onClick={() => setOngletActif(null)}
+            style={{
+              padding: '6px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              background: ongletActif === null ? '#3b82f6' : '#1f2937',
+              color: ongletActif === null ? '#fff' : '#9ca3af',
+            }}
+          >
+            Tous
+          </button>
+          {onglets.map(o => (
+            <button
+              key={o.label}
+              onClick={() => setOngletActif(ongletActif === o.label ? null : o.label)}
+              style={{
+                padding: '6px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                background: ongletActif === o.label ? '#3b82f6' : '#1f2937',
+                color: ongletActif === o.label ? '#fff' : '#9ca3af',
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {chargement ? (
         <div className="loading-container"><div className="loading-spinner" /></div>
