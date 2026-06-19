@@ -259,7 +259,7 @@ body {
   letter-spacing: 0.06em;
   border-bottom: 1px solid #2d3148;
 }
-.table td { padding: 10px 14px; border-top: 1px solid #1e2130; color: #cbd5e1; font-size: 14px; }
+.table td { padding: 10px 14px; border-top: 1px solid #1e2130; color: #cbd5e1; font-size: 14px; white-space: normal; word-wrap: break-word; }
 .table-filter-row td { position: sticky; top: 33px; background: #141720; z-index: 1; border-top: none; border-bottom: 1px solid #2d3148; padding: 8px 8px; }
 .table tbody tr:hover td { background: #1e2130; color: #e2e8f0; }
 

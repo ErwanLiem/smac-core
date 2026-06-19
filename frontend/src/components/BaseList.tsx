@@ -258,7 +258,7 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath, 
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
-          <table className="table" style={{ minWidth: 'max-content' }}>
+          <table className="table" style={{ minWidth: 'max-content', tableLayout: 'auto' }}>
             <thead>
               <tr>
                 {champsAffiches.map(c => (
@@ -298,7 +298,9 @@ export default function BaseList({ titre, sousTitre, baseUrl, siteId, pagePath, 
               {filteredItems.map((item, idx) => (
                 <tr key={item.id} style={{ background: idx % 2 === 0 ? '#1a1d27' : '#141720' }}>
                   {champsAffiches.map(c => (
-                    <td key={c.id}>{getValeur(item, c) || <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                    <td key={c.id} style={{ maxWidth: c.code === 'DESIGNATION' ? '280px' : '180px' }}>
+                      {getValeur(item, c) || <span style={{ color: '#d1d5db' }}>—</span>}
+                    </td>
                   ))}
                   <td style={{ color: '#9ca3af', fontSize: '13px' }}>
                     {new Date(item.createdAt).toLocaleDateString('fr-FR')}
