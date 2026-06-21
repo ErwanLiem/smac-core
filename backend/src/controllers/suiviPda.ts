@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
-import { normCode, getISOWeek, getMoisCible, getArticlesQTE } from '../utils/pda'
+import { getISOWeek, getMoisCible, getArticlesQTE } from '../utils/pda'
 
 const prisma = new PrismaClient()
 
@@ -10,7 +10,7 @@ export async function getSuiviPDA(req: Request, res: Response, next: any) {
     const { siteId } = req.params
     const site = Number(siteId)
 
-    const { typesAutorises, champType, champDetail, champModel, articlesQTE } = await getArticlesQTE(prisma, site)
+    const { typesAutorises, champType, champPN, champDetail, champModel, champAddRef, articlesQTE } = await getArticlesQTE(prisma, site)
     const articleIds = articlesQTE.map(a => a.id)
 
     if (typesAutorises.length === 0 || !champType) {
@@ -19,58 +19,46 @@ export async function getSuiviPDA(req: Request, res: Response, next: any) {
 
     const { annee, mois, semaines, debutMois, finMois, estMoisCourant } = getMoisCible(req.query)
 
-    // Stock labo (source de vérité pour les quantités)
-    const laboItems = articleIds.length > 0
-      ? await prisma.inventaireLabo.findMany({ where: { siteId: site, articleId: { in: articleIds } } })
+    // Tous les mouvements QTE (stock global + hebdo + appro du mois)
+    const tousLesMovements = articleIds.length > 0
+      ? await prisma.mouvementQTE.findMany({ where: { siteId: site, articleId: { in: articleIds } } })
       : []
 
-    // Transferts QTE validés du mois en cours (consommation hebdomadaire vers production)
-    const demandesOut = articleIds.length > 0
-      ? await prisma.demandeTransfert.findMany({
-          where: { siteId: site, type: 'QTE', statut: 'VALIDEE', articleId: { in: articleIds }, datePlanifiee: { gte: debutMois, lte: finMois } }
-        })
-      : []
-
-    // Transferts QTE reçus du mois = approvisionnements (Supply)
-    const demandesIn = articleIds.length > 0
-      ? await prisma.demandeTransfert.findMany({
-          where: { siteId: site, type: 'QTE', statut: 'VALIDEE', articleId: { in: articleIds }, createdAt: { gte: debutMois, lte: finMois } }
-        })
-      : []
-
-    const champsArticle = await prisma.champArticle.findMany({ where: { siteId: site } })
-    const champPNArt   = champsArticle.find(c => normCode(c.code) === 'PN')
-    const champDetailA = champDetail
-    const champModelA  = champModel
+    const mouvementsMois = tousLesMovements.filter(m => m.date >= debutMois && m.date <= finMois)
 
     const rows = articlesQTE.map(article => {
-      const labo = laboItems.find(l => l.articleId === article.id)
+      // Stock = Σ réceptions − Σ transferts − Σ sorties (tous les mouvements)
+      const mouvArt = tousLesMovements.filter(m => m.articleId === article.id)
+      const stockQty = mouvArt.reduce((acc, m) => {
+        if (m.type === 'RECEPTION') return acc + m.quantite
+        if (m.type === 'TRANSFERT' || m.type === 'SORTIE') return acc - m.quantite
+        return acc
+      }, 0)
 
+      // Hebdo = transferts du mois (sorties vers labo)
       const hebdo: Record<number, number> = {}
       for (const s of semaines) hebdo[s] = 0
-      for (const d of demandesOut) {
-        if (d.articleId !== article.id) continue
-        const semaine = getISOWeek(new Date(d.datePlanifiee))
-        if (semaine in hebdo) hebdo[semaine] += d.quantite
+      for (const m of mouvementsMois) {
+        if (m.articleId !== article.id || m.type !== 'TRANSFERT') continue
+        const semaine = getISOWeek(new Date(m.date))
+        if (semaine in hebdo) hebdo[semaine] += m.quantite
       }
       const monthlyConsumption = Object.values(hebdo).reduce((a, b) => a + b, 0)
 
-      let supply = 0
-      for (const d of demandesIn) {
-        if (d.articleId === article.id) supply += d.quantite
-      }
+      // Appro = réceptions du mois
+      const supply = mouvementsMois
+        .filter(m => m.articleId === article.id && m.type === 'RECEPTION')
+        .reduce((acc, m) => acc + m.quantite, 0)
 
-      const reference = champPNArt   ? (article.valeurs.find(v => v.champId === champPNArt.id)?.valeur   ?? '') : ''
-      const detail    = champDetailA  ? (article.valeurs.find(v => v.champId === champDetailA.id)?.valeur  ?? '') : ''
-      const range     = champModelA   ? (article.valeurs.find(v => v.champId === champModelA.id)?.valeur   ?? '') : ''
+      const v = (champ?: { id: number }) => champ ? (article.valeurs.find(val => val.champId === champ.id)?.valeur ?? '') : ''
 
       return {
         articleId: article.id,
-        reference,
-        additionalReference: detail,
-        wording: detail,
-        range,
-        stockQty: labo?.quantite ?? 0,
+        reference:           v(champPN),
+        additionalReference: v(champAddRef),
+        wording:             v(champDetail),
+        range:               v(champModel),
+        stockQty,
         hebdo,
         monthlyConsumption,
         supply
@@ -82,6 +70,12 @@ export async function getSuiviPDA(req: Request, res: Response, next: any) {
       mois: mois + 1,
       estMoisCourant,
       semaines: semaines.map(s => ({ numero: s, label: `S${s}` })),
+      colonnes: {
+        reference:           champPN?.label      ?? 'Référence',
+        additionalReference: champAddRef?.label  ?? 'Réf. additionnelle',
+        wording:             champDetail?.label  ?? 'Désignation',
+        range:               champModel?.label   ?? 'Famille',
+      },
       rows
     })
   } catch (e) { next(e) }

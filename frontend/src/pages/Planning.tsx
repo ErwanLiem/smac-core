@@ -20,6 +20,24 @@ function getLundi(d: Date) {
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 const JOURS_LONG = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
 
+interface ArticleCarte {
+  pnValeur: string
+  designationValeur: string
+  quantite: number
+  ids: number[]
+  caisses: Array<{ numero: string; quantite: number }>
+}
+
+interface CarteRMA {
+  rmaValeur: string
+  clientValeur: string
+  totalQuantite: number
+  articles: ArticleCarte[]
+  dateRic: string | null
+  slaJours: number | null
+}
+
+// Alias pour la compatibilité drag-drop (une "carte" draggable = un article d'un RMA)
 interface Carte {
   pnValeur: string
   rmaValeur: string
@@ -106,10 +124,11 @@ export default function Planning() {
   const siteId = getSiteId()
   const [lundi, setLundi] = useState(() => getLundi(new Date()))
   const [chargement, setChargement] = useState(true)
-  const [cartes, setCartes]     = useState<Carte[]>([])
+  const [cartes, setCartes]     = useState<CarteRMA[]>([])
   const [capacite, setCapacite] = useState<Record<string, CapaciteJour>>({})
   const [demandes, setDemandes] = useState<Demande[]>([])
   const [config, setConfig]     = useState<Config>({ labelPN: 'P/N', labelRMA: 'RMA' })
+  const [expandedRmas, setExpandedRmas] = useState<Set<string>>(new Set())
   const [dragCarte, setDragCarte] = useState<Carte | null>(null)
   const [dropJour, setDropJour]   = useState<string | null>(null)
   const [modalDrop, setModalDrop] = useState<{ carte: Carte; jour: string } | null>(null)
@@ -137,7 +156,7 @@ export default function Planning() {
   async function reload() {
     const [cfg, c, cap, d] = await Promise.all([
       get<Config>(`/production/config/${siteId}`),
-      get<Carte[]>(`/production/cartes/${siteId}`),
+      get<CarteRMA[]>(`/production/cartes/${siteId}`),
       get<Record<string, CapaciteJour>>(`/production/capacite/${siteId}?debut=${debut}&fin=${fin}`),
       get<Demande[]>(`/production/demandes/${siteId}`)
     ])
@@ -339,92 +358,115 @@ export default function Planning() {
       <div style={{ display: 'flex', gap: '16px', flex: 1, minHeight: 0 }}>
 
         {/* ── Colonne cartes ── */}
-        <div style={{ width: '230px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
+        <div style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto' }}>
           <p style={{ fontSize: '12px', fontWeight: 600, color: '#cbd5e1', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
-            En stock ({cartes.reduce((s, c) => s + c.quantite, 0)} S/N)
+            En stock ({cartes.reduce((s, c) => s + c.totalQuantite, 0)} S/N)
           </p>
           {cartes.length === 0 && (
             <div style={{ background: '#1a1d27', borderRadius: '8px', padding: '20px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>
               Aucune machine en stock
             </div>
           )}
-          {cartes.map((carte, idx) => (
-            <div key={idx}
-              draggable
-              onDragStart={() => onDragStart(carte)}
-              onDragEnd={onDragEnd}
-              style={{
-                background: '#1a1d27',
-                border: dragCarte === carte ? '1px solid #3b82f6' : '1px solid #2d3748',
-                borderRadius: '8px',
-                padding: '9px 11px',
-                cursor: 'grab',
-                userSelect: 'none',
-                opacity: dragCarte === carte ? 0.45 : 1,
-                transition: 'all 0.1s'
-              }}
-            >
-              {/* Client */}
-              {carte.clientValeur && (
-                <div style={{ marginBottom: '3px' }}>
-                  <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '3px', background: '#1e293b', color: '#93c5fd', border: '1px solid #334155', fontWeight: 600 }}>
-                    {carte.clientValeur}
-                  </span>
-                </div>
-              )}
-              {/* RMA */}
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '3px' }}>
-                <span style={{ fontSize: '11px', color: '#6b7280', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{config.labelRMA}</span>
-                <span style={{ fontWeight: 700, fontSize: '14px', color: '#f8fafc', lineHeight: 1.2 }}>{carte.rmaValeur || '—'}</span>
-              </div>
-              {/* P/N */}
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: carte.designationValeur ? '2px' : '5px' }}>
-                <span style={{ fontSize: '11px', color: '#6b7280', flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{config.labelPN}</span>
-                <span style={{ fontWeight: 500, fontSize: '12px', color: '#e2e8f0' }}>{carte.pnValeur || '—'}</span>
-              </div>
-              {/* Désignation */}
-              {carte.designationValeur && (
-                <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {carte.designationValeur}
-                </div>
-              )}
-              {/* Caisses */}
-              {carte.caisses.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginBottom: '5px' }}>
-                  {carte.caisses.map(c => (
-                    <span key={c.numero} style={{ fontSize: '11px', padding: '1px 5px', borderRadius: '3px', background: '#1f2937', color: '#cbd5e1', border: '1px solid #374151' }}>
-                      📦 {c.numero} ({c.quantite})
-                    </span>
-                  ))}
-                </div>
-              )}
-              {/* Indicateur SLA */}
-              {carte.slaJours !== null && carte.dateRic && (() => {
-                const restant = joursOuvresRestants(new Date(carte.dateRic), carte.slaJours)
-                const depasse = restant < 0
-                const urgent  = restant >= 0 && restant <= 3
-                const bg    = depasse ? '#3b0f0f' : urgent ? '#3b2700' : '#0f2318'
-                const border = depasse ? '#dc2626' : urgent ? '#f59e0b' : '#16a34a'
-                const color  = depasse ? '#f87171' : urgent ? '#fbbf24' : '#4ade80'
-                const label  = depasse
-                  ? `SLA dépassé de ${Math.abs(restant)} j ouvré${Math.abs(restant) > 1 ? 's' : ''}`
-                  : restant === 0
-                    ? 'SLA : dernier jour !'
-                    : `SLA : ${restant} j ouvré${restant > 1 ? 's' : ''} restant${restant > 1 ? 's' : ''}`
-                return (
-                  <div style={{ margin: '5px 0 3px', padding: '3px 7px', borderRadius: '4px', background: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ fontSize: '10px' }}>{depasse || urgent ? '⚠' : '✓'}</span>
-                    <span style={{ fontSize: '11px', fontWeight: 600, color }}>{label}</span>
+          {cartes.map((carteRMA) => {
+            const keyRMA = `${carteRMA.rmaValeur}__${carteRMA.clientValeur}`
+            const expanded = expandedRmas.has(keyRMA)
+            const accentColor = (() => {
+              if (carteRMA.slaJours !== null && carteRMA.dateRic) {
+                const r = joursOuvresRestants(new Date(carteRMA.dateRic), carteRMA.slaJours)
+                return r < 0 ? '#dc2626' : r <= 3 ? '#f59e0b' : '#16a34a'
+              }
+              return '#334155'
+            })()
+
+            return (
+              <div key={keyRMA}>
+                {/* ── Carte recap RMA ── */}
+                <div
+                  onClick={() => setExpandedRmas(prev => {
+                    const next = new Set(prev)
+                    next.has(keyRMA) ? next.delete(keyRMA) : next.add(keyRMA)
+                    return next
+                  })}
+                  style={{ background: '#16181f', border: '1px solid #252836', borderLeft: `3px solid ${accentColor}`, borderRadius: '8px', padding: '10px 12px', cursor: 'pointer', userSelect: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
+                >
+                  {/* Client + total */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#93c5fd', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{carteRMA.clientValeur || '—'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a', background: '#94a3b8', borderRadius: '10px', padding: '1px 7px' }}>{carteRMA.totalQuantite} S/N</span>
+                      <span style={{ fontSize: '11px', color: '#475569' }}>{expanded ? '▲' : '▼'}</span>
+                    </div>
                   </div>
-                )
-              })()}
-              {/* Pied de carte */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#e2e8f0' }}>{carte.quantite} S/N</span>
-                <span style={{ fontSize: '11px', color: '#4b5563' }}>⠿ glisser</span>
+                  {/* RMA */}
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: '#f1f5f9', marginBottom: '5px', lineHeight: 1.2 }}>{carteRMA.rmaValeur || '—'}</div>
+                  {/* Résumé articles */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {carteRMA.articles.map(a => (
+                      <div key={a.pnValeur} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: '11px', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}>{a.designationValeur || a.pnValeur || '—'}</span>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', flexShrink: 0 }}>×{a.quantite}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* SLA */}
+                  {carteRMA.slaJours !== null && carteRMA.dateRic && (() => {
+                    const restant = joursOuvresRestants(new Date(carteRMA.dateRic), carteRMA.slaJours)
+                    const color = restant < 0 ? '#f87171' : restant <= 3 ? '#fbbf24' : '#4ade80'
+                    const label = restant < 0 ? `SLA dépassé de ${Math.abs(restant)} j` : restant === 0 ? 'Dernier jour !' : `${restant} j restant${restant > 1 ? 's' : ''}`
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, flexShrink: 0, boxShadow: `0 0 5px ${color}` }} />
+                        <span style={{ fontSize: '11px', color, fontWeight: 600 }}>{label}</span>
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                {/* ── Cartes PN (expandées, draggables) ── */}
+                {expanded && (
+                  <div style={{ marginTop: '4px', marginLeft: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {carteRMA.articles.map(article => {
+                      const carte: Carte = {
+                        pnValeur: article.pnValeur,
+                        rmaValeur: carteRMA.rmaValeur,
+                        designationValeur: article.designationValeur,
+                        clientValeur: carteRMA.clientValeur,
+                        quantite: article.quantite,
+                        ids: article.ids,
+                        caisses: article.caisses,
+                        dateRic: carteRMA.dateRic,
+                        slaJours: carteRMA.slaJours,
+                      }
+                      return (
+                        <div key={article.pnValeur}
+                          draggable
+                          onDragStart={() => onDragStart(carte)}
+                          onDragEnd={onDragEnd}
+                          style={{ background: dragCarte === carte ? '#1e2433' : '#1a1d27', border: dragCarte === carte ? '1px solid #3b82f6' : '1px solid #1e2433', borderLeft: '3px solid #334155', borderRadius: '6px', padding: '8px 10px', cursor: 'grab', userSelect: 'none', opacity: dragCarte === carte ? 0.45 : 1 }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                            {article.designationValeur
+                              ? <span style={{ fontSize: '11px', fontWeight: 600, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '155px' }}>{article.designationValeur}</span>
+                              : <span />
+                            }
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#e2e8f0', flexShrink: 0 }}>×{article.quantite}</span>
+                          </div>
+                          <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: article.caisses.length > 0 ? '4px' : '0' }}>{article.pnValeur || '—'}</div>
+                          {article.caisses.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                              {article.caisses.map(c => (
+                                <span key={c.numero} style={{ fontSize: '10px', padding: '1px 4px', borderRadius: '3px', background: '#1e2433', color: '#64748b', border: '1px solid #2d3748' }}>📦{c.numero} ×{c.quantite}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* ── Calendrier semaine ── */}

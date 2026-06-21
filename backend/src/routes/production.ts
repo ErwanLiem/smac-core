@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import * as ctrl from '../controllers/production'
+import * as mouvQteCtrl from '../controllers/mouvementQTE'
 import * as suiviPdaCtrl from '../controllers/suiviPda'
 import * as suiviPdaLaboCtrl from '../controllers/suiviPdaLabo'
 import * as repCtrl from '../controllers/reparation'
@@ -39,6 +40,11 @@ router.post('/demandes/:siteId/sn',   ctrl.createDemandeSN)
 router.post('/demandes/:siteId/qte',  ctrl.createDemandeQTE)
 router.put('/demandes/:id/valider',   ctrl.validerDemande)
 router.put('/demandes/:id/annuler',   ctrl.annulerDemande)
+
+// Mouvements QTE (PDA / Accessoires)
+router.get('/mouvement-qte/:siteId',  mouvQteCtrl.getAll)
+router.post('/mouvement-qte/:siteId', mouvQteCtrl.create)
+router.delete('/mouvement-qte/:id',   mouvQteCtrl.remove)
 
 // Suivi PDA
 router.get('/suivi-pda/:siteId', suiviPdaCtrl.getSuiviPDA)

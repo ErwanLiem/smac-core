@@ -62,6 +62,11 @@ export default function HistoriqueActivite() {
   const [filtreEntite, setFiltreEntite] = useState('')
 
   useEffect(() => {
+    document.querySelector('.main-content')?.classList.add('page-table')
+    return () => { document.querySelector('.main-content')?.classList.remove('page-table') }
+  }, [])
+
+  useEffect(() => {
     get<string[]>(`/historique-activite/${siteId}/types`).then(setTypes).catch(() => {})
     get<User[]>(`/historique-activite/${siteId}/users`).then(setUsers).catch(() => {})
   }, [siteId])
@@ -97,8 +102,8 @@ export default function HistoriqueActivite() {
   }
 
   return (
-    <div>
-      <div className="page-header">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="page-header" style={{ flexShrink: 0 }}>
         <div>
           <h1 className="page-title">Historique d'activité</h1>
           <p className="page-subtitle">{data ? `${data.total} événement${data.total !== 1 ? 's' : ''}` : '…'}</p>
@@ -106,7 +111,7 @@ export default function HistoriqueActivite() {
       </div>
 
       {/* Filtres */}
-      <div className="card" style={{ marginBottom: '20px', padding: '14px 16px' }}>
+      <div className="card" style={{ marginBottom: '20px', padding: '14px 16px', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280' }}>
             <Filter size={14} />
@@ -148,11 +153,12 @@ export default function HistoriqueActivite() {
       </div>
 
       {/* Tableau */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         {chargement ? (
           <div className="loading-container" style={{ minHeight: '300px' }}><div className="loading-spinner" /></div>
         ) : (
           <>
+            <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
             <table className="table">
               <thead>
                 <tr>
@@ -207,6 +213,7 @@ export default function HistoriqueActivite() {
                 )}
               </tbody>
             </table>
+            </div>
 
             {/* Pagination */}
             {data && data.pages > 1 && (

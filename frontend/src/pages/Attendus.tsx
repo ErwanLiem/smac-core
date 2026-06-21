@@ -12,8 +12,8 @@ interface Attendu {
   donneesCommunes: string | null
 }
 
-const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
-const CODES_CLIENT    = ['CLIENT', 'CLIENTS']
+const CODES_NOM = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE', 'SOCIETE']
+const CODES_CLIENT    = ['CLIENT', 'CLIENTS', 'CUSTOMER']
 const CODES_PLATEFORME = ['PLATEFORME', 'PLATEFORMES']
 
 function parseOptions(raw: string | null): string[] {
@@ -41,6 +41,11 @@ export default function Attendus() {
   const [erreur, setErreur] = useState<string | null>(null)
   const [modalDelete, setModalDelete] = useState<Attendu | null>(null)
   const [configChamps, setConfigChamps] = useState<{ code: string; visible: boolean; obligatoire: boolean; visibleListe: boolean }[]>([])
+
+  useEffect(() => {
+    document.querySelector('.main-content')?.classList.add('page-table')
+    return () => { document.querySelector('.main-content')?.classList.remove('page-table') }
+  }, [])
 
   useEffect(() => { reload() }, [siteId])
 
@@ -112,8 +117,8 @@ export default function Attendus() {
   }
 
   return (
-    <div>
-      <div className="page-header">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="page-header" style={{ flexShrink: 0 }}>
         <div>
           <h1 className="page-title">Réceptions prévues</h1>
           <p className="page-subtitle">{attendus.length} réception{attendus.length !== 1 ? 's' : ''} prévue{attendus.length !== 1 ? 's' : ''}</p>
@@ -132,7 +137,8 @@ export default function Attendus() {
           <p style={{ fontSize: '13px' }}>Importez un fichier Excel client pour démarrer</p>
         </div>
       ) : (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
           <table className="table">
             <thead>
               <tr>
@@ -171,6 +177,7 @@ export default function Attendus() {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
 

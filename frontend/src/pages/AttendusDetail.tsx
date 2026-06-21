@@ -43,6 +43,7 @@ interface ArticleAccessoire {
   id: number
   label: string
 }
+interface Emplacement { id: number; nom: string; capaciteMax: number; remplissage: number }
 
 const CODES_NOM       = ['NOM', 'NAME', 'LIBELLE', 'RAISON_SOCIALE']
 const CODES_CLIENT    = ['CLIENT', 'CLIENTS']
@@ -67,6 +68,8 @@ export default function AttendusDetail() {
   const [pnActif, setPnActif] = useState<string | null>(null)
   const [snSaisie, setSnSaisie] = useState('')
   const [caisseActive, setCaisseActive] = useState('')
+  const [emplacementId, setEmplacementId] = useState<number>(0)
+  const [emplacements, setEmplacements]   = useState<Emplacement[]>([])
   const [dernierScan, setDernierScan] = useState<{ resultat: string; pn?: string; dejaEnInventaire?: boolean; sn?: string } | null>(null)
   const [alerteScan, setAlerteScan] = useState<{ type: 'DEJA_SCANNE' | 'DEJA_INVENTAIRE'; sn: string; pn?: string } | null>(null)
   const [accessoiresParLigne, setAccessoiresParLigne] = useState<Record<number, number[]>>({})
@@ -90,7 +93,7 @@ export default function AttendusDetail() {
 
 
   async function reload() {
-    const [data, arts, champsArts, plats, champsPlats, cl, cc, cfg] = await Promise.all([
+    const [data, arts, champsArts, plats, champsPlats, cl, cc, cfg, emps] = await Promise.all([
       attendusApi.getDetail(Number(id)),
       get<any[]>(`/articles/${siteId}`),
       get<any[]>(`/articles/${siteId}/champs`),
@@ -98,9 +101,11 @@ export default function AttendusDetail() {
       get<any[]>(`/plateformes/${siteId}/champs`),
       get<any[]>(`/clients/${siteId}`),
       get<any[]>(`/clients/${siteId}/champs`),
-      get<any>(`/config-attendus/${siteId}`)
+      get<any>(`/config-attendus/${siteId}`),
+      get<Emplacement[]>(`/emplacements/${siteId}`)
     ])
     setAttendu(data)
+    setEmplacements(emps)
     setPlateformes(plats)
     setChampsPlateformes(champsPlats.filter((c: any) => c.actif))
     setClients(cl)
@@ -171,7 +176,7 @@ export default function AttendusDetail() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ sn: snSaisie.trim(), pn: pnActif, accessoires: [], caisse: caisseActive || undefined })
+        body: JSON.stringify({ sn: snSaisie.trim(), pn: pnActif, accessoires: [], caisse: caisseActive || undefined, emplacementId: emplacementId || undefined })
       })
       const result = await res.json()
       const snScanne = snSaisie.trim()
@@ -499,9 +504,29 @@ export default function AttendusDetail() {
                   </div>
 
                   {!caisseActive && (
-                    <p style={{ fontSize: '12px', color: '#f59e0b', marginTop: '6px', marginBottom: '10px' }}>
+                    <p style={{ fontSize: '12px', color: '#f59e0b', marginTop: '6px', marginBottom: '6px' }}>
                       ⚠️ Renseignez le numéro de caisse avant de scanner des S/N.
                     </p>
+                  )}
+
+                  {emplacements.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', marginBottom: '4px', padding: '8px 12px', background: emplacementId ? '#1c2838' : '#1a1d27', border: `1px solid ${emplacementId ? '#60a5fa' : '#374151'}`, borderRadius: '8px' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap' }}>📍 Emplacement :</span>
+                      <select
+                        value={emplacementId}
+                        onChange={e => setEmplacementId(Number(e.target.value))}
+                        style={{ flex: 1, padding: '4px 8px', fontSize: '13px', fontWeight: emplacementId ? 700 : 400, color: emplacementId ? '#60a5fa' : '#9ca3af', background: 'transparent', border: 'none', outline: 'none' }}
+                      >
+                        <option value={0}>— Choisir un emplacement —</option>
+                        {emplacements.map(e => (
+                          <option key={e.id} value={e.id}>{e.nom} ({e.remplissage}/{e.capaciteMax})</option>
+                        ))}
+                      </select>
+                      {emplacementId > 0 && (
+                        <button type="button" onClick={() => setEmplacementId(0)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: '16px', lineHeight: 1 }}>×</button>
+                      )}
+                    </div>
                   )}
 
                   <form onSubmit={scannerSN}>

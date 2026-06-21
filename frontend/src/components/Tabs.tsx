@@ -11,9 +11,10 @@ interface Props {
   defaultTab?: string
   active?: string
   onChange?: (key: string) => void
+  flex?: boolean
 }
 
-export default function Tabs({ tabs, defaultTab, active: activeProp, onChange }: Props) {
+export default function Tabs({ tabs, defaultTab, active: activeProp, onChange, flex }: Props) {
   const initial = defaultTab ?? tabs[0]?.key
   const [activeState, setActiveState] = useState(initial)
   const active = activeProp ?? activeState
@@ -30,8 +31,8 @@ export default function Tabs({ tabs, defaultTab, active: activeProp, onChange }:
   }
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #1f2937', marginBottom: '20px' }}>
+    <div style={flex ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : undefined}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid #1f2937', marginBottom: '20px', flexShrink: 0 }}>
         {tabs.map(tab => {
           const isActive = tab.key === current?.key
           return (
@@ -55,7 +56,7 @@ export default function Tabs({ tabs, defaultTab, active: activeProp, onChange }:
         })}
       </div>
       {tabs.filter(tab => visites.includes(tab.key)).map(tab => (
-        <div key={tab.key} style={{ display: tab.key === current?.key ? 'block' : 'none' }}>
+        <div key={tab.key} style={{ display: tab.key === current?.key ? (flex ? 'flex' : 'block') : 'none', ...(flex ? { flex: 1, minHeight: 0, flexDirection: 'column' } : {}) }}>
           {tab.content}
         </div>
       ))}

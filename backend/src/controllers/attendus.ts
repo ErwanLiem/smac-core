@@ -42,6 +42,8 @@ const COLONNES_FIXES = [
   'repaireNotes', 'genericNotes',
 ]
 
+const COLONNES_FIXES_DATE = ['rmaCreationDate', 'dateRic']
+
 // ─── Helper : injection d'une ligne dans l'inventaire ────────────────────────
 async function creerEntreeInventaire(params: {
   siteId: number
@@ -76,9 +78,25 @@ async function creerEntreeInventaire(params: {
         else if (codeNorm === 'CLIENT') data.customer = valeur
         else if (codeNorm === 'GARANTIE' || codeNorm === 'WARRANTY') data.warranty = valeur
         else if (codeNorm === 'PANNE_CLIENT') data.defectFromCustomer = valeur
-        // Mapping direct si colonneInventaire configurée
+        // Mapping direct si la clé est une colonne inventaire connue (donneesCommunes stocke les clés camelCase)
+        if (COLONNES_FIXES.includes(code) && !(code in data)) {
+          if (COLONNES_FIXES_DATE.includes(code)) {
+            const d = new Date(valeur)
+            data[code] = isNaN(d.getTime()) ? null : d
+          } else {
+            data[code] = valeur
+          }
+        }
+        // Mapping via configImportExcel (colonneExcel → colonneInventaire)
         const mapping = mappings.find(m => normalizeCode(m.colonneExcel) === codeNorm && COLONNES_FIXES.includes(m.colonneInventaire))
-        if (mapping) data[mapping.colonneInventaire] = valeur
+        if (mapping && !(mapping.colonneInventaire in data)) {
+          if (COLONNES_FIXES_DATE.includes(mapping.colonneInventaire)) {
+            const d = new Date(valeur)
+            data[mapping.colonneInventaire] = isNaN(d.getTime()) ? null : d
+          } else {
+            data[mapping.colonneInventaire] = valeur
+          }
+        }
       }
     } catch {}
   }
@@ -87,6 +105,8 @@ async function creerEntreeInventaire(params: {
   if (ligne.garantie) data.warranty = ligne.garantie
   if (ligne.panneClient) data.defectFromCustomer = ligne.panneClient
   if (attendu.rma) data.rma = attendu.rma
+  if (ligne.caisse) data.caisse = ligne.caisse
+  if (ligne.emplacementId) data.emplacementId = ligne.emplacementId
 
   // Règles d'alerte
   const alerte = await verifierReglesAlerte(prisma, siteId, ligne.sn ?? null)
@@ -308,7 +328,7 @@ export async function deleteAttendu(req: Request, res: Response, next: any) {
 export async function scannerSN(req: Request, res: Response, next: any) {
   try {
     const { id } = req.params
-    const { sn, pn, accessoires, caisse } = req.body
+    const { sn, pn, accessoires, caisse, emplacementId } = req.body
 
     const attendu = await prisma.attendu.findUnique({ where: { id: Number(id) }, include: { lignes: true } })
     if (!attendu) return res.status(404).json({ error: 'Attendu introuvable' })
@@ -329,7 +349,7 @@ export async function scannerSN(req: Request, res: Response, next: any) {
     if (ligne) {
       await prisma.ligneAttendue.update({
         where: { id: ligne.id },
-        data: { statut: 'RECU', snRecu: snNorm, accessoires: accessoiresJson, caisse: caisse || null }
+        data: { statut: 'RECU', snRecu: snNorm, accessoires: accessoiresJson, caisse: caisse || null, emplacementId: emplacementId ? Number(emplacementId) : null }
       })
       if (dejaEnInventaire) {
         await prisma.ligneAttendue.create({

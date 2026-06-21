@@ -20,6 +20,7 @@ model article {
   inventaires       inventaire[]
   demandesTransfert demandeTransfert[]
   inventairesLabo   inventaireLabo[]
+  mouvementsQTE     mouvementQTE[]
 
   @@index([siteId], map: "Article_siteId_fkey")
   @@index([statutId], map: "Article_statutId_fkey")
@@ -101,8 +102,9 @@ model plateforme {
   siteId    Int
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
-  site      site                    @relation(fields: [siteId], references: [id], map: "Plateforme_siteId_fkey")
-  valeurs   valeurChampPlateforme[]
+  site          site                    @relation(fields: [siteId], references: [id], map: "Plateforme_siteId_fkey")
+  valeurs       valeurChampPlateforme[]
+  mouvementsQTE mouvementQTE[]
 
   @@index([siteId], map: "Plateforme_siteId_fkey")
 }
@@ -195,6 +197,11 @@ model inventaire {
   dateCls            DateTime? @db.Date
   dateSHP            DateTime? @db.Date
 
+  // Logistique réception
+  bt                 String?
+  caisse             String?
+  emplacementId      Int?
+
   // Méta
   archive            Boolean   @default(false)
   couleurAlerte      String?
@@ -207,6 +214,7 @@ model inventaire {
   article            article?                @relation(fields: [articleId], references: [id], map: "Inventaire_articleId_fkey")
   statut             statut?                 @relation(fields: [statutId], references: [id], onDelete: Cascade, map: "Inventaire_statutId_fkey")
   regleAlerte        regleAlerte?            @relation(fields: [regleAlerteId], references: [id], map: "Inventaire_regleAlerteId_fkey")
+  emplacement        emplacement?            @relation(fields: [emplacementId], references: [id], map: "Inventaire_emplacementId_fkey")
   pieces             piecesUtilisees[]
   lignesTransfert    ligneDemandeTransfert[]
   ligneMasterBox     ligneMasterBox?
@@ -215,6 +223,7 @@ model inventaire {
   @@index([articleId], map: "Inventaire_articleId_fkey")
   @@index([statutId], map: "Inventaire_statutId_fkey")
   @@index([regleAlerteId], map: "Inventaire_regleAlerteId_fkey")
+  @@index([emplacementId], map: "Inventaire_emplacementId_fkey")
   @@index([siteId, archive])
   @@index([serialNumber])
   @@index([rma])
@@ -261,9 +270,11 @@ model ligneAttendue {
   snRecu       String?
   accessoires  String?  @db.LongText
   notes        String?
-  caisse       String?
-  createdAt    DateTime @default(now())
-  attendu      attendu  @relation(fields: [attenduId], references: [id], onDelete: Cascade, map: "LigneAttendue_attenduId_fkey")
+  caisse        String?
+  emplacementId Int?
+  createdAt     DateTime    @default(now())
+  attendu       attendu     @relation(fields: [attenduId], references: [id], onDelete: Cascade, map: "LigneAttendue_attenduId_fkey")
+  emplacement   emplacement? @relation(fields: [emplacementId], references: [id], map: "LigneAttendue_emplacementId_fkey")
 
   @@index([attenduId], map: "LigneAttendue_attenduId_fkey")
 }
@@ -353,6 +364,7 @@ model utilisateur {
   role                 role                   @relation(fields: [roleId], references: [id], map: "Utilisateur_roleId_fkey")
   site                 site                   @relation(fields: [siteId], references: [id], map: "Utilisateur_siteId_fkey")
   technicienProduction technicienProduction[]
+  mouvementsQTE        mouvementQTE[]
 
   @@index([roleId], map: "Utilisateur_roleId_fkey")
   @@index([siteId], map: "Utilisateur_siteId_fkey")
@@ -389,6 +401,7 @@ model site {
   champPlateforme      champPlateforme[]
   inventaire           inventaire[]
   historiqueActivite   historiqueActivite[]
+  mouvementsQTE        mouvementQTE[]
   attendu              attendu[]
   configAttendus       configAttendus?
   configImportExcel    configImportExcel[]
@@ -469,8 +482,34 @@ model configProduction {
   champTypeArticleCode String  @default("TYPE")
   typesArticleQTE      String? @db.LongText
   champsAffichageQTE   String? @db.LongText
+  champsReceptionSN    String? @db.LongText
+  champsReceptionQTE   String? @db.LongText
   quotaSamediActif     Boolean @default(false)
   site                 site    @relation(fields: [siteId], references: [id], map: "ConfigProduction_siteId_fkey")
+}
+
+// ─── Mouvements QTE (PDA / Accessoires) ──────────────────────────────────────
+
+model mouvementQTE {
+  id            Int          @id @default(autoincrement())
+  siteId        Int
+  articleId     Int
+  type          String       @default("RECEPTION") // RECEPTION | TRANSFERT | SORTIE
+  quantite      Int
+  bl            String?
+  plateformeId  Int?
+  commentaire   String?      @db.Text
+  date          DateTime     @default(now())
+  userId        Int?
+  createdAt     DateTime     @default(now())
+  site          site         @relation(fields: [siteId], references: [id], map: "MouvementQTE_siteId_fkey")
+  article       article      @relation(fields: [articleId], references: [id], map: "MouvementQTE_articleId_fkey")
+  plateforme    plateforme?  @relation(fields: [plateformeId], references: [id], map: "MouvementQTE_plateformeId_fkey")
+  utilisateur   utilisateur? @relation(fields: [userId], references: [id], map: "MouvementQTE_userId_fkey")
+
+  @@index([siteId], map: "MouvementQTE_siteId_fkey")
+  @@index([articleId], map: "MouvementQTE_articleId_fkey")
+  @@index([plateformeId], map: "MouvementQTE_plateformeId_fkey")
 }
 
 model technicienProduction {
@@ -598,7 +637,9 @@ model emplacement {
   description String?  @db.LongText
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  site        site     @relation(fields: [siteId], references: [id], map: "Emplacement_siteId_fkey")
+  site          site              @relation(fields: [siteId], references: [id], map: "Emplacement_siteId_fkey")
+  inventaires   inventaire[]
+  lignesAttendues ligneAttendue[]
 
   @@unique([siteId, nom], map: "Emplacement_siteId_nom_key")
   @@index([siteId], map: "Emplacement_siteId_fkey")

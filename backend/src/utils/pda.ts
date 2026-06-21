@@ -50,6 +50,15 @@ export function getMoisCible(query: { annee?: unknown; mois?: unknown }) {
   }
 }
 
+const CODES_PN      = ['PN', 'P_N', 'PART_NUMBER', 'PART_NO', 'REFERENCE', 'REF']
+const CODES_WORDING = ['DESIGNATION', 'DESIG', 'WORDING', 'NOM', 'LIBELLE', 'DESCRIPTION', 'DETAIL']
+const CODES_RANGE   = ['FAMILLE', 'TYPE_PIECE', 'RANGE', 'MODEL', 'MODELE', 'GAMME']
+const CODES_ADD_REF = ['CONSTRUCTEUR', 'MARQUE', 'FABRICANT', 'ADDITIONAL_REFERENCE', 'REF_ADDITIONNELLE']
+
+function findChamp(champs: { id: number; code: string; label: string }[], codes: string[]) {
+  return champs.find(c => codes.includes(normCode(c.code)))
+}
+
 // Articles dont le type (champ configurable) fait partie des types suivis en quantité (config Production)
 export async function getArticlesQTE(prisma: PrismaClient, siteId: number) {
   const config = await prisma.configProduction.findUnique({ where: { siteId } })
@@ -57,8 +66,10 @@ export async function getArticlesQTE(prisma: PrismaClient, siteId: number) {
   const typesAutorises: string[] = config?.typesArticleQTE ? JSON.parse(config.typesArticleQTE) : []
   const champsArticle = await prisma.champArticle.findMany({ where: { siteId } })
   const champType   = champsArticle.find(c => normCode(c.code) === normCode(champTypeCode))
-  const champDetail = champsArticle.find(c => normCode(c.code) === 'DETAIL')
-  const champModel  = champsArticle.find(c => normCode(c.code) === 'MODEL')
+  const champPN     = findChamp(champsArticle, CODES_PN)
+  const champDetail = findChamp(champsArticle, CODES_WORDING)
+  const champModel  = findChamp(champsArticle, CODES_RANGE)
+  const champAddRef = findChamp(champsArticle, CODES_ADD_REF)
 
   let articlesQTE: Awaited<ReturnType<typeof prisma.article.findMany<{ where: { siteId: number }; include: { valeurs: true } }>>> = []
   if (typesAutorises.length > 0 && champType) {
@@ -72,5 +83,5 @@ export async function getArticlesQTE(prisma: PrismaClient, siteId: number) {
     })
   }
 
-  return { typesAutorises, champType, champDetail, champModel, articlesQTE }
+  return { typesAutorises, champType, champPN, champDetail, champModel, champAddRef, articlesQTE }
 }

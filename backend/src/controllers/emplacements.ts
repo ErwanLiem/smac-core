@@ -4,21 +4,21 @@ import { hasRole } from '../utils/roles'
 
 const prisma = new PrismaClient()
 
-async function calcRemplissage(siteId: number, nomsEmplacements: string[]): Promise<Record<string, number>> {
-  if (nomsEmplacements.length === 0) return {}
+async function calcRemplissage(siteId: number, emplacementIds: number[]): Promise<Record<number, number>> {
+  if (emplacementIds.length === 0) return {}
 
-  // Compte les inventaires en statut estStock dont le genericNotes contient le nom d'emplacement
-  // Note: emplacement sera un champ dédié à ajouter si nécessaire
   const statuts = await prisma.statut.findMany({ where: { siteId }, select: { id: true, roles: true } })
   const stockIds = statuts.filter(s => hasRole(s.roles, 'estStock')).map(s => s.id)
 
-  const inventaires = await prisma.inventaire.findMany({
-    where: { siteId, archive: false, statutId: { in: stockIds } },
-    select: { id: true }
+  const groupes = await (prisma.inventaire as any).groupBy({
+    by: ['emplacementId'],
+    where: { siteId, archive: false, statutId: { in: stockIds }, emplacementId: { in: emplacementIds } },
+    _count: { id: true }
   })
 
-  // TODO: lier emplacement via une colonne dédiée quand ajoutée
-  return Object.fromEntries(nomsEmplacements.map(n => [n, 0]))
+  return Object.fromEntries(
+    emplacementIds.map(id => [id, (groupes as any[]).find((g: any) => g.emplacementId === id)?._count.id ?? 0])
+  )
 }
 
 export async function getAll(req: Request, res: Response) {
@@ -28,11 +28,11 @@ export async function getAll(req: Request, res: Response) {
     orderBy: { nom: 'asc' }
   })
 
-  const counts = await calcRemplissage(siteId, emplacements.map(e => e.nom))
+  const counts = await calcRemplissage(siteId, emplacements.map(e => e.id))
 
   res.json(emplacements.map(e => ({
     ...e,
-    remplissage: counts[e.nom] ?? 0
+    remplissage: counts[e.id] ?? 0
   })))
 }
 
@@ -61,9 +61,8 @@ export async function update(req: Request, res: Response, next: any) {
       where: { id },
       data: { nom: nom.trim(), capaciteMax: Number(capaciteMax), description: description?.trim() || null }
     })
-    const siteId = emp.siteId
-    const counts = await calcRemplissage(siteId, [emp.nom])
-    res.json({ ...emp, remplissage: counts[emp.nom] ?? 0 })
+    const counts = await calcRemplissage(emp.siteId, [emp.id])
+    res.json({ ...emp, remplissage: counts[emp.id] ?? 0 })
   } catch (e) { next(e) }
 }
 

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
-import { normCode, getMoisCible, getArticlesQTE } from '../utils/pda'
+import { getMoisCible, getArticlesQTE } from '../utils/pda'
 
 const prisma = new PrismaClient()
 
@@ -10,7 +10,7 @@ export async function getSuiviPDALabo(req: Request, res: Response, next: any) {
     const { siteId } = req.params
     const site = Number(siteId)
 
-    const { typesAutorises, champType, champDetail, champModel, articlesQTE } = await getArticlesQTE(prisma, site)
+    const { typesAutorises, champType, champPN, champDetail, champModel, champAddRef, articlesQTE } = await getArticlesQTE(prisma, site)
     const articleIds = articlesQTE.map(a => a.id)
 
     if (typesAutorises.length === 0 || !champType) {
@@ -31,9 +31,6 @@ export async function getSuiviPDALabo(req: Request, res: Response, next: any) {
         })
       : []
 
-    const champsArticle = await prisma.champArticle.findMany({ where: { siteId: site } })
-    const champPNArt = champsArticle.find(c => normCode(c.code) === 'PN')
-
     const rows = articlesQTE.map(article => {
       const labo = laboItems.find(l => l.articleId === article.id)
 
@@ -46,16 +43,14 @@ export async function getSuiviPDALabo(req: Request, res: Response, next: any) {
         if (d.articleId === article.id) supply += d.quantite
       }
 
-      const reference = champPNArt  ? (article.valeurs.find(v => v.champId === champPNArt.id)?.valeur  ?? '') : ''
-      const detail    = champDetail  ? (article.valeurs.find(v => v.champId === champDetail.id)?.valeur  ?? '') : ''
-      const range     = champModel   ? (article.valeurs.find(v => v.champId === champModel.id)?.valeur   ?? '') : ''
+      const v = (champ?: { id: number }) => champ ? (article.valeurs.find(val => val.champId === champ.id)?.valeur ?? '') : ''
 
       return {
         articleId: article.id,
-        reference,
-        additionalReference: detail,
-        wording: detail,
-        range,
+        reference:           v(champPN),
+        additionalReference: v(champAddRef),
+        wording:             v(champDetail),
+        range:               v(champModel),
         stockQty: labo?.quantite ?? 0,
         hebdo,
         monthlyConsumption,
@@ -68,6 +63,12 @@ export async function getSuiviPDALabo(req: Request, res: Response, next: any) {
       mois: mois + 1,
       estMoisCourant,
       semaines: semaines.map(s => ({ numero: s, label: `S${s}` })),
+      colonnes: {
+        reference:           champPN?.label      ?? 'Référence',
+        additionalReference: champAddRef?.label  ?? 'Réf. additionnelle',
+        wording:             champDetail?.label  ?? 'Désignation',
+        range:               champModel?.label   ?? 'Famille',
+      },
       rows
     })
   } catch (e) { next(e) }

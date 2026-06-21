@@ -130,8 +130,9 @@ export default function Inventaire() {
   }
 
   function getValeur(item: Inventaire, key: string): string {
+    if (key === 'emplacementNom') return (item as any).emplacement?.nom ?? '—'
     const col = COLONNES_INVENTAIRE.find(c => c.key === key)
-    const val = item[key]
+    const val = (item as any)[key]
     if (val == null || val === '') return '—'
     if (col?.type === 'date') return formatDate(val)
     return String(val)
@@ -290,13 +291,19 @@ export default function Inventaire() {
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editItem) return
-    const data: Record<string, any> = { statutId: editItem.statutId || null }
-    for (const col of COLONNES_INVENTAIRE) {
-      data[col.key] = editItem.fields[col.key] || null
+    try {
+      const data: Record<string, any> = { statutId: editItem.statutId || null }
+      for (const col of COLONNES_INVENTAIRE) {
+        if (col.key === 'emplacementNom') continue
+        const val = editItem.fields[col.key] || null
+        data[col.key] = val
+      }
+      await inventaireApi.update(editItem.id, data)
+      setEditItem(null)
+      reload()
+    } catch (e: any) {
+      alert(e?.data?.error ?? e?.message ?? 'Erreur lors de la sauvegarde')
     }
-    await inventaireApi.update(editItem.id, data)
-    setEditItem(null)
-    reload()
   }
 
   function StatutBadge({ statut }: { statut: Statut | null }) {

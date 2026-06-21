@@ -31,6 +31,8 @@ export async function getConfig(req: Request, res: Response, next: any) {
       ...config,
       typesArticleQTE:    config.typesArticleQTE    ? JSON.parse(config.typesArticleQTE)    : [],
       champsAffichageQTE: config.champsAffichageQTE ? JSON.parse(config.champsAffichageQTE) : [],
+      champsReceptionSN:  config.champsReceptionSN  ? JSON.parse(config.champsReceptionSN)  : null,
+      champsReceptionQTE: config.champsReceptionQTE ? JSON.parse(config.champsReceptionQTE) : null,
     })
   } catch (e) { next(e) }
 }
@@ -38,12 +40,14 @@ export async function getConfig(req: Request, res: Response, next: any) {
 export async function updateConfig(req: Request, res: Response, next: any) {
   try {
     const { siteId } = req.params
-    const { champTypeArticleCode, typesArticleQTE, champsAffichageQTE, quotaSamediActif } = req.body
+    const { champTypeArticleCode, typesArticleQTE, champsAffichageQTE, quotaSamediActif, champsReceptionSN, champsReceptionQTE } = req.body
     const data = {
       champTypeArticleCode: champTypeArticleCode ?? 'TYPE',
-      typesArticleQTE: typesArticleQTE !== undefined ? JSON.stringify(typesArticleQTE) : undefined,
+      typesArticleQTE:    typesArticleQTE    !== undefined ? JSON.stringify(typesArticleQTE)    : undefined,
       champsAffichageQTE: champsAffichageQTE !== undefined ? JSON.stringify(champsAffichageQTE) : undefined,
-      quotaSamediActif: quotaSamediActif !== undefined ? Boolean(quotaSamediActif) : undefined,
+      champsReceptionSN:  champsReceptionSN  !== undefined ? JSON.stringify(champsReceptionSN)  : undefined,
+      champsReceptionQTE: champsReceptionQTE !== undefined ? JSON.stringify(champsReceptionQTE) : undefined,
+      quotaSamediActif:   quotaSamediActif   !== undefined ? Boolean(quotaSamediActif)          : undefined,
     }
     const config = await prisma.configProduction.upsert({
       where: { siteId: Number(siteId) },
@@ -52,8 +56,10 @@ export async function updateConfig(req: Request, res: Response, next: any) {
     })
     res.json({
       ...config,
-      typesArticleQTE: config.typesArticleQTE ? JSON.parse(config.typesArticleQTE) : [],
+      typesArticleQTE:    config.typesArticleQTE    ? JSON.parse(config.typesArticleQTE)    : [],
       champsAffichageQTE: config.champsAffichageQTE ? JSON.parse(config.champsAffichageQTE) : [],
+      champsReceptionSN:  config.champsReceptionSN  ? JSON.parse(config.champsReceptionSN)  : null,
+      champsReceptionQTE: config.champsReceptionQTE ? JSON.parse(config.champsReceptionQTE) : null,
     })
   } catch (e) { next(e) }
 }
@@ -279,17 +285,26 @@ export async function getCartes(req: Request, res: Response, next: any) {
     const { siteId } = req.params
 
     const stockIds = await getStatutIdsByRole(Number(siteId), 'estStock')
+
+    const champFamille = await prisma.champArticle.findFirst({
+      where: { siteId: Number(siteId), code: { in: ['FAMILLE', 'FAMILY'] } }
+    })
+
     const inventaires = await prisma.inventaire.findMany({
       where: {
         siteId: Number(siteId),
         archive: false,
         statutId: stockIds.length > 0 ? { in: stockIds } : undefined
+      },
+      include: {
+        article: champFamille ? { include: { valeurs: { where: { champId: champFamille.id } } } } : true
       }
     })
 
-    // SLA par client
-    const champClientSLA = await prisma.champClient.findFirst({ where: { siteId: Number(siteId), code: 'SLA' } })
-    const champClientNOM = await prisma.champClient.findFirst({ where: { siteId: Number(siteId), code: { in: ['NOM', 'NOM_CLIENT', 'RAISON_SOCIALE'] } } })
+    // SLA par client (recherche insensible à la casse)
+    const champsClient = await prisma.champClient.findMany({ where: { siteId: Number(siteId) } })
+    const champClientSLA = champsClient.find(c => c.code.toUpperCase() === 'SLA' || c.label.toUpperCase().includes('SLA'))
+    const champClientNOM = champsClient.find(c => ['NOM', 'NOM_CLIENT', 'RAISON_SOCIALE', 'CLIENT', 'NOM_SOCIETE', 'SOCIETE'].includes(c.code.toUpperCase()))
     const slaParClient: Record<string, number> = {}
     if (champClientSLA && champClientNOM) {
       const clients = await prisma.client.findMany({
@@ -303,33 +318,45 @@ export async function getCartes(req: Request, res: Response, next: any) {
       }
     }
 
-    // Grouper par PN × RMA × customer
-    const groupes = new Map<string, { pnValeur: string; rmaValeur: string; designationValeur: string; clientValeur: string; ids: number[]; quantite: number; dateRic: Date | null }>()
+    // Grouper par RMA × customer → articles par PN
+    type GroupePN = { pnValeur: string; designationValeur: string; ids: number[]; quantite: number; caisseMap: Map<string, number> }
+    type GroupeRMA = { rmaValeur: string; clientValeur: string; dateRic: Date | null; articles: Map<string, GroupePN> }
+    const groupesRMA = new Map<string, GroupeRMA>()
 
     for (const inv of inventaires) {
-      const pnVal     = inv.partNumber    ?? ''
-      const rmaVal    = inv.rma           ?? ''
-      const clientVal = inv.customer      ?? ''
-      const desgVal   = inv.productFamily ?? ''
-      const key = `${pnVal}__${rmaVal}__${clientVal}`
-      if (!groupes.has(key)) {
-        groupes.set(key, { pnValeur: pnVal, rmaValeur: rmaVal, designationValeur: desgVal, clientValeur: clientVal, ids: [], quantite: 0, dateRic: inv.dateRic })
+      const pnVal     = inv.partNumber ?? ''
+      const rmaVal    = inv.rma       ?? ''
+      const clientVal = inv.customer  ?? ''
+      const desgVal   = (champFamille ? (inv as any).article?.valeurs?.[0]?.valeur : null) ?? inv.productFamily ?? ''
+      const keyRMA = `${rmaVal}__${clientVal}`
+      if (!groupesRMA.has(keyRMA)) {
+        groupesRMA.set(keyRMA, { rmaValeur: rmaVal, clientValeur: clientVal, dateRic: inv.dateRic, articles: new Map() })
       }
-      const g = groupes.get(key)!
-      g.ids.push(inv.id)
-      g.quantite++
-      if (inv.dateRic && (!g.dateRic || inv.dateRic < g.dateRic)) g.dateRic = inv.dateRic
+      const gr = groupesRMA.get(keyRMA)!
+      if (inv.dateRic && (!gr.dateRic || inv.dateRic < gr.dateRic)) gr.dateRic = inv.dateRic
+
+      if (!gr.articles.has(pnVal)) {
+        gr.articles.set(pnVal, { pnValeur: pnVal, designationValeur: desgVal, ids: [], quantite: 0, caisseMap: new Map() })
+      }
+      const ga = gr.articles.get(pnVal)!
+      ga.ids.push(inv.id)
+      ga.quantite++
+      if (inv.caisse) ga.caisseMap.set(inv.caisse, (ga.caisseMap.get(inv.caisse) ?? 0) + 1)
     }
 
-    const result = Array.from(groupes.values()).map(g => ({
-      pnValeur: g.pnValeur,
-      rmaValeur: g.rmaValeur,
-      designationValeur: g.designationValeur,
-      clientValeur: g.clientValeur,
-      ids: g.ids,
-      quantite: g.quantite,
-      dateRic: g.dateRic,
-      slaJours: g.clientValeur ? (slaParClient[g.clientValeur] ?? null) : null
+    const result = Array.from(groupesRMA.values()).map(gr => ({
+      rmaValeur: gr.rmaValeur,
+      clientValeur: gr.clientValeur,
+      dateRic: gr.dateRic,
+      slaJours: gr.clientValeur ? (slaParClient[gr.clientValeur] ?? null) : null,
+      totalQuantite: Array.from(gr.articles.values()).reduce((s, a) => s + a.quantite, 0),
+      articles: Array.from(gr.articles.values()).map(a => ({
+        pnValeur: a.pnValeur,
+        designationValeur: a.designationValeur,
+        ids: a.ids,
+        quantite: a.quantite,
+        caisses: Array.from(a.caisseMap.entries()).map(([numero, quantite]) => ({ numero, quantite }))
+      })).sort((a, b) => a.pnValeur.localeCompare(b.pnValeur))
     }))
 
     res.json(result)
@@ -418,11 +445,15 @@ export async function createDemandeQTE(req: Request, res: Response, next: any) {
     const { datePlanifiee, quantite, articleId } = req.body
     const qte = Number(quantite)
 
-    // Pour les articles QTE (PDAs etc.) : vérifier le stock disponible dans inventaireLabo
-    const stockLabo = await prisma.inventaireLabo.findUnique({
-      where: { siteId_articleId: { siteId: Number(siteId), articleId: Number(articleId) } }
+    // Vérifier le stock logistique disponible (mouvementQTE : RECEPTION + TRANSFERT/SORTIE -)
+    const mouvements = await prisma.mouvementQTE.findMany({
+      where: { siteId: Number(siteId), articleId: Number(articleId) }
     })
-    const stockDisponible = stockLabo?.quantite ?? 0
+    const stockDisponible = mouvements.reduce((acc, m) => {
+      if (m.type === 'RECEPTION') return acc + m.quantite
+      if (m.type === 'TRANSFERT' || m.type === 'SORTIE') return acc - m.quantite
+      return acc
+    }, 0)
 
     if (stockDisponible < qte) {
       return res.status(400).json({
@@ -485,11 +516,21 @@ export async function validerDemande(req: Request, res: Response, next: any) {
     }
 
     if (demande.type === 'QTE' && demande.articleId) {
-      // Incrémenter l'inventaire labo et décrémenter le stock source
+      // Incrémenter l'inventaire labo
       await prisma.inventaireLabo.upsert({
         where: { siteId_articleId: { siteId: demande.siteId, articleId: demande.articleId } },
         create: { siteId: demande.siteId, articleId: demande.articleId, quantite: demande.quantite },
         update: { quantite: { increment: demande.quantite } }
+      })
+      // Créer le mouvement de sortie logistique (décrémente le stock Suivi PDA)
+      await prisma.mouvementQTE.create({
+        data: {
+          siteId: demande.siteId,
+          articleId: demande.articleId,
+          type: 'TRANSFERT',
+          quantite: demande.quantite,
+          userId: (req as any).user?.id ?? null,
+        }
       })
     }
 

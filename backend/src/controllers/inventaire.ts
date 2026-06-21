@@ -49,7 +49,7 @@ export async function getAll(req: Request, res: Response) {
       archive: false,
       ...(idsQTE.length > 0 ? { NOT: { articleId: { in: idsQTE } } } : {})
     },
-    include: { article: true, statut: true, pieces: true },
+    include: { article: true, statut: true, pieces: true, emplacement: true },
     orderBy: { createdAt: 'desc' }
   })
   res.json(inventaires)
@@ -60,8 +60,9 @@ export async function create(req: Request, res: Response, next: any) {
     const { siteId } = req.params
     const {
       articleId, statutId,
-      serialNumber, partNumber, rma, customer, productFamily, mercurySn,
+      serialNumber, partNumber, rma, bt, customer, productFamily, mercurySn,
       warranty, rmaCreationDate, dateRic, defectFromCustomer, genericNotes,
+      caisse, emplacementId,
     } = req.body
 
     const alerte = await verifierReglesAlerte(prisma, Number(siteId), serialNumber ?? null)
@@ -82,6 +83,7 @@ export async function create(req: Request, res: Response, next: any) {
         serialNumber: serialNumber ?? null,
         partNumber: partNumber ?? null,
         rma: rma ?? null,
+        bt: bt ?? null,
         customer: customer ?? null,
         productFamily: productFamily ?? null,
         mercurySn: mercurySn ?? null,
@@ -90,6 +92,8 @@ export async function create(req: Request, res: Response, next: any) {
         dateRic: dateRic ? new Date(dateRic) : null,
         defectFromCustomer: defectFromCustomer ?? null,
         genericNotes: genericNotes ?? null,
+        caisse: caisse ?? null,
+        emplacementId: emplacementId ? Number(emplacementId) : null,
         couleurAlerte: alerte?.couleurAlerte ?? null,
         regleAlerteId: alerte?.regleAlerteId ?? null,
         ...autoFillData,
@@ -126,9 +130,20 @@ export async function update(req: Request, res: Response, next: any) {
       'datePra', 'dateEng', 'dateAsw', 'dateBsf', 'dateBsfn', 'dateNlv',
       'codeStatut', 'dateMaj', 'dateInjection', 'dateTest', 'datePack', 'dateCls', 'dateSHP', 'archive',
     ]
+    const colonnesDate = [
+      'rmaCreationDate', 'dateRic', 'dateRip', 'dateLav', 'dateAsp', 'dateLab',
+      'datePrv', 'datePrr', 'datePrf', 'datePra', 'dateEng', 'dateAsw',
+      'dateBsf', 'dateBsfn', 'dateNlv', 'dateMaj', 'dateInjection', 'dateTest',
+      'datePack', 'dateCls', 'dateSHP',
+    ]
     const data: Record<string, any> = {}
     for (const col of colonnesAutorisees) {
-      if (champs[col] !== undefined) data[col] = champs[col]
+      if (champs[col] === undefined) continue
+      if (colonnesDate.includes(col)) {
+        data[col] = champs[col] ? new Date(champs[col]) : null
+      } else {
+        data[col] = champs[col]
+      }
     }
     if (statutId !== undefined) data.statutId = statutId ? Number(statutId) : null
 
