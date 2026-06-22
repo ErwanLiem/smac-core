@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Cpu, ChevronRight, Clock, X, Check, Search, AlertCircle } from 'lucide-react'
-import { get, put } from '../api/client'
-
+import { Cpu, ChevronRight, Clock, X, Check, Search, AlertCircle, ChevronDown } from 'lucide-react'
+import { get, put, post } from '../api/client'
+import ModalHistorique from '../components/ModalHistorique'
 import { getSiteId } from '../utils/permissions'
 
 interface RmaGroupe {
@@ -33,6 +33,7 @@ interface HistoriqueItem {
 
 interface StatutInfo {
   id: number
+  code: string
   label: string
   couleur: string
 }
@@ -50,6 +51,7 @@ interface DetailInventaire {
   estMaj: boolean
   statutCible: StatutInfo | null
   statutRetour: StatutInfo | null
+  statutsAttenteInfo: StatutInfo[]
 }
 
 function BadgeStatut({ statut }: { statut: { label: string; couleur: string } | null }) {
@@ -78,8 +80,23 @@ function ModalMaj({
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState('')
   const [actionEnCours, setActionEnCours] = useState(false)
+  const [attenteEnCours, setAttenteEnCours] = useState<StatutInfo | null>(null)
+  const [commentaireAttente, setCommentaireAttente] = useState('')
+  const [dropdownOuvert, setDropdownOuvert] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { chargerDetail() }, [inventaireId])
+
+  useEffect(() => {
+    if (!dropdownOuvert) return
+    function handler(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOuvert(false); setAttenteEnCours(null); setCommentaireAttente('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [dropdownOuvert])
 
   async function chargerDetail() {
     setChargement(true)
@@ -106,11 +123,28 @@ function ModalMaj({
     setActionEnCours(true)
     setErreur('')
     try {
-      await put(`/production/maj-injection/${siteId}/inventaire/${inventaireId}/statut`, { statutId: detail.statutRetour.id })
+      await put(`/production/maj-injection/${siteId}/inventaire/${inventaireId}/statut`, { statutCode: detail.statutRetour.code })
       onStatutChange()
       onClose()
     } catch (e: any) {
       setErreur(e?.message ?? 'Erreur lors du changement de statut')
+      setActionEnCours(false)
+    }
+  }
+
+  async function confirmerAttente() {
+    if (!attenteEnCours || !commentaireAttente.trim()) return
+    setActionEnCours(true)
+    setErreur('')
+    try {
+      await post(`/production/reparation/${siteId}/inventaire/${inventaireId}/attente`, {
+        statutCode: attenteEnCours.code,
+        commentaire: commentaireAttente.trim(),
+      })
+      onStatutChange()
+      onClose()
+    } catch (e: any) {
+      setErreur(e?.message ?? 'Erreur lors de l\'envoi en attente')
       setActionEnCours(false)
     }
   }
@@ -126,17 +160,76 @@ function ModalMaj({
         maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden'
       }}>
         {/* Header */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #1f2937', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Cpu size={18} style={{ color: '#3b82f6' }} />
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#f1f5f9' }}>
-              {detail ? (detail.estRepare ? 'MAJ' : 'Injection') : 'MAJ / Injection'}
-            </span>
-            {detail && <span style={{ fontSize: '13px', color: '#6b7280' }}>— {detail.serialNumber || detail.partNumber || `#${inventaireId}`}</span>}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #1f2937', display: 'flex', alignItems: 'center', gap: '12px', background: '#0f1117' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+            <div style={{ background: '#3b82f61a', borderRadius: '8px', padding: '6px', flexShrink: 0 }}>
+              <Cpu size={16} style={{ color: '#3b82f6', display: 'block' }} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9' }}>
+                {detail ? (detail.estRepare ? 'MAJ' : 'Injection') : 'MAJ / Injection'}
+              </div>
+              {detail && <div style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>{detail.serialNumber || detail.partNumber || `#${inventaireId}`}</div>}
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
-            <X size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+
+            {/* Dropdown Attente info */}
+            {detail && detail.statutsAttenteInfo.length > 0 && (
+              <div ref={dropdownRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => { setDropdownOuvert(o => !o); if (attenteEnCours) { setAttenteEnCours(null); setCommentaireAttente('') } }}
+                  disabled={actionEnCours}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', background: dropdownOuvert ? '#1f2937' : '#141720', border: '1px solid #374151', color: '#9ca3af', fontSize: '13px', fontWeight: 600 }}
+                >
+                  <Clock size={14} /> Attente info
+                  <ChevronDown size={13} style={{ transform: dropdownOuvert ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
+                {dropdownOuvert && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50, background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', minWidth: '260px', overflow: 'hidden' }}>
+                    {attenteEnCours ? (
+                      <div style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                          <button onClick={() => { setAttenteEnCours(null); setCommentaireAttente('') }} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                            <ChevronDown size={14} style={{ transform: 'rotate(90deg)' }} />
+                          </button>
+                          <span style={{ background: attenteEnCours.couleur + '1F', color: attenteEnCours.couleur, border: `1px solid ${attenteEnCours.couleur}33`, padding: '3px 10px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>{attenteEnCours.label}</span>
+                        </div>
+                        <textarea className="form-input" rows={3} placeholder="Commentaire obligatoire…" value={commentaireAttente} onChange={e => setCommentaireAttente(e.target.value)} autoFocus style={{ width: '100%', resize: 'vertical', fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }} />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="btn btn-primary" style={{ flex: 1, fontSize: '12px', padding: '7px', justifyContent: 'center', opacity: !commentaireAttente.trim() || actionEnCours ? 0.5 : 1 }} disabled={!commentaireAttente.trim() || actionEnCours} onClick={confirmerAttente}>
+                            <Check size={13} /> Confirmer
+                          </button>
+                          <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '7px 12px' }} onClick={() => { setDropdownOuvert(false); setAttenteEnCours(null); setCommentaireAttente('') }}>Annuler</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '6px' }}>
+                        <div style={{ padding: '6px 10px 4px', fontSize: '10px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Choisir le type d'attente</div>
+                        {detail.statutsAttenteInfo.map(s => (
+                          <button key={s.code} onClick={() => { setAttenteEnCours(s); setCommentaireAttente('') }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', borderRadius: '6px', padding: '8px 10px', cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = s.couleur + '15' }} onMouseLeave={e => { e.currentTarget.style.background = 'none' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.couleur, flexShrink: 0 }} />
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: s.couleur }}>{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Retour Réparation */}
+            {detail?.statutRetour && (
+              <button onClick={retourReparation} disabled={actionEnCours} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', background: '#141720', border: '1px solid #374151', color: '#f59e0b', fontSize: '13px', fontWeight: 600, opacity: actionEnCours ? 0.6 : 1 }}>
+                ↩ Retour réparation
+              </button>
+            )}
+
+            <button onClick={onClose} style={{ background: '#1f2937', border: 'none', borderRadius: '6px', color: '#9ca3af', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {chargement ? (
@@ -200,22 +293,6 @@ function ModalMaj({
                   </div>
                 )}
 
-                {detail.estMaj && detail.statutRetour && (
-                  <button
-                    onClick={retourReparation}
-                    disabled={actionEnCours}
-                    style={{
-                      width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer',
-                      background: 'transparent', color: '#f59e0b',
-                      border: '1px solid #f59e0b55', fontSize: '13px', fontWeight: 600,
-                      opacity: actionEnCours ? 0.6 : 1, transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f59e0b15' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                  >
-                    ↩ Retour en réparation
-                  </button>
-                )}
               </div>
             </div>
 
@@ -274,6 +351,7 @@ export default function MajInjection() {
   const [scanSN, setScanSN] = useState('')
   const [erreurScan, setErreurScan] = useState('')
   const [inventaireModalId, setInventaireModalId] = useState<number | null>(null)
+  const [historiqueModal, setHistoriqueModal] = useState<{ id: number; sn: string } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { chargerRmaList() }, [siteId])
@@ -432,6 +510,7 @@ export default function MajInjection() {
                     <tr
                       key={inv.id}
                       onClick={() => setInventaireModalId(inv.id)}
+                      onDoubleClick={e => { e.stopPropagation(); setInventaireModalId(null); setHistoriqueModal({ id: inv.id, sn: inv.sn || inv.pn || `#${inv.id}` }) }}
                       style={{ cursor: 'pointer' }}
                       onMouseEnter={e => { e.currentTarget.style.background = '#0f1117' }}
                       onMouseLeave={e => { e.currentTarget.style.background = '' }}
@@ -460,6 +539,13 @@ export default function MajInjection() {
           siteId={siteId}
           onClose={() => setInventaireModalId(null)}
           onStatutChange={onStatutChange}
+        />
+      )}
+      {historiqueModal && (
+        <ModalHistorique
+          inventaireId={historiqueModal.id}
+          titre={`Historique — ${historiqueModal.sn}`}
+          onClose={() => setHistoriqueModal(null)}
         />
       )}
     </div>

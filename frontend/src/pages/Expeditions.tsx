@@ -258,21 +258,55 @@ interface ArticleExport {
   partNumber: string
   rma: string
   customer: string
-  productFamily: string
+  designation: string
+  famille: string
+  defectFromCustomer: string
+  descrCode: string
+  repaireNotes: string
   livelloRiparazione: string
   warranty: string
+  mercurySn: string
+  techLabo: string
+  dateRic: string
+  dateLav: string
+  dateMaj: string
+  dateInjection: string
+  dateTest: string
+  datePack: string
+  dateAsp: string
+  dateAsw: string
+  dateEng: string
+  datePrv: string
+  dateNlv: string
   statut: { label: string } | null
 }
 
 const ARTICLE_EXPORT_COLUMNS = [
-  { key: 'statut', label: 'Statut' },
-  { key: 'serialNumber', label: 'N° de série' },
-  { key: 'partNumber', label: 'P/N' },
-  { key: 'rma', label: 'RMA' },
-  { key: 'customer', label: 'Client' },
-  { key: 'productFamily', label: 'Famille produit' },
+  { key: 'statut',             label: 'Statut' },
+  { key: 'serialNumber',       label: 'N° Série' },
+  { key: 'partNumber',         label: 'P/N' },
+  { key: 'rma',                label: 'RMA' },
+  { key: 'customer',           label: 'Client' },
+  { key: 'designation',        label: 'Désignation' },
+  { key: 'famille',            label: 'Famille / Model' },
+  { key: 'defectFromCustomer', label: 'Panne client' },
+  { key: 'descrCode',          label: 'Descr. Code' },
+  { key: 'repaireNotes',       label: 'Notes réparation' },
   { key: 'livelloRiparazione', label: 'Niveau réparation' },
-  { key: 'warranty', label: 'Garantie' },
+  { key: 'warranty',           label: 'Garantie' },
+  { key: 'mercurySn',          label: 'Mercury S/N' },
+  { key: 'techLabo',           label: 'Technicien' },
+  { key: 'dateRic',            label: 'Date réception' },
+  { key: 'dateLav',            label: 'Date LAV' },
+  { key: 'dateMaj',            label: 'Date MAJ' },
+  { key: 'dateInjection',      label: 'Date Injection' },
+  { key: 'dateTest',           label: 'Date CQ' },
+  { key: 'datePack',           label: 'Date emballage' },
+  { key: 'dateAsp',            label: 'Date ASP' },
+  { key: 'dateAsw',            label: 'Date ASW' },
+  { key: 'dateEng',            label: 'Date ENG' },
+  { key: 'datePrv',            label: 'Date PRV' },
+  { key: 'dateNlv',            label: 'Date NLV' },
 ]
 
 function formatDate(iso: string) {
@@ -286,49 +320,62 @@ function numeroBox(numero: string): string {
   return String(parseInt(m[1], 10))
 }
 
-const sectionTitre: CSSProperties = {
-  textAlign: 'center', fontSize: '13px', fontWeight: 700, letterSpacing: '0.12em',
-  textTransform: 'uppercase', borderTop: '1px solid #9ca3af', borderBottom: '1px solid #9ca3af',
-  padding: '4px 0', margin: '12px 0 10px'
+const TD: CSSProperties = { padding: '3px 4px', fontSize: '10px', lineHeight: 1.3, textAlign: 'center', verticalAlign: 'middle' }
+const TH: CSSProperties = { padding: '3px 4px', fontSize: '10px', lineHeight: 1.3, textAlign: 'center', verticalAlign: 'middle' }
+const SEP: CSSProperties = {
+  textAlign: 'center', fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em',
+  textTransform: 'uppercase', borderTop: '1px solid #6b7280', borderBottom: '1px solid #6b7280',
+  padding: '2px 0', margin: '6px 0 5px'
 }
 
-/** Bandeau "logo" Castles Technology (pas d'image fournie : rendu typographique) */
 function CastlesLogo() {
   return (
-    <div style={{ textAlign: 'center', marginBottom: '14px' }}>
-      <span style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '0.06em', color: '#111827' }}>CASTLES</span>{' '}
-      <span style={{ fontSize: '22px', fontWeight: 300, letterSpacing: '0.18em', color: '#111827' }}>TECHNOLOGY</span>
+    <div style={{ textAlign: 'center', marginBottom: '8px', borderBottom: '1.5px solid #111827', paddingBottom: '6px' }}>
+      <span style={{ fontSize: '16px', fontWeight: 900, letterSpacing: '0.05em', color: '#111827' }}>CASTLES</span>{' '}
+      <span style={{ fontSize: '16px', fontWeight: 300, letterSpacing: '0.15em', color: '#111827' }}>TECHNOLOGY</span>
     </div>
   )
 }
 
-/** Étiquette zone A3F : Box / Customer, quantité globale, table N°/Model/P-N/S-N/Barcode (P/N par ligne) */
 function EtiquetteA3F({ detail }: { detail: MasterBoxDetail }) {
   return (
-    <div className="label-paper" style={{ maxWidth: '520px', marginBottom: '32px' }}>
+    <div className="label-paper" style={{ marginBottom: '16px' }}>
       <CastlesLogo />
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 700, marginBottom: '6px' }}>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
         <span>Box : {numeroBox(detail.numero)}</span>
         <span>Customer : {detail.clientValeur || '—'}</span>
       </div>
-      <div style={{ textAlign: 'center', fontSize: '20px', fontWeight: 800, margin: '12px 0' }}>
+
+      <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 800, margin: '6px 0' }}>
         QUANTITY : {detail.quantite}
       </div>
-      <div style={sectionTitre}>Serial Number</div>
-      <table className="table">
+
+      <div style={SEP}>Serial Number</div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '16%' }} />
+          <col style={{ width: '19%' }} />
+          <col style={{ width: '22%' }} />
+          <col style={{ width: '37%' }} />
+        </colgroup>
         <thead>
-          <tr>
-            <th>N°</th><th>MODEL</th><th>P/N</th><th>S/N</th><th>BARCODE</th>
+          <tr style={{ background: '#f3f4f6', borderBottom: '1px solid #9ca3af' }}>
+            <th style={TH}>N°</th><th style={TH}>MODEL</th><th style={TH}>P/N</th><th style={TH}>S/N</th><th style={TH}>BARCODE</th>
           </tr>
         </thead>
         <tbody>
           {detail.articles.map((a, i) => (
-            <tr key={a.inventaireId}>
-              <td style={{ textAlign: 'center' }}>{i + 1}</td>
-              <td>{a.modelValeur || '—'}</td>
-              <td>{a.pnValeur || '—'}</td>
-              <td style={{ fontFamily: 'monospace' }}>{a.sn || '—'}</td>
-              <td><span className="barcode">*{a.sn || '—'}*</span></td>
+            <tr key={a.inventaireId} style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <td style={TD}>{i + 1}</td>
+              <td style={{ ...TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.modelValeur || '—'}</td>
+              <td style={{ ...TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.pnValeur || '—'}</td>
+              <td style={{ ...TD, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.sn || '—'}</td>
+              <td style={{ ...TD, overflow: 'hidden', whiteSpace: 'nowrap', padding: '1px 2px' }}>
+                <span className="barcode" style={{ fontSize: '13px', verticalAlign: 'middle' }}>*{a.sn || '—'}*</span>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -337,43 +384,55 @@ function EtiquetteA3F({ detail }: { detail: MasterBoxDetail }) {
   )
 }
 
-/** Étiquette zone Adyen : Box, Part Number unique + RMA_xxx, quantité, table N°/Model/S-N/Barcode (sans P/N) */
 function EtiquetteAdyen({ detail }: { detail: MasterBoxDetail }) {
   const rma = detail.groupes[0]?.rmaValeur || ''
   return (
-    <div className="label-paper" style={{ maxWidth: '520px', marginBottom: '32px' }}>
+    <div className="label-paper" style={{ marginBottom: '16px' }}>
       <CastlesLogo />
-      <div style={{ fontSize: '14px', fontWeight: 700, marginBottom: '6px' }}>
+
+      <div style={{ fontSize: '11px', fontWeight: 700, marginBottom: '4px' }}>
         Box : {numeroBox(detail.numero)}
       </div>
-      <div style={sectionTitre}>Part Number</div>
+
+      <div style={SEP}>Part Number</div>
       {detail.groupes.map((g, i) => (
-        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
-          <span>{g.modelValeur || '—'}</span>
-          <span>{g.pnValeur || '—'}</span>
-          <span className="barcode">*{g.pnValeur || '—'}*</span>
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', fontWeight: 700, marginBottom: '4px' }}>
+          <span style={{ flexShrink: 0 }}>{g.modelValeur || '—'}</span>
+          <span style={{ flexShrink: 0 }}>{g.pnValeur || '—'}</span>
+          <div style={{ display: 'flex', alignItems: 'center' }}><span className="barcode" style={{ fontSize: '22px' }}>*{g.pnValeur || '—'}*</span></div>
         </div>
       ))}
-      <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 800, margin: '10px 0' }}>
+
+      <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: 800, margin: '5px 0' }}>
         RMA_{rma || '—'}
       </div>
-      <div style={{ textAlign: 'center', fontSize: '20px', fontWeight: 800, margin: '12px 0' }}>
+      <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 800, margin: '5px 0' }}>
         QUANTITY : {detail.quantite}
       </div>
-      <div style={sectionTitre}>Serial Number</div>
-      <table className="table">
+
+      <div style={SEP}>Serial Number</div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '18%' }} />
+          <col style={{ width: '25%' }} />
+          <col style={{ width: '50%' }} />
+        </colgroup>
         <thead>
-          <tr>
-            <th>N°</th><th>MODEL</th><th>S/N</th><th>BARCODE</th>
+          <tr style={{ background: '#f3f4f6', borderBottom: '1px solid #9ca3af' }}>
+            <th style={TH}>N°</th><th style={TH}>MODEL</th><th style={TH}>S/N</th><th style={TH}>BARCODE</th>
           </tr>
         </thead>
         <tbody>
           {detail.articles.map((a, i) => (
-            <tr key={a.inventaireId}>
-              <td style={{ textAlign: 'center' }}>{i + 1}</td>
-              <td>{a.modelValeur || '—'}</td>
-              <td style={{ fontFamily: 'monospace' }}>{a.sn || '—'}</td>
-              <td><span className="barcode">*{a.sn || '—'}*</span></td>
+            <tr key={a.inventaireId} style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <td style={TD}>{i + 1}</td>
+              <td style={{ ...TD, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.modelValeur || '—'}</td>
+              <td style={{ ...TD, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.sn || '—'}</td>
+              <td style={{ ...TD, overflow: 'hidden', whiteSpace: 'nowrap', padding: '1px 2px' }}>
+                <span className="barcode" style={{ fontSize: '13px', verticalAlign: 'middle' }}>*{a.sn || '—'}*</span>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -391,7 +450,13 @@ function MasterBoxImpression({ detail, onFermer }: { detail: MasterBoxDetail; on
           <ArrowLeft size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
           Retour
         </button>
-        <button className="btn btn-primary" onClick={() => window.print()}>
+        <button className="btn btn-primary" onClick={() => {
+          const style = document.createElement('style')
+          style.textContent = '@page { size: 10.5cm 15cm; margin: 0mm; }'
+          document.head.appendChild(style)
+          window.print()
+          setTimeout(() => document.head.removeChild(style), 1000)
+        }}>
           <Printer size={15} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
           Imprimer
         </button>
@@ -660,7 +725,7 @@ function EnvoiTab() {
       return pl.valeurs?.find((v: any) => v.champId === champ.id)?.valeur ?? ''
     }
     return {
-      nom: val('NOM'),
+      nom: val('SOCIETE'),
       adresse: val('ADRESSE'),
       codePostal: val('CODE_POSTALE'),
       ville: val('VILLE'),
@@ -729,8 +794,10 @@ function EnvoiTab() {
       const numeroBL = bonLivraison.trim() || blParClient[client.clientValeur]?.numero || undefined
       const res = await post<{ ok: boolean; nbBoxes: number; nbArticles: number }>(`/expeditions/${siteId}/masterbox/envoyer`, {
         clientValeur,
-        bonEnvoi: bonEnvoi.trim() || undefined,
-        bonLivraison: numeroBL
+        bonEnvoi:     bonEnvoi.trim() || undefined,
+        bonLivraison: numeroBL,
+        btEnvoi:      bonEnvoi.trim() || undefined,
+        plateformeId: plateformeSelectionnee || undefined,
       })
       setSucces(`${res.nbArticles} article(s) expédié(s) dans ${res.nbBoxes} Master Box pour ${client.clientValeur}`)
       setConfirmEnvoi(null)
@@ -1052,7 +1119,7 @@ function EnvoiTab() {
                     >
                       <option value="">— Choisir une plateforme —</option>
                       {plateformes.map(pl => {
-                        const champNom = champsPlateforme.find((c: any) => c.code.toUpperCase() === 'NOM')
+                        const champNom = champsPlateforme.find((c: any) => c.code.toUpperCase() === 'SOCIETE')
                         const nom = champNom ? pl.valeurs?.find((v: any) => v.champId === champNom.id)?.valeur ?? `Plateforme #${pl.id}` : `Plateforme #${pl.id}`
                         return <option key={pl.id} value={pl.id}>{nom}</option>
                       })}

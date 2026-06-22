@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
-import { logActivite } from '../utils/historique'
+import { logActivite, computeResultat } from '../utils/historique'
 import { hasRole } from '../utils/roles'
 
 const prisma = new PrismaClient()
@@ -129,8 +129,12 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
         ? tousStatuts.find(s => hasRole(s.roles, 'estMajInjection')) ?? null
         : null
 
-    // Pour retour en réparation
-    const statutRetour = tousStatuts.find(s => hasRole(s.roles, 'estRepare')) ?? null
+    // Pour retour ATT REP
+    const statutRetour = tousStatuts.find(s => hasRole(s.roles, 'estAttenteReparation')) ?? null
+
+    // Statuts attente info
+    const { ATTENTE_ROLES } = await import('./attenteInfo')
+    const statutsAttenteInfo = tousStatuts.filter(s => ATTENTE_ROLES.some(r => hasRole(s.roles, r)))
 
     res.json({
       id:                 inv.id,
@@ -140,12 +144,12 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
       customer:           inv.customer           ?? '',
       livelloRiparazione: inv.livelloRiparazione ?? '',
       statut:             inv.statut ? { ...inv.statut, roles: inv.statut.roles } : null,
-      pieces:             inv.pieces,
       historique,
       estRepare,
       estMaj,
       statutCible,
       statutRetour,
+      statutsAttenteInfo,
     })
   } catch (e) { next(e) }
 }
@@ -191,7 +195,8 @@ export async function validerMajInjection(req: Request, res: Response, next: any
     const labelSource = inv.statut?.label ?? '?'
     await logActivite({
       siteId, userId: userId ?? undefined, type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inventaireId,
-      details: { label: `${labelSource} → ${statutCible.label}`, couleur: statutCible.couleur }
+      details: { label: `${labelSource} → ${statutCible.label}`, couleur: statutCible.couleur, statutAvant: labelSource, statutApres: statutCible.label },
+      resultat: await computeResultat(inventaireId, inv.statut?.ordre ?? 0, statutCible.ordre, statutCible.label)
     })
 
     res.json({ success: true, statut: statutCible, etape: estRepare ? 'maj' : 'injection' })
@@ -204,11 +209,11 @@ export async function changerStatut(req: Request, res: Response, next: any) {
   try {
     const siteId       = Number(req.params.siteId)
     const inventaireId = Number(req.params.id)
-    const { statutId } = req.body
+    const { statutCode } = req.body
     const userId = req.user?.id ?? null
 
     const [statut, invActuel] = await Promise.all([
-      prisma.statut.findUnique({ where: { id: Number(statutId) } }),
+      prisma.statut.findUnique({ where: { siteId_code: { siteId, code: statutCode } } }),
       prisma.inventaire.findUnique({ where: { id: inventaireId }, include: { statut: true } })
     ])
     if (!statut) return res.status(404).json({ error: 'Statut introuvable' })
@@ -218,7 +223,8 @@ export async function changerStatut(req: Request, res: Response, next: any) {
 
     await logActivite({
       siteId, userId: userId ?? undefined, type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inventaireId,
-      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur }
+      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur, statutAvant: labelSource, statutApres: statut.label },
+      resultat: await computeResultat(inventaireId, invActuel?.statut?.ordre ?? 0, statut.ordre, statut.label)
     })
 
     res.json({ success: true, statut })

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { ShieldCheck, ChevronRight, Clock, X, Check, Search, AlertCircle } from 'lucide-react'
-import { get, put } from '../api/client'
+import { ShieldCheck, ChevronRight, Clock, X, Check, Search, AlertCircle, ChevronDown, RotateCcw } from 'lucide-react'
+import { get, put, post } from '../api/client'
 import { getSiteId } from '../utils/permissions'
+import ModalHistorique from '../components/ModalHistorique'
 
 interface RmaGroupe {
   rma: string
@@ -47,9 +48,12 @@ interface DetailInventaire {
   niveauRep: string
   statut: StatutInfo | null
   historique: HistoriqueItem[]
-  statutControleOk: StatutInfo | null
-  statutAttenteRep: StatutInfo | null
-  statutRepare: StatutInfo | null
+  statutControleOk:  StatutInfo | null
+  statutAttenteRep:  StatutInfo | null
+  statutRepare:      StatutInfo | null
+  statutMaj:         StatutInfo | null
+  statutInjection:   StatutInfo | null
+  statutsAttenteInfo: StatutInfo[]
 }
 
 function BadgeStatut({ statut }: { statut: { label: string; couleur: string } | null }) {
@@ -78,8 +82,23 @@ function ModalControle({
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState('')
   const [actionEnCours, setActionEnCours] = useState(false)
+  const [retourDropdown, setRetourDropdown] = useState(false)
+  const [attenteEnCours, setAttenteEnCours] = useState<StatutInfo | null>(null)
+  const [commentaireAttente, setCommentaireAttente] = useState('')
+  const [attenteDropdown, setAttenteDropdown] = useState(false)
+  const retourRef = useRef<HTMLDivElement>(null)
+  const attenteRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { chargerDetail() }, [inventaireId])
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (retourRef.current && !retourRef.current.contains(e.target as Node)) setRetourDropdown(false)
+      if (attenteRef.current && !attenteRef.current.contains(e.target as Node)) { setAttenteDropdown(false); setAttenteEnCours(null); setCommentaireAttente('') }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   async function chargerDetail() {
     setChargement(true)
@@ -114,25 +133,112 @@ function ModalControle({
     }
   }
 
+  async function confirmerAttente() {
+    if (!attenteEnCours || !commentaireAttente.trim()) return
+    setActionEnCours(true)
+    setErreur('')
+    try {
+      await post(`/production/reparation/${siteId}/inventaire/${inventaireId}/attente`, { statutCode: attenteEnCours.code, commentaire: commentaireAttente.trim() })
+      onStatutChange()
+      onClose()
+    } catch (e: any) {
+      setErreur(e?.message ?? 'Erreur lors de l\'envoi en attente')
+      setActionEnCours(false)
+    }
+  }
+
   function formatDate(d: string) {
     return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div style={{
-        background: '#1a1d27', borderRadius: '12px', width: '780px', maxWidth: '95vw',
-        maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+        background: '#13161f', borderRadius: '14px', width: '780px', maxWidth: '95vw',
+        maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        border: '1px solid #1f2937', boxShadow: '0 24px 64px rgba(0,0,0,0.6)'
       }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #1f2937', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <ShieldCheck size={18} style={{ color: '#10b981' }} />
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#f1f5f9' }}>Contrôle qualité</span>
-            {detail && <span style={{ fontSize: '13px', color: '#6b7280' }}>— {detail.sn || detail.pn || `#${inventaireId}`}</span>}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #1f2937', display: 'flex', alignItems: 'center', gap: '12px', background: '#0f1117' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+            <div style={{ background: '#10b9811a', borderRadius: '8px', padding: '6px', flexShrink: 0 }}>
+              <ShieldCheck size={16} style={{ color: '#10b981', display: 'block' }} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9' }}>Contrôle qualité</div>
+              {detail && <div style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace' }}>{detail.sn || detail.pn || `#${inventaireId}`}</div>}
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
-            <X size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+
+            {/* Dropdown Attente info */}
+            {detail && detail.statutsAttenteInfo.length > 0 && (
+              <div ref={attenteRef} style={{ position: 'relative' }}>
+                <button onClick={() => { setAttenteDropdown(o => !o); if (attenteEnCours) { setAttenteEnCours(null); setCommentaireAttente('') } }} disabled={actionEnCours} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', background: attenteDropdown ? '#1f2937' : '#141720', border: '1px solid #374151', color: '#9ca3af', fontSize: '13px', fontWeight: 600 }}>
+                  <Clock size={14} /> Attente info <ChevronDown size={13} style={{ transform: attenteDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
+                {attenteDropdown && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50, background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', minWidth: '260px', overflow: 'hidden' }}>
+                    {attenteEnCours ? (
+                      <div style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                          <button onClick={() => { setAttenteEnCours(null); setCommentaireAttente('') }} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}><ChevronDown size={14} style={{ transform: 'rotate(90deg)' }} /></button>
+                          <span style={{ background: attenteEnCours.couleur + '1F', color: attenteEnCours.couleur, border: `1px solid ${attenteEnCours.couleur}33`, padding: '3px 10px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>{attenteEnCours.label}</span>
+                        </div>
+                        <textarea className="form-input" rows={3} placeholder="Commentaire obligatoire…" value={commentaireAttente} onChange={e => setCommentaireAttente(e.target.value)} autoFocus style={{ width: '100%', resize: 'vertical', fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }} />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="btn btn-primary" style={{ flex: 1, fontSize: '12px', padding: '7px', justifyContent: 'center', opacity: !commentaireAttente.trim() || actionEnCours ? 0.5 : 1 }} disabled={!commentaireAttente.trim() || actionEnCours} onClick={confirmerAttente}><Check size={13} /> Confirmer</button>
+                          <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '7px 12px' }} onClick={() => { setAttenteDropdown(false); setAttenteEnCours(null); setCommentaireAttente('') }}>Annuler</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '6px' }}>
+                        <div style={{ padding: '6px 10px 4px', fontSize: '10px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Choisir le type d'attente</div>
+                        {detail.statutsAttenteInfo.map(s => (
+                          <button key={s.code} onClick={() => setAttenteEnCours(s)} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', borderRadius: '6px', padding: '8px 10px', cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = s.couleur + '15' }} onMouseLeave={e => { e.currentTarget.style.background = 'none' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.couleur, flexShrink: 0 }} />
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: s.couleur }}>{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Dropdown Retour */}
+            {detail && (detail.statutAttenteRep || detail.statutMaj || detail.statutInjection) && (
+              <div ref={retourRef} style={{ position: 'relative' }}>
+                <button onClick={() => setRetourDropdown(o => !o)} disabled={actionEnCours} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', background: retourDropdown ? '#1f2937' : '#141720', border: '1px solid #374151', color: '#f59e0b', fontSize: '13px', fontWeight: 600 }}>
+                  <RotateCcw size={14} /> Retour <ChevronDown size={13} style={{ transform: retourDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </button>
+                {retourDropdown && (
+                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50, background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', minWidth: '200px', padding: '6px', overflow: 'hidden' }}>
+                    <div style={{ padding: '6px 10px 4px', fontSize: '10px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Renvoyer vers</div>
+                    {detail.statutAttenteRep && (
+                      <button onClick={() => { setRetourDropdown(false); changerStatut(detail.statutAttenteRep!.code) }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', borderRadius: '6px', padding: '8px 10px', cursor: 'pointer', color: '#f59e0b', fontSize: '13px', fontWeight: 600 }} onMouseEnter={e => { e.currentTarget.style.background = '#f59e0b15' }} onMouseLeave={e => { e.currentTarget.style.background = 'none' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} /> Réparation (ATT REP)
+                      </button>
+                    )}
+                    {detail.statutMaj && (
+                      <button onClick={() => { setRetourDropdown(false); changerStatut(detail.statutMaj!.code) }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', borderRadius: '6px', padding: '8px 10px', cursor: 'pointer', color: '#a78bfa', fontSize: '13px', fontWeight: 600 }} onMouseEnter={e => { e.currentTarget.style.background = '#a78bfa15' }} onMouseLeave={e => { e.currentTarget.style.background = 'none' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#a78bfa', flexShrink: 0 }} /> MAJ
+                      </button>
+                    )}
+                    {detail.statutInjection && (
+                      <button onClick={() => { setRetourDropdown(false); changerStatut(detail.statutInjection!.code) }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', borderRadius: '6px', padding: '8px 10px', cursor: 'pointer', color: '#06b6d4', fontSize: '13px', fontWeight: 600 }} onMouseEnter={e => { e.currentTarget.style.background = '#06b6d415' }} onMouseLeave={e => { e.currentTarget.style.background = 'none' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#06b6d4', flexShrink: 0 }} /> Injection
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button onClick={onClose} style={{ background: '#1f2937', border: 'none', borderRadius: '6px', color: '#9ca3af', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {chargement ? (
@@ -176,64 +282,28 @@ function ModalControle({
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {detail.statutControleOk ? (
-                  <button
-                    onClick={valider}
-                    disabled={actionEnCours}
-                    style={{
-                      width: '100%', padding: '12px', borderRadius: '8px', cursor: 'pointer',
-                      background: detail.statutControleOk.couleur, color: '#fff', border: 'none',
-                      fontSize: '14px', fontWeight: 700, letterSpacing: '0.03em',
-                      boxShadow: `0 0 12px ${detail.statutControleOk.couleur}55`,
-                      opacity: actionEnCours ? 0.6 : 1, transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.15)' }}
-                    onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
-                  >
-                    <Check size={15} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
-                    Contrôle qualité OK
-                  </button>
-                ) : (
-                  <div style={{ padding: '12px', borderRadius: '8px', background: '#1f2937', color: '#6b7280', fontSize: '13px', textAlign: 'center' }}>
-                    Statut CONTROLE OK non configuré dans le workflow.
-                  </div>
-                )}
-
-                {detail.statutRepare && (
-                  <button
-                    onClick={() => changerStatut(detail.statutRepare!.code)}
-                    disabled={actionEnCours}
-                    style={{
-                      width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer',
-                      background: 'transparent', color: '#3b82f6',
-                      border: '1px solid #3b82f655', fontSize: '13px', fontWeight: 600,
-                      opacity: actionEnCours ? 0.6 : 1, transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#3b82f615' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                  >
-                    ↩ Retour MAJ / Injection
-                  </button>
-                )}
-
-                {detail.statutAttenteRep && (
-                  <button
-                    onClick={() => changerStatut(detail.statutAttenteRep!.code)}
-                    disabled={actionEnCours}
-                    style={{
-                      width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer',
-                      background: 'transparent', color: '#f59e0b',
-                      border: '1px solid #f59e0b55', fontSize: '13px', fontWeight: 600,
-                      opacity: actionEnCours ? 0.6 : 1, transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f59e0b15' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                  >
-                    ↩ Retour technicien
-                  </button>
-                )}
-              </div>
+              {detail.statutControleOk ? (
+                <button
+                  onClick={valider}
+                  disabled={actionEnCours}
+                  style={{
+                    width: '100%', padding: '12px', borderRadius: '8px', cursor: 'pointer',
+                    background: detail.statutControleOk.couleur, color: '#fff', border: 'none',
+                    fontSize: '14px', fontWeight: 700, letterSpacing: '0.03em',
+                    boxShadow: `0 0 12px ${detail.statutControleOk.couleur}55`,
+                    opacity: actionEnCours ? 0.6 : 1, transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.15)' }}
+                  onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
+                >
+                  <Check size={15} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
+                  Contrôle qualité OK
+                </button>
+              ) : (
+                <div style={{ padding: '12px', borderRadius: '8px', background: '#1f2937', color: '#6b7280', fontSize: '13px', textAlign: 'center' }}>
+                  Statut CQ (rôle estControleQualite) non configuré dans le workflow.
+                </div>
+              )}
             </div>
 
             <div className="card" style={{ padding: '16px' }}>
@@ -289,6 +359,7 @@ export default function ControleQualite() {
   const [scanSN, setScanSN] = useState('')
   const [erreurScan, setErreurScan] = useState('')
   const [inventaireModalId, setInventaireModalId] = useState<number | null>(null)
+  const [historiqueModal, setHistoriqueModal] = useState<{ id: number; sn: string } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { chargerRmaList() }, [siteId])
@@ -443,6 +514,7 @@ export default function ControleQualite() {
                     <tr
                       key={inv.id}
                       onClick={() => setInventaireModalId(inv.id)}
+                      onDoubleClick={e => { e.stopPropagation(); setInventaireModalId(null); setHistoriqueModal({ id: inv.id, sn: inv.sn || inv.pn || `#${inv.id}` }) }}
                       style={{ cursor: 'pointer' }}
                       onMouseEnter={e => { e.currentTarget.style.background = '#0f1117' }}
                       onMouseLeave={e => { e.currentTarget.style.background = '' }}
@@ -471,6 +543,13 @@ export default function ControleQualite() {
           siteId={siteId}
           onClose={() => setInventaireModalId(null)}
           onStatutChange={onStatutChange}
+        />
+      )}
+      {historiqueModal && (
+        <ModalHistorique
+          inventaireId={historiqueModal.id}
+          titre={`Historique — ${historiqueModal.sn}`}
+          onClose={() => setHistoriqueModal(null)}
         />
       )}
     </div>

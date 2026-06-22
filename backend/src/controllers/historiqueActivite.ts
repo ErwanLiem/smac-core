@@ -8,16 +8,42 @@ const PAGE_SIZE = 50
 export async function getHistorique(req: Request, res: Response, next: any) {
   try {
     const siteId = Number(req.params.siteId)
-    const { type, entite, userId, dateDebut, dateFin, page = '1' } = req.query
+    const { type, entite, intervenant, dateDebut, dateFin, page = '1', sn, rma } = req.query
 
     const where: any = { siteId }
-    if (type)      where.type    = String(type)
-    if (entite)    where.entite  = String(entite)
-    if (userId)    where.userId  = Number(userId)
+    if (type)   where.type   = { contains: String(type) }
+    if (entite) where.entite = { contains: String(entite) }
     if (dateDebut || dateFin) {
       where.createdAt = {}
       if (dateDebut) where.createdAt.gte = new Date(String(dateDebut))
       if (dateFin)   where.createdAt.lte = new Date(String(dateFin) + 'T23:59:59')
+    }
+
+    // Filtre intervenant : chercher les userId correspondants
+    if (intervenant) {
+      const term = String(intervenant)
+      const matchingUsers = await prisma.utilisateur.findMany({
+        where: {
+          siteId,
+          OR: [
+            { nom:    { contains: term } },
+            { prenom: { contains: term } },
+            { login:  { contains: term } },
+          ]
+        },
+        select: { id: true }
+      })
+      where.userId = { in: matchingUsers.map(u => u.id) }
+    }
+
+    // Filtres SN / RMA : trouver les inventaireIds correspondants
+    if (sn || rma) {
+      const invFilter: any = { siteId }
+      if (sn)  invFilter.serialNumber = { contains: String(sn) }
+      if (rma) invFilter.rma          = { contains: String(rma) }
+      const invIds = (await prisma.inventaire.findMany({ where: invFilter, select: { id: true } })).map(i => i.id)
+      where.entite   = 'inventaire'
+      where.entiteId = { in: invIds }
     }
 
     const skip = (Number(page) - 1) * PAGE_SIZE
@@ -41,14 +67,16 @@ export async function getHistorique(req: Request, res: Response, next: any) {
 
     // Résoudre le SN pour les lignes entite=inventaire via colonne fixe
     const invIds = [...new Set(lignes.filter(l => l.entite === 'inventaire' && l.entiteId).map(l => l.entiteId!))]
-    const snMap: Record<number, string> = {}
+    const snMap:  Record<number, string> = {}
+    const rmaMap: Record<number, string> = {}
     if (invIds.length) {
       const inventaires = await prisma.inventaire.findMany({
         where: { id: { in: invIds } },
-        select: { id: true, serialNumber: true }
+        select: { id: true, serialNumber: true, rma: true }
       })
       for (const inv of inventaires) {
-        if (inv.serialNumber) snMap[inv.id] = inv.serialNumber
+        if (inv.serialNumber) snMap[inv.id]  = inv.serialNumber
+        if (inv.rma)          rmaMap[inv.id] = inv.rma
       }
     }
 
@@ -60,13 +88,15 @@ export async function getHistorique(req: Request, res: Response, next: any) {
         type:        l.type,
         entite:      l.entite,
         entiteId:    l.entiteId,
-        sn:          l.entite === 'inventaire' && l.entiteId ? (snMap[l.entiteId] ?? null) : null,
+        sn:          l.entite === 'inventaire' && l.entiteId ? (snMap[l.entiteId]  ?? null) : null,
+        rma:         l.entite === 'inventaire' && l.entiteId ? (rmaMap[l.entiteId] ?? null) : null,
         label:       details.label ?? null,
         couleur:     details.couleur ?? '#6b7280',
         commentaire: details.commentaire ?? null,
         createdAt:   l.createdAt,
         intervenant: u ? `${u.prenom} ${u.nom}` : null,
         login:       u?.login ?? null,
+        resultat:    l.resultat ?? null,
       }
     })
 

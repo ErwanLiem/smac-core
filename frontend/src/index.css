@@ -362,19 +362,32 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); cur
   letter-spacing: 1px;
 }
 
-/* Aperçu "papier" (étiquette / liste imprimable) : fond blanc, texte sombre, même à l'écran */
+/* Aperçu "papier" (étiquette Master Box : 10.5 × 15 cm) */
 .label-paper {
   background: #ffffff;
   color: #111827;
   border: 1px solid #d1d5db;
   border-radius: 4px;
-  padding: 16px 20px;
+  width: 10.5cm;
+  min-height: 15cm;
+  padding: 3mm;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 .label-paper .barcode { color: #111827; }
 .label-paper table.table { color: #111827; border: 1px solid #9ca3af; }
 .label-paper table.table th { background: #f3f4f6; color: #374151; border: 1px solid #9ca3af; text-align: center; }
 .label-paper table.table td { color: #111827; border: 1px solid #d1d5db; }
 .label-paper table.table tbody tr:hover td { background: transparent; color: #111827; }
+
 @media print {
-  .label-paper { border: none; }
+  .label-paper {
+    border: none;
+    border-radius: 0;
+    width: 10.5cm;
+    height: 15cm;
+    page-break-after: always;
+    margin: 0;
+    padding: 2mm;
+  }
 }

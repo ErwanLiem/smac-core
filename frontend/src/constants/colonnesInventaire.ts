@@ -35,6 +35,8 @@ export const COLONNES_INVENTAIRE: ColonneInventaire[] = [
   { key: 'dateSHP',            label: 'Date SHP',           type: 'date' },
   { key: 'bt',                 label: 'BT',                 type: 'text',  receptionSN: true },
   { key: 'caisse',             label: 'Caisse',             type: 'text',  receptionSN: true },
+  { key: 'btEnvoi',            label: 'BT Envoi',           type: 'text' },
+  { key: 'plateformeEnvoi',    label: 'Plateforme Envoi',   type: 'text' },
   { key: 'emplacementNom',    label: 'Emplacement',        type: 'text' },
   { key: 'genericNotes',      label: 'Notes génériques',   type: 'text',  receptionSN: true },
   { key: 'livelloRiparazione', label: 'Niveau réparation',  type: 'text' },

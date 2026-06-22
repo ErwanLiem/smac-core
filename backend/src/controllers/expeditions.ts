@@ -9,34 +9,25 @@ const prisma = new PrismaClient()
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Trouve le statut "Contrôle qualité" (rôle estControleQualite ou CONTROL) et la
- * transition de sortie associée vers "Emballé".
- */
-async function getTransitionEmballage(siteId: number) {
-  const statuts = await prisma.statut.findMany({ where: { siteId } })
-  const statutControle = statuts.find(s => hasRole(s.roles, 'estControleQualite') || hasRole(s.roles, 'CONTROL'))
-  if (!statutControle) return null
-
-  const transition = await prisma.transition.findFirst({
-    where: { siteId, statutFromId: statutControle.id },
-    include: { statutTo: true },
-    orderBy: { ordre: 'asc' }
-  })
-  return transition ? { statutControle, transition } : null
+async function getStatuts(siteId: number) {
+  return prisma.statut.findMany({ where: { siteId } })
 }
 
-async function getTransitionExpedition(siteId: number) {
-  const emballage = await getTransitionEmballage(siteId)
-  if (!emballage) return null
-  const statutEmballeId = emballage.transition.statutToId
+function getDesignationByChampId(inv: { article?: { valeurs: { valeur: string | null; champId: number }[] } | null }, champId: number | undefined): string {
+  if (!champId) return ''
+  return inv.article?.valeurs.find(v => v.champId === champId)?.valeur ?? ''
+}
 
-  const transition = await prisma.transition.findFirst({
-    where: { siteId, statutFromId: statutEmballeId },
-    include: { statutTo: true },
-    orderBy: { ordre: 'asc' }
-  })
-  return transition ? { statutEmballeId, transition } : null
+async function getStatutEmballage(siteId: number) {
+  const statuts = await getStatuts(siteId)
+  const statutControle = statuts.find(s => hasRole(s.roles, 'estControleQualite')) ?? null
+  const statutEmballage = statuts.find(s => hasRole(s.roles, 'estEmballage')) ?? null
+  return { statutControle, statutEmballage }
+}
+
+async function getStatutFinal(siteId: number) {
+  const statuts = await getStatuts(siteId)
+  return statuts.find(s => hasRole(s.roles, 'estFinal')) ?? null
 }
 
 async function genererNumeroMasterBox(siteId: number, clientValeur: string | null): Promise<string> {
@@ -101,7 +92,7 @@ export async function scanEmballage(req: Request, res: Response, next: any) {
 
     const inv = await prisma.inventaire.findFirst({
       where: { siteId, serialNumber: sn },
-      include: { statut: true }
+      include: { statut: true, article: { include: { valeurs: { include: { champ: true } } } } }
     })
 
     if (!inv) return res.status(404).json({ error: `S/N ${sn} introuvable en inventaire` })
@@ -114,15 +105,15 @@ export async function scanEmballage(req: Request, res: Response, next: any) {
       })
     }
 
-    const result = await getTransitionEmballage(siteId)
-    if (!result) {
-      return res.status(400).json({ error: 'Aucune transition "Emballage" configurée depuis le statut "Contrôle qualité" (Configuration → Workflow)' })
+    const { statutEmballage } = await getStatutEmballage(siteId)
+    if (!statutEmballage) {
+      return res.status(400).json({ error: 'Aucun statut "Emballage" (rôle estEmballage) configuré dans le workflow.' })
     }
 
     const today = new Date()
     await prisma.inventaire.update({
       where: { id: inv.id },
-      data: { statutId: result.transition.statutToId, datePack: today, dateCls: today }
+      data: { statutId: statutEmballage.id, datePack: today, dateCls: today }
     })
 
     await enregistrerOperation({
@@ -138,9 +129,9 @@ export async function scanEmballage(req: Request, res: Response, next: any) {
       sn,
       pnValeur: inv.partNumber ?? '',
       rmaValeur: inv.rma ?? '',
-      designationValeur: inv.productFamily ?? '',
+      designationValeur: inv.article?.valeurs.find((v: any) => normCode(v.champ?.code ?? '') === 'DESIGNATION')?.valeur ?? '',
       clientValeur: inv.customer ?? '',
-      statut: result.transition.statutTo.label
+      statut: statutEmballage.label
     })
   } catch (e) { next(e) }
 }
@@ -151,14 +142,18 @@ export async function getEmballages(req: Request, res: Response, next: any) {
   try {
     const siteId = Number(req.params.siteId)
 
-    const result = await getTransitionEmballage(siteId)
-    if (!result) return res.json([])
-    const statutEmballeId = result.transition.statutToId
+    const { statutEmballage } = await getStatutEmballage(siteId)
+    if (!statutEmballage) return res.json([])
 
-    const inventaires = await prisma.inventaire.findMany({
-      where: { siteId, statutId: statutEmballeId, ligneMasterBox: { is: null } },
-      orderBy: { updatedAt: 'desc' }
-    })
+    const [inventaires, champsArticleEmb] = await Promise.all([
+      prisma.inventaire.findMany({
+        where: { siteId, statutId: statutEmballage.id, ligneMasterBox: { is: null } },
+        include: { article: { include: { valeurs: true } } },
+        orderBy: { updatedAt: 'desc' }
+      }),
+      prisma.champArticle.findMany({ where: { siteId } })
+    ])
+    const champDesigEmb = champsArticleEmb.find(c => normCode(c.code) === 'DESIGNATION')
 
     const groupes = new Map<string, {
       pnValeur: string; rmaValeur: string; designationValeur: string; clientValeur: string
@@ -168,7 +163,7 @@ export async function getEmballages(req: Request, res: Response, next: any) {
     for (const inv of inventaires) {
       const pnVal     = inv.partNumber    ?? ''
       const rmaVal    = inv.rma           ?? ''
-      const desigVal  = inv.productFamily ?? ''
+      const desigVal  = getDesignationByChampId(inv, champDesigEmb?.id)
       const clientVal = inv.customer      ?? ''
       const snVal     = inv.serialNumber  ?? ''
       const key = `${pnVal}__${rmaVal}`
@@ -199,20 +194,19 @@ export async function scanMasterBox(req: Request, res: Response, next: any) {
     const sn = String(req.body?.sn ?? '').trim()
     if (!sn) return res.status(400).json({ error: 'S/N requis' })
 
-    const result = await getTransitionEmballage(siteId)
-    if (!result) {
-      return res.status(400).json({ error: 'Aucune transition "Emballage" configurée (Configuration → Workflow)' })
+    const { statutEmballage } = await getStatutEmballage(siteId)
+    if (!statutEmballage) {
+      return res.status(400).json({ error: 'Aucun statut "Emballage" (rôle estEmballage) configuré dans le workflow.' })
     }
-    const statutEmballeId = result.transition.statutToId
 
     const inv = await prisma.inventaire.findFirst({
       where: { siteId, serialNumber: sn },
-      include: { statut: true, ligneMasterBox: true }
+      include: { statut: true, ligneMasterBox: true, article: { include: { valeurs: { include: { champ: true } } } } }
     })
 
     if (!inv) return res.status(404).json({ error: `S/N ${sn} introuvable en inventaire` })
 
-    if (inv.statutId !== statutEmballeId) {
+    if (inv.statutId !== statutEmballage.id) {
       return res.status(400).json({
         error: `Ce S/N n'est pas au statut "Emballé" (statut actuel : ${inv.statut?.label ?? '—'})`,
         statutActuel: inv.statut?.label ?? '—'
@@ -239,7 +233,7 @@ export async function scanMasterBox(req: Request, res: Response, next: any) {
       sn,
       pnValeur,
       rmaValeur,
-      designationValeur: inv.productFamily ?? '',
+      designationValeur: inv.article?.valeurs.find((v: any) => normCode(v.champ?.code ?? '') === 'DESIGNATION')?.valeur ?? '',
       clientValeur,
       masterBox: { id: masterBox.id, numero: masterBox.numero }
     })
@@ -275,11 +269,15 @@ export async function getMasterBoxesEnregistrees(req: Request, res: Response, ne
   try {
     const siteId = Number(req.params.siteId)
 
-    const boxes = await prisma.masterBox.findMany({
-      where: { siteId, statut: 'EN_ATTENTE' },
-      include: { lignes: { include: { inventaire: true } } },
-      orderBy: [{ clientValeur: 'asc' }, { createdAt: 'asc' }]
-    })
+    const [boxes, champsArticleEnr] = await Promise.all([
+      prisma.masterBox.findMany({
+        where: { siteId, statut: 'EN_ATTENTE' },
+        include: { lignes: { include: { inventaire: { include: { article: { include: { valeurs: true } } } } } } },
+        orderBy: [{ clientValeur: 'asc' }, { createdAt: 'asc' }]
+      }),
+      prisma.champArticle.findMany({ where: { siteId } })
+    ])
+    const champDesigEnr = champsArticleEnr.find(c => normCode(c.code) === 'DESIGNATION')
 
     const parClient = new Map<string, {
       clientValeur: string
@@ -300,7 +298,7 @@ export async function getMasterBoxesEnregistrees(req: Request, res: Response, ne
       for (const l of b.lignes) {
         const pnVal    = l.inventaire.partNumber    ?? ''
         const rmaVal   = l.inventaire.rma           ?? ''
-        const desigVal = l.inventaire.productFamily ?? ''
+        const desigVal = getDesignationByChampId(l.inventaire, champDesigEnr?.id)
         const key = `${pnVal}__${rmaVal}`
         if (!g.groupesMap.has(key)) {
           g.groupesMap.set(key, { pnValeur: pnVal, rmaValeur: rmaVal, designationValeur: desigVal, quantite: 0 })
@@ -352,13 +350,25 @@ export async function retirerLigneMasterBox(req: Request, res: Response, next: a
 
 export async function envoyerMasterBoxes(req: Request, res: Response, next: any) {
   try {
-    const siteId = Number(req.params.siteId)
-    const raw = req.body?.clientValeur
+    const siteId       = Number(req.params.siteId)
+    const raw          = req.body?.clientValeur
     const clientValeur = (raw === null || raw === undefined || raw === '') ? null : String(raw)
+    const btEnvoi      = req.body?.btEnvoi      ? String(req.body.btEnvoi)      : null
+    const plateformeId = req.body?.plateformeId ? Number(req.body.plateformeId) : null
 
-    const expedition = await getTransitionExpedition(siteId)
-    if (!expedition) {
-      return res.status(400).json({ error: 'Aucune transition "Expédition" configurée depuis le statut "Emballé" (Configuration → Workflow)' })
+    // Résoudre le nom SOCIETE de la plateforme
+    let plateformeNom: string | null = null
+    if (plateformeId) {
+      const champSociete = await prisma.champPlateforme.findFirst({ where: { siteId, code: 'SOCIETE' } })
+      if (champSociete) {
+        const valeur = await prisma.valeurChampPlateforme.findFirst({ where: { plateformeId, champId: champSociete.id } })
+        plateformeNom = valeur?.valeur ?? null
+      }
+    }
+
+    const statutFinal = await getStatutFinal(siteId)
+    if (!statutFinal) {
+      return res.status(400).json({ error: 'Aucun statut Final (rôle estFinal) configuré dans le workflow.' })
     }
 
     const boxes = await prisma.masterBox.findMany({
@@ -376,7 +386,12 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
       for (const ligne of box.lignes) {
         await prisma.inventaire.update({
           where: { id: ligne.inventaireId },
-          data: { statutId: expedition.transition.statutToId, dateSHP: today }
+          data: {
+            statutId:       statutFinal.id,
+            dateSHP:        today,
+            ...(btEnvoi      ? { btEnvoi }                    : {}),
+            ...(plateformeNom ? { plateformeEnvoi: plateformeNom } : {}),
+          }
         })
         await enregistrerOperation({
           siteId,
@@ -427,22 +442,49 @@ export async function getArticlesMasterBoxEnregistrees(req: Request, res: Respon
     const raw = req.query.clientValeur
     const clientValeur = (raw === undefined || raw === null || raw === '' || raw === 'Sans client') ? null : String(raw)
 
-    const lignes = await prisma.ligneMasterBox.findMany({
-      where: { masterBox: { siteId, statut: 'EN_ATTENTE', clientValeur } },
-      include: { inventaire: { include: { statut: true } } }
-    })
+    const [lignes, champsArticle] = await Promise.all([
+      prisma.ligneMasterBox.findMany({
+        where: { masterBox: { siteId, statut: 'EN_ATTENTE', clientValeur } },
+        include: { inventaire: { include: { statut: true, article: { include: { valeurs: true } } } } }
+      }),
+      prisma.champArticle.findMany({ where: { siteId } })
+    ])
+    const champDesig  = champsArticle.find(c => normCode(c.code) === 'DESIGNATION')
+    const champFamille = champsArticle.find(c => normCode(c.code) === 'FAMILLE')
 
-    const articles = lignes.map(l => ({
-      id: l.inventaire.id,
-      serialNumber:       l.inventaire.serialNumber       ?? '',
-      partNumber:         l.inventaire.partNumber         ?? '',
-      rma:                l.inventaire.rma                ?? '',
-      customer:           l.inventaire.customer           ?? '',
-      productFamily:      l.inventaire.productFamily      ?? '',
-      livelloRiparazione: l.inventaire.livelloRiparazione ?? '',
-      warranty:           l.inventaire.warranty           ?? '',
-      statut: l.inventaire.statut ? { label: l.inventaire.statut.label } : null,
-    }))
+    const fmtDate = (d: Date | null | undefined) => d ? d.toISOString().slice(0, 10) : ''
+
+    const articles = lignes.map(l => {
+      const inv = l.inventaire
+      return {
+        id:                 inv.id,
+        serialNumber:       inv.serialNumber        ?? '',
+        partNumber:         inv.partNumber          ?? '',
+        rma:                inv.rma                 ?? '',
+        customer:           inv.customer            ?? '',
+        designation:        getDesignationByChampId(inv, champDesig?.id),
+        famille:            getDesignationByChampId(inv, champFamille?.id),
+        defectFromCustomer: inv.defectFromCustomer  ?? '',
+        descrCode:          inv.descrCode           ?? '',
+        repaireNotes:       inv.repaireNotes        ?? '',
+        livelloRiparazione: inv.livelloRiparazione  ?? '',
+        warranty:           inv.warranty            ?? '',
+        mercurySn:          inv.mercurySn           ?? '',
+        techLabo:           inv.techLabo            ?? '',
+        dateRic:            fmtDate(inv.dateRic),
+        dateLav:            fmtDate(inv.dateLav),
+        dateMaj:            fmtDate(inv.dateMaj),
+        dateInjection:      fmtDate(inv.dateInjection),
+        dateTest:           fmtDate(inv.dateTest),
+        datePack:           fmtDate(inv.datePack),
+        dateAsp:            fmtDate(inv.dateAsp),
+        dateAsw:            fmtDate(inv.dateAsw),
+        dateEng:            fmtDate(inv.dateEng),
+        datePrv:            fmtDate(inv.datePrv),
+        dateNlv:            fmtDate(inv.dateNlv),
+        statut: inv.statut ? { label: inv.statut.label } : null,
+      }
+    })
 
     res.json({ articles })
   } catch (e) { next(e) }
@@ -455,7 +497,8 @@ export async function getArticlesBL(req: Request, res: Response, next: any) {
     const clientValeur = (raw === undefined || raw === null || raw === '' || raw === 'Sans client') ? null : String(raw)
 
     const champsArticle = await prisma.champArticle.findMany({ where: { siteId } })
-    const champModelArticle = champsArticle.find(c => normCode(c.code) === 'MODEL')
+    const champModelArticle       = champsArticle.find(c => normCode(c.code) === 'FAMILLE')
+    const champDesignationArticle = champsArticle.find(c => normCode(c.code) === 'DESIGNATION')
 
     const lignes = await prisma.ligneMasterBox.findMany({
       where: { masterBox: { siteId, statut: 'EN_ATTENTE', clientValeur } },
@@ -465,7 +508,7 @@ export async function getArticlesBL(req: Request, res: Response, next: any) {
     const articles = lignes.map(l => ({
       sn:          l.inventaire.serialNumber  ?? '',
       pn:          l.inventaire.partNumber    ?? '',
-      designation: l.inventaire.productFamily ?? '',
+      designation: getDesignationByChampId(l.inventaire, champDesignationArticle?.id),
       model:       champModelArticle ? (l.inventaire.article?.valeurs.find(v => v.champId === champModelArticle.id)?.valeur ?? '') : '',
     }))
 
@@ -481,14 +524,15 @@ async function getMasterBoxDetailData(siteId: number, id: number) {
   if (!masterBox) return null
 
   const champsArticle = await prisma.champArticle.findMany({ where: { siteId } })
-  const champModelArticle = champsArticle.find(c => normCode(c.code) === 'MODEL')
+  const champModelArticle       = champsArticle.find(c => normCode(c.code) === 'FAMILLE')
+  const champDesignationArticle = champsArticle.find(c => normCode(c.code) === 'DESIGNATION')
 
   const articles = masterBox.lignes.map(l => ({
     inventaireId:      l.inventaireId,
     sn:                l.inventaire.serialNumber  ?? '',
     pnValeur:          l.inventaire.partNumber    ?? '',
     rmaValeur:         l.inventaire.rma           ?? '',
-    designationValeur: l.inventaire.productFamily ?? '',
+    designationValeur: getDesignationByChampId(l.inventaire, champDesignationArticle?.id),
     modelValeur:       champModelArticle ? (l.inventaire.article?.valeurs.find(v => v.champId === champModelArticle.id)?.valeur ?? '') : '',
     clientValeur:      l.inventaire.customer      ?? '',
   }))

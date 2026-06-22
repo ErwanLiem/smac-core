@@ -110,7 +110,7 @@ function qteAbsolue(carte: Carte, caisseFiltre: string): number {
 function getDemandeCaisses(d: Demande): string[] {
   return [...new Set(
     (d.lignes ?? [])
-      .map((l: any) => l.inventaire?.genericNotes ?? null)
+      .map((l: any) => l.inventaire?.caisse ?? null)
       .filter(Boolean)
   )] as string[]
 }

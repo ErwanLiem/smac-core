@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Trash2, Pencil, X, History, Columns3 } from 'lucide-react'
 import { inventaireApi } from '../api/inventaire'
 import { get, del } from '../api/client'
+import ModalHistorique from '../components/ModalHistorique'
 import { getPermissions, getSiteId } from '../utils/permissions'
 import ExportExcelButton, { type ExportColumn } from '../components/ExportExcelButton'
 import { formatDate } from '../utils/dates'
@@ -79,6 +80,7 @@ export default function Inventaire() {
   const [editItem, setEditItem] = useState<{ id: number; articleId: number; statutId: number | null; fields: Record<string, string> } | null>(null)
   const [historique, setHistorique] = useState<HistoriqueEntry[] | null>(null)
   const [historiqueLoading, setHistoriqueLoading] = useState(false)
+  const [historiqueModal, setHistoriqueModal] = useState<{ id: number; label: string } | null>(null)
 
   useEffect(() => {
     document.querySelector('.main-content')?.classList.add('page-table')
@@ -439,14 +441,17 @@ export default function Inventaire() {
                 </td></tr>
               )}
               {filteredInventaires.map((item, idx) => (
-                <tr key={item.id} style={{
-                  background: selection.has(item.id)
-                    ? '#1e3a5f'
-                    : item.couleurAlerte
-                      ? `${item.couleurAlerte}26`
-                      : idx % 2 === 0 ? '#1a1d27' : '#141720',
-                  borderLeft: item.couleurAlerte ? `3px solid ${item.couleurAlerte}` : undefined,
-                }}>
+                <tr key={item.id}
+                  onDoubleClick={() => setHistoriqueModal({ id: item.id, label: item.serialNumber || item.partNumber || `#${item.id}` })}
+                  style={{
+                    cursor: 'default',
+                    background: selection.has(item.id)
+                      ? '#1e3a5f'
+                      : item.couleurAlerte
+                        ? `${item.couleurAlerte}26`
+                        : idx % 2 === 0 ? '#1a1d27' : '#141720',
+                    borderLeft: item.couleurAlerte ? `3px solid ${item.couleurAlerte}` : undefined,
+                  }}>
                   <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                     <input type="checkbox"
                       checked={selection.has(item.id)}
@@ -554,40 +559,13 @@ export default function Inventaire() {
         </div>
       )}
 
-      {/* Modal historique */}
-      {historique !== null && (
-        <div className="modal-overlay">
-          <div style={{ background: '#1a1d27', borderRadius: '10px', padding: '28px', maxWidth: '560px', width: '100%', maxHeight: '85vh', overflow: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Historique de la ligne</h3>
-              <button className="btn btn-secondary btn-icon" onClick={() => setHistorique(null)}><X size={14} /></button>
-            </div>
-            {historiqueLoading ? (
-              <div className="loading-container"><div className="loading-spinner" /></div>
-            ) : historique.length === 0 ? (
-              <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center', padding: '24px' }}>Aucun mouvement enregistré pour cette ligne.</p>
-            ) : (
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Date / heure</th>
-                    <th>Opération</th>
-                    <th>Opérateur</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historique.map(h => (
-                    <tr key={h.id}>
-                      <td>{new Date(h.createdAt).toLocaleString('fr-FR')}</td>
-                      <td>{LABELS_TYPE_HISTORIQUE[h.type] ?? h.type}</td>
-                      <td>{h.operateur ? h.operateur.login : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+      {/* Modal historique (double-clic sur une ligne) */}
+      {historiqueModal && (
+        <ModalHistorique
+          inventaireId={historiqueModal.id}
+          titre={`Historique — ${historiqueModal.label}`}
+          onClose={() => setHistoriqueModal(null)}
+        />
       )}
 
       {/* Modal suppression */}

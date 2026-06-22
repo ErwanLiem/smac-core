@@ -4,6 +4,7 @@ import * as mouvQteCtrl from '../controllers/mouvementQTE'
 import * as suiviPdaCtrl from '../controllers/suiviPda'
 import * as suiviPdaLaboCtrl from '../controllers/suiviPdaLabo'
 import * as repCtrl from '../controllers/reparation'
+import * as aiCtrl  from '../controllers/attenteInfo'
 import * as majCtrl from '../controllers/majInjection'
 import * as cqCtrl  from '../controllers/controleQualite'
 
@@ -60,6 +61,11 @@ router.get('/reparation/:siteId/inventaire/:id',          repCtrl.getDetailInven
 router.put('/reparation/:siteId/inventaire/:id/panne',    repCtrl.saisirPanneConstatee)
 router.post('/reparation/:siteId/inventaire/:id/pda',     repCtrl.utiliserPDA)
 router.put('/reparation/:siteId/inventaire/:id/statut',   repCtrl.changerStatutReparation)
+router.post('/reparation/:siteId/inventaire/:id/attente', aiCtrl.entrerAttenteInfo)
+
+// ─── Attente info ─────────────────────────────────────────────────────────────
+router.get('/attente-info/:siteId/:type',                      aiCtrl.getAttenteInfoByType)
+router.put('/attente-info/:siteId/:inventaireId/retour',       aiCtrl.retourProduction)
 
 // ─── MAJ / Injection ──────────────────────────────────────────────────────────
 router.get('/maj-injection/:siteId/rma',                    majCtrl.getRmaList)

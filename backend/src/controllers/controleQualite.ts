@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
-import { logActivite } from '../utils/historique'
+import { logActivite, computeResultat } from '../utils/historique'
 import { hasRole } from '../utils/roles'
 
 const prisma = new PrismaClient()
@@ -91,9 +91,14 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
 
     const inv = await prisma.inventaire.findUnique({
       where: { id: inventaireId },
-      include: { statut: true, pieces: true }
+      include: {
+        statut: true,
+        article: { include: { valeurs: { include: { champ: true } } } }
+      }
     })
     if (!inv) return res.status(404).json({ error: 'Inventaire introuvable' })
+
+    const designation = inv.article?.valeurs.find(v => v.champ.code.toUpperCase() === 'DESIGNATION')?.valeur ?? ''
 
     const hActivites = await prisma.historiqueActivite.findMany({
       where: { siteId, entite: 'inventaire', entiteId: inventaireId },
@@ -108,8 +113,7 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
       const u = h.userId ? actUserMap[h.userId] : null
       const details = h.details ? JSON.parse(h.details) : {}
       return {
-        type: h.type,
-        date: h.createdAt,
+        type: h.type, date: h.createdAt,
         label: details.label ?? h.type,
         couleur: details.couleur ?? '#6b7280',
         commentaire: details.commentaire ?? null,
@@ -117,23 +121,32 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
       }
     })
 
-    // Statuts disponibles depuis le module CQ
     const tousStatuts = await prisma.statut.findMany({ where: { siteId } })
-    const statutsCQ     = tousStatuts.filter(s => hasRole(s.roles, 'estControleQualite'))
-    const statutsRetour = tousStatuts.filter(s => hasRole(s.roles, 'estMajInjection') || hasRole(s.roles, 'estRepare'))
+    const statutControleOk  = tousStatuts.find(s => hasRole(s.roles, 'estControleQualite'))    ?? null
+    const statutAttenteRep  = tousStatuts.find(s => hasRole(s.roles, 'estAttenteReparation'))  ?? null
+    const statutRepare      = tousStatuts.find(s => hasRole(s.roles, 'estRepare'))             ?? null
+    const statutMaj         = tousStatuts.find(s => hasRole(s.roles, 'estRepare'))             ?? null
+    const statutInjection   = tousStatuts.find(s => hasRole(s.roles, 'estMaj'))               ?? null
+
+    const { ATTENTE_ROLES } = await import('./attenteInfo')
+    const statutsAttenteInfo = tousStatuts.filter(s => ATTENTE_ROLES.some(r => hasRole(s.roles, r)))
 
     res.json({
-      id:                 inv.id,
-      serialNumber:       inv.serialNumber       ?? '',
-      partNumber:         inv.partNumber         ?? '',
-      rma:                inv.rma                ?? '',
-      customer:           inv.customer           ?? '',
-      livelloRiparazione: inv.livelloRiparazione ?? '',
-      statut:             inv.statut,
-      pieces:             inv.pieces,
+      id:          inv.id,
+      pn:          inv.partNumber         ?? '',
+      sn:          inv.serialNumber       ?? '',
+      rma:         inv.rma                ?? '',
+      designation,
+      client:      inv.customer           ?? '',
+      niveauRep:   inv.livelloRiparazione ?? '',
+      statut:      inv.statut,
       historique,
-      statutsCQ,
-      statutsRetour,
+      statutControleOk,
+      statutAttenteRep,
+      statutRepare,
+      statutMaj,
+      statutInjection,
+      statutsAttenteInfo,
     })
   } catch (e) { next(e) }
 }
@@ -144,14 +157,14 @@ export async function validerControle(req: Request, res: Response, next: any) {
   try {
     const siteId       = Number(req.params.siteId)
     const inventaireId = Number(req.params.id)
-    const { statutId } = req.body
     const userId       = req.user?.id ?? null
 
-    const [statut, invActuel] = await Promise.all([
-      prisma.statut.findUnique({ where: { id: Number(statutId) } }),
+    const [tousStatuts, invActuel] = await Promise.all([
+      prisma.statut.findMany({ where: { siteId } }),
       prisma.inventaire.findUnique({ where: { id: inventaireId }, include: { statut: true } })
     ])
-    if (!statut) return res.status(404).json({ error: 'Statut introuvable' })
+    const statut = tousStatuts.find(s => hasRole(s.roles, 'estControleQualite'))
+    if (!statut) return res.status(400).json({ error: 'Aucun statut Contrôle qualité (rôle estControleQualite) configuré dans le workflow.' })
     const labelSource = invActuel?.statut?.label ?? '?'
 
     await prisma.inventaire.update({
@@ -161,7 +174,8 @@ export async function validerControle(req: Request, res: Response, next: any) {
 
     await logActivite({
       siteId, userId: userId ?? undefined, type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inventaireId,
-      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur }
+      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur, statutAvant: labelSource, statutApres: statut.label },
+      resultat: await computeResultat(inventaireId, invActuel?.statut?.ordre ?? 0, statut.ordre, statut.label)
     })
 
     res.json({ success: true, statut })
@@ -174,11 +188,11 @@ export async function changerStatut(req: Request, res: Response, next: any) {
   try {
     const siteId       = Number(req.params.siteId)
     const inventaireId = Number(req.params.id)
-    const { statutId } = req.body
+    const { statutCode } = req.body
     const userId = req.user?.id ?? null
 
     const [statut, invActuel] = await Promise.all([
-      prisma.statut.findUnique({ where: { id: Number(statutId) } }),
+      prisma.statut.findUnique({ where: { siteId_code: { siteId, code: statutCode } } }),
       prisma.inventaire.findUnique({ where: { id: inventaireId }, include: { statut: true } })
     ])
     if (!statut) return res.status(404).json({ error: 'Statut introuvable' })
@@ -188,7 +202,8 @@ export async function changerStatut(req: Request, res: Response, next: any) {
 
     await logActivite({
       siteId, userId: userId ?? undefined, type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inventaireId,
-      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur }
+      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur, statutAvant: labelSource, statutApres: statut.label },
+      resultat: await computeResultat(inventaireId, invActuel?.statut?.ordre ?? 0, statut.ordre, statut.label)
     })
 
     res.json({ success: true, statut })

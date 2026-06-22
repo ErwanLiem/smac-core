@@ -42,9 +42,20 @@ function ColorSquare({ color }: { color: string }) {
 
 // ─── Rôles système prédéfinis (ont un comportement particulier dans le code) ──
 const ROLES_SYSTEME: Record<string, { label: string; couleur: string; fond: string; desc: string }> = {
-  estStock:     { label: 'Stock',     couleur: '#60a5fa', fond: '#1e3a5f', desc: '1er statut après réception d\'un article' },
-  estTransfert: { label: 'Transfert', couleur: '#fb923c', fond: '#1c1917', desc: 'Attente de transfert vers le labo (planning)' },
-  estFinal:     { label: 'Final',     couleur: '#4ade80', fond: '#052e16', desc: 'Statut de sortie définitif' },
+  estStock:            { label: 'Stock',            couleur: '#60a5fa', fond: '#1e3a5f', desc: '1er statut après réception d\'un article' },
+  estTransfert:        { label: 'Transfert',        couleur: '#fb923c', fond: '#1c1917', desc: 'Attente de transfert vers le labo (planning)' },
+  estFinal:            { label: 'Final',            couleur: '#4ade80', fond: '#052e16', desc: 'Statut de sortie définitif' },
+  estRepare:              { label: 'Réparé',           couleur: '#a78bfa', fond: '#1e1b4b', desc: 'Machine réparée, prête pour MAJ/Injection' },
+  estAttenteReparation:   { label: 'Att. Réparation',  couleur: '#f97316', fond: '#1c1000', desc: 'Machine en attente de prise en charge réparation (ATT REP)' },
+  estMaj:              { label: 'MAJ',               couleur: '#06b6d4', fond: '#041f2a', desc: 'Machine en cours de mise à jour logicielle' },
+  estMajInjection:     { label: 'MAJ Injection',     couleur: '#0ea5e9', fond: '#041525', desc: 'Machine en cours d\'injection firmware' },
+  estControleQualite:  { label: 'Contrôle Qualité',  couleur: '#84cc16', fond: '#0f1f00', desc: 'Machine ayant passé le CQ — visible au poste emballage' },
+  estEmballage:        { label: 'Emballage',         couleur: '#f472b6', fond: '#1f0020', desc: 'Machine emballée — en attente d\'expédition' },
+  estAttentePiece:     { label: 'Att. Pièce (ASP)', couleur: '#f59e0b', fond: '#1c1400', desc: 'Machine en attente de pièce détachée' },
+  estAttenteSoft:      { label: 'Att. Soft (ASW)',  couleur: '#8b5cf6', fond: '#1e1040', desc: 'Machine en attente de firmware/soft' },
+  estAttenteTechnique: { label: 'Att. Tech (ENG)',  couleur: '#3b82f6', fond: '#0f1f3a', desc: 'Machine en attente d\'expertise technique' },
+  estNonReparable:     { label: 'Non répar. (NLV)', couleur: '#ef4444', fond: '#1f0808', desc: 'Machine déclarée non réparable' },
+  estAttenteDevis:     { label: 'Att. Devis (PRV)', couleur: '#10b981', fond: '#042f1c', desc: 'Machine en attente de devis client' },
 }
 
 function RoleTag({ code, onRemove }: { code: string; onRemove?: () => void }) {

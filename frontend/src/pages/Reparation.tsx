@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Wrench, Package, ChevronRight, Clock, X, Check, Search, AlertCircle, Minus, Plus } from 'lucide-react'
+import { Wrench, Package, ChevronRight, Clock, X, Check, Search, AlertCircle, Minus, Plus, ChevronDown } from 'lucide-react'
 import { get, put, post } from '../api/client'
 import { getSiteId } from '../utils/permissions'
+import ModalHistorique from '../components/ModalHistorique'
 
 interface RmaGroupe {
   rma: string
@@ -97,6 +98,23 @@ function ModalReparation({
   const [erreur, setErreur] = useState('')
   const [succes, setSucces] = useState('')
   const [actionEnCours, setActionEnCours] = useState(false)
+  const [attenteEnCours, setAttenteEnCours] = useState<StatutInfo | null>(null)
+  const [commentaireAttente, setCommentaireAttente] = useState('')
+  const [dropdownOuvert, setDropdownOuvert] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!dropdownOuvert) return
+    function handler(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOuvert(false)
+        setAttenteEnCours(null)
+        setCommentaireAttente('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [dropdownOuvert])
 
   useEffect(() => {
     chargerDetail()
@@ -152,123 +170,273 @@ function ModalReparation({
     }
   }
 
+  async function confirmerAttente() {
+    if (!attenteEnCours || !commentaireAttente.trim()) return
+    setActionEnCours(true)
+    setErreur('')
+    try {
+      await post(`/production/reparation/${siteId}/inventaire/${inventaireId}/attente`, {
+        statutCode: attenteEnCours.code,
+        commentaire: commentaireAttente.trim(),
+      })
+      onStatutChange()
+      onClose()
+    } catch (e: any) {
+      setErreur(e?.message ?? 'Erreur lors de l\'envoi en attente')
+      setActionEnCours(false)
+    }
+  }
+
   function formatDate(d: string) {
     const date = new Date(d)
     return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay">
       <div style={{
-        background: '#1a1d27', borderRadius: '12px', width: '900px', maxWidth: '95vw',
-        maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+        background: '#13161f', borderRadius: '14px', width: '980px', maxWidth: '96vw',
+        maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        border: '1px solid #1f2937', boxShadow: '0 24px 64px rgba(0,0,0,0.6)'
       }}>
-        {/* Header */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #1f2937', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Wrench size={18} style={{ color: '#f59e0b' }} />
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#f1f5f9' }}>Réparation</span>
-            {detail && <span style={{ fontSize: '13px', color: '#6b7280' }}>— {detail.sn || detail.pn || `#${inventaireId}`}</span>}
+
+        {/* ── Header ── */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #1f2937', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0, background: '#0f1117' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+            <div style={{ background: '#f59e0b1a', borderRadius: '8px', padding: '6px', flexShrink: 0 }}>
+              <Wrench size={16} style={{ color: '#f59e0b', display: 'block' }} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9' }}>Fiche réparation</div>
+              {detail && (
+                <div style={{ fontSize: '12px', color: '#6b7280', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {[detail.sn, detail.pn, detail.designation].filter(Boolean).join(' · ')}
+                </div>
+              )}
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
-            <X size={20} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+
+            {/* Attente info — dropdown */}
+            {detail && detail.statutsAttenteInfo.length > 0 && (
+              <div ref={dropdownRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => { setDropdownOuvert(o => !o); if (attenteEnCours) { setAttenteEnCours(null); setCommentaireAttente('') } }}
+                  disabled={actionEnCours}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 14px', borderRadius: '8px', cursor: 'pointer',
+                    background: dropdownOuvert ? '#1f2937' : '#141720',
+                    border: '1px solid #374151', color: '#9ca3af',
+                    fontSize: '13px', fontWeight: 600, transition: 'all 0.15s'
+                  }}
+                >
+                  <Clock size={14} />
+                  Attente info
+                  <ChevronDown size={13} style={{ transition: 'transform 0.15s', transform: dropdownOuvert ? 'rotate(180deg)' : 'none' }} />
+                </button>
+
+                {dropdownOuvert && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 50,
+                    background: '#1a1d27', border: '1px solid #2d3148', borderRadius: '10px',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)', minWidth: '260px', overflow: 'hidden'
+                  }}>
+                    {attenteEnCours ? (
+                      /* ── Formulaire commentaire ── */
+                      <div style={{ padding: '14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                          <button
+                            onClick={() => { setAttenteEnCours(null); setCommentaireAttente('') }}
+                            style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                          >
+                            <ChevronDown size={14} style={{ transform: 'rotate(90deg)' }} />
+                          </button>
+                          <span style={{ background: attenteEnCours.couleur + '1F', color: attenteEnCours.couleur, border: `1px solid ${attenteEnCours.couleur}33`, padding: '3px 10px', borderRadius: '4px', fontSize: '12px', fontWeight: 700 }}>
+                            {attenteEnCours.label}
+                          </span>
+                        </div>
+                        <textarea
+                          className="form-input"
+                          rows={3}
+                          placeholder="Commentaire obligatoire…"
+                          value={commentaireAttente}
+                          onChange={e => setCommentaireAttente(e.target.value)}
+                          autoFocus
+                          style={{ width: '100%', resize: 'vertical', fontSize: '13px', marginBottom: '8px', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            className="btn btn-primary"
+                            style={{ flex: 1, fontSize: '12px', padding: '7px', justifyContent: 'center', opacity: !commentaireAttente.trim() || actionEnCours ? 0.5 : 1 }}
+                            disabled={!commentaireAttente.trim() || actionEnCours}
+                            onClick={confirmerAttente}
+                          >
+                            <Check size={13} /> Confirmer
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: '12px', padding: '7px 12px' }}
+                            onClick={() => { setDropdownOuvert(false); setAttenteEnCours(null); setCommentaireAttente('') }}
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ── Liste des statuts ── */
+                      <div style={{ padding: '6px' }}>
+                        <div style={{ padding: '6px 10px 4px', fontSize: '10px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                          Choisir le type d'attente
+                        </div>
+                        {detail.statutsAttenteInfo.map(s => (
+                          <button
+                            key={s.code}
+                            onClick={() => { setAttenteEnCours(s); setCommentaireAttente('') }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '10px', width: '100%',
+                              background: 'none', border: 'none', borderRadius: '6px',
+                              padding: '8px 10px', cursor: 'pointer', transition: 'background 0.1s'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = s.couleur + '15' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                          >
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.couleur, flexShrink: 0 }} />
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: s.couleur }}>{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Réparation OK */}
+            {detail?.statutRepare && (
+              <button
+                onClick={() => changerStatut(detail.statutRepare!.code)}
+                disabled={actionEnCours}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '8px 18px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+                  background: detail.statutRepare.couleur, color: '#fff',
+                  fontSize: '13px', fontWeight: 700, letterSpacing: '0.02em',
+                  boxShadow: `0 0 16px ${detail.statutRepare.couleur}55`,
+                  opacity: actionEnCours ? 0.6 : 1, transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.15)' }}
+                onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
+              >
+                <Check size={15} />
+                Réparation OK
+              </button>
+            )}
+          </div>
+          <button onClick={onClose} style={{ background: '#1f2937', border: 'none', borderRadius: '6px', color: '#9ca3af', cursor: 'pointer', padding: '6px', display: 'flex', flexShrink: 0 }}>
+            <X size={16} />
           </button>
         </div>
 
         {chargement ? (
           <div className="loading-container" style={{ flex: 1, minHeight: '300px' }}><div className="loading-spinner" /></div>
         ) : detail ? (
-          <div style={{ flex: 1, overflow: 'auto', padding: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          <div style={{ flex: 1, overflow: 'auto', padding: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
-            {/* Colonne gauche */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* ── Colonne gauche ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-              {/* Infos pratiques */}
-              <div className="card" style={{ padding: '16px' }}>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Informations</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+              {/* Infos machine */}
+              <div className="card" style={{ padding: '14px 16px' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Informations machine</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 20px' }}>
                   {[
-                    { label: 'P/N', val: detail.pn },
                     { label: 'N° Série', val: detail.sn },
+                    { label: 'P/N',      val: detail.pn },
                     { label: 'Désignation', val: detail.designation },
-                    { label: 'Client', val: detail.client },
-                    { label: 'RMA', val: detail.rma },
-                    { label: 'Model', val: detail.model },
+                    { label: 'Model',    val: detail.model },
+                    { label: 'Client',   val: detail.client },
+                    { label: 'RMA',      val: detail.rma },
                   ].map(({ label, val }) => (
                     <div key={label}>
-                      <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>{label}</div>
-                      <div style={{ fontSize: '13px', fontWeight: 500, color: val ? '#f1f5f9' : '#4b5563', fontFamily: 'monospace' }}>{val || '—'}</div>
+                      <div style={{ fontSize: '10px', color: '#4b5563', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: val ? '#e2e8f0' : '#374151', fontFamily: 'monospace' }}>{val || '—'}</div>
                     </div>
                   ))}
+                </div>
+                <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #1f2937', display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div>
-                    <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>Statut</div>
+                    <div style={{ fontSize: '10px', color: '#4b5563', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Statut actuel</div>
                     <BadgeStatut statut={detail.statut} />
                   </div>
                   {detail.niveauRep && (
                     <div>
-                      <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '2px' }}>Niveau réparation</div>
+                      <div style={{ fontSize: '10px', color: '#4b5563', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Niveau réparation</div>
                       <span style={{ fontSize: '13px', fontWeight: 700, color: '#8b5cf6' }}>{detail.niveauRep}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Panne client */}
-              <div className="card" style={{ padding: '16px' }}>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Panne client (entrée)</p>
-                <p style={{ fontSize: '13px', color: detail.panneClient ? '#f1f5f9' : '#4b5563', fontStyle: detail.panneClient ? 'normal' : 'italic' }}>
-                  {detail.panneClient || 'Non renseignée'}
-                </p>
-              </div>
-
-              {/* Panne constatée */}
-              <div className="card" style={{ padding: '16px' }}>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Panne constatée</p>
-                {panneEnEdit ? (
-                  <div>
-                    <textarea
-                      className="form-input"
-                      rows={3}
-                      value={panneConstate}
-                      onChange={e => setPanneConstate(e.target.value)}
-                      style={{ width: '100%', resize: 'vertical', fontSize: '13px', marginBottom: '8px' }}
-                      autoFocus
-                    />
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn btn-primary" style={{ fontSize: '12px', padding: '5px 12px' }} onClick={sauvegarderPanne}>
-                        <Check size={13} /> Enregistrer
+              {/* Pannes */}
+              <div className="card" style={{ padding: '14px 16px' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Diagnostic</p>
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '10px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Panne déclarée client</div>
+                  <p style={{ fontSize: '13px', color: detail.panneClient ? '#cbd5e1' : '#374151', fontStyle: detail.panneClient ? 'normal' : 'italic', margin: 0 }}>
+                    {detail.panneClient || 'Non renseignée'}
+                  </p>
+                </div>
+                <div style={{ paddingTop: '10px', borderTop: '1px solid #1f2937' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '10px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Panne constatée</div>
+                    {!panneEnEdit && (
+                      <button onClick={() => setPanneEnEdit(true)} style={{ background: 'none', border: '1px solid #374151', borderRadius: '4px', padding: '2px 8px', color: '#9ca3af', cursor: 'pointer', fontSize: '11px' }}>
+                        ✎ Modifier
                       </button>
-                      <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '5px 12px' }} onClick={() => { setPanneEnEdit(false); setPanneConstate(detail.panneConstate) }}>
-                        Annuler
-                      </button>
-                    </div>
+                    )}
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <p style={{ flex: 1, fontSize: '13px', color: detail.panneConstate ? '#f1f5f9' : '#4b5563', fontStyle: detail.panneConstate ? 'normal' : 'italic', margin: 0 }}>
+                  {panneEnEdit ? (
+                    <div>
+                      <textarea
+                        className="form-input"
+                        rows={3}
+                        value={panneConstate}
+                        onChange={e => setPanneConstate(e.target.value)}
+                        style={{ width: '100%', resize: 'vertical', fontSize: '13px', marginBottom: '8px' }}
+                        autoFocus
+                      />
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn btn-primary" style={{ fontSize: '12px', padding: '5px 12px' }} onClick={sauvegarderPanne}>
+                          <Check size={13} /> Enregistrer
+                        </button>
+                        <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '5px 12px' }} onClick={() => { setPanneEnEdit(false); setPanneConstate(detail.panneConstate) }}>
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '13px', color: panneConstate ? '#cbd5e1' : '#374151', fontStyle: panneConstate ? 'normal' : 'italic', margin: 0 }}>
                       {panneConstate || 'Non renseignée'}
                     </p>
-                    <button onClick={() => setPanneEnEdit(true)} style={{ background: 'none', border: '1px solid #374151', borderRadius: '4px', padding: '3px 8px', color: '#9ca3af', cursor: 'pointer', fontSize: '12px', flexShrink: 0 }}>
-                      ✎
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
-              {/* Pièces PDA */}
-              <div className="card" style={{ padding: '16px' }}>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                  <Package size={12} style={{ display: 'inline', marginRight: '4px' }} />
+              {/* PDA */}
+              <div className="card" style={{ padding: '14px 16px' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+                  <Package size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
                   Pièces détachées (PDA)
                 </p>
                 {detail.pdaDispos.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: '#6b7280', fontStyle: 'italic' }}>Aucune pièce disponible pour ce modèle.</p>
+                  <p style={{ fontSize: '13px', color: '#374151', fontStyle: 'italic' }}>Aucune pièce disponible pour ce modèle.</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {detail.pdaDispos.map(pda => (
                       <div key={pda.articleId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: '#0f1117', borderRadius: '6px', border: '1px solid #1f2937' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 500, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 500, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {pda.reference}{pda.detail ? ` — ${pda.detail}` : ''}
                           </div>
                           <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
@@ -277,26 +445,10 @@ function ModalReparation({
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button
-                            onClick={() => setQtePDA(q => ({ ...q, [pda.articleId]: Math.max(1, (q[pda.articleId] ?? 1) - 1) }))}
-                            style={{ background: '#1f2937', border: 'none', color: '#9ca3af', cursor: 'pointer', borderRadius: '4px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          >
-                            <Minus size={12} />
-                          </button>
-                          <span style={{ fontSize: '13px', fontWeight: 600, minWidth: '24px', textAlign: 'center', color: '#f1f5f9' }}>
-                            {qtePDA[pda.articleId] ?? 1}
-                          </span>
-                          <button
-                            onClick={() => setQtePDA(q => ({ ...q, [pda.articleId]: Math.min(pda.stock, (q[pda.articleId] ?? 1) + 1) }))}
-                            style={{ background: '#1f2937', border: 'none', color: '#9ca3af', cursor: 'pointer', borderRadius: '4px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          >
-                            <Plus size={12} />
-                          </button>
-                          <button
-                            onClick={() => utiliserPDA(pda.articleId, qtePDA[pda.articleId] ?? 1)}
-                            disabled={actionEnCours}
-                            style={{ background: '#8b5cf6', border: 'none', color: 'white', cursor: 'pointer', borderRadius: '4px', padding: '4px 10px', fontSize: '12px', fontWeight: 600, marginLeft: '4px' }}
-                          >
+                          <button onClick={() => setQtePDA(q => ({ ...q, [pda.articleId]: Math.max(1, (q[pda.articleId] ?? 1) - 1) }))} style={{ background: '#1f2937', border: 'none', color: '#9ca3af', cursor: 'pointer', borderRadius: '4px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Minus size={12} /></button>
+                          <span style={{ fontSize: '13px', fontWeight: 600, minWidth: '24px', textAlign: 'center', color: '#f1f5f9' }}>{qtePDA[pda.articleId] ?? 1}</span>
+                          <button onClick={() => setQtePDA(q => ({ ...q, [pda.articleId]: Math.min(pda.stock, (q[pda.articleId] ?? 1) + 1) }))} style={{ background: '#1f2937', border: 'none', color: '#9ca3af', cursor: 'pointer', borderRadius: '4px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={12} /></button>
+                          <button onClick={() => utiliserPDA(pda.articleId, qtePDA[pda.articleId] ?? 1)} disabled={actionEnCours} style={{ background: '#7c3aed', border: 'none', color: 'white', cursor: 'pointer', borderRadius: '4px', padding: '4px 10px', fontSize: '12px', fontWeight: 600, marginLeft: '4px' }}>
                             Utiliser
                           </button>
                         </div>
@@ -307,19 +459,19 @@ function ModalReparation({
               </div>
             </div>
 
-            {/* Colonne droite */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* ── Colonne droite ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
               {/* Historique */}
-              <div className="card" style={{ padding: '16px', flex: 1 }}>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
-                  <Clock size={12} style={{ display: 'inline', marginRight: '4px' }} />
+              <div className="card" style={{ padding: '14px 16px', flex: 1, overflow: 'auto' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+                  <Clock size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
                   Historique des mouvements
                 </p>
                 {detail.historique.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: '#6b7280', fontStyle: 'italic' }}>Aucun mouvement enregistré.</p>
+                  <p style={{ fontSize: '13px', color: '#374151', fontStyle: 'italic' }}>Aucun mouvement enregistré.</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
                     {detail.historique.map((h, i) => (
                       <div key={i} style={{ display: 'flex', gap: '10px', paddingBottom: '12px', position: 'relative' }}>
                         {i < detail.historique.length - 1 && (
@@ -327,11 +479,11 @@ function ModalReparation({
                         )}
                         <div style={{ flexShrink: 0, width: '17px', height: '17px', borderRadius: '50%', background: h.couleur + '30', border: `2px solid ${h.couleur}`, marginTop: '1px' }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '13px', fontWeight: 500, color: '#f1f5f9' }}>{h.label}</div>
-                          {h.commentaire && <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>{h.commentaire}</div>}
-                          <div style={{ display: 'flex', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '11px', color: '#6b7280' }}>{formatDate(h.date)}</span>
-                            {h.intervenant && <span style={{ fontSize: '11px', color: '#4b5563' }}>· {h.intervenant}</span>}
+                          <div style={{ fontSize: '13px', fontWeight: 500, color: '#e2e8f0' }}>{h.label}</div>
+                          {h.commentaire && <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px', fontStyle: 'italic' }}>{h.commentaire}</div>}
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '3px' }}>
+                            <span style={{ fontSize: '11px', color: '#4b5563' }}>{formatDate(h.date)}</span>
+                            {h.intervenant && <span style={{ fontSize: '11px', color: '#374151' }}>· {h.intervenant}</span>}
                           </div>
                         </div>
                       </div>
@@ -340,58 +492,13 @@ function ModalReparation({
                 )}
               </div>
 
-              {/* Bouton Réparation OK */}
-              {detail.statutRepare && (
-                <button
-                  onClick={() => changerStatut(detail.statutRepare!.code)}
-                  disabled={actionEnCours}
-                  style={{
-                    width: '100%', padding: '12px', borderRadius: '8px', cursor: 'pointer',
-                    background: detail.statutRepare.couleur, color: '#fff', border: 'none',
-                    fontSize: '14px', fontWeight: 700, letterSpacing: '0.03em',
-                    boxShadow: `0 0 12px ${detail.statutRepare.couleur}55`,
-                    transition: 'all 0.15s', opacity: actionEnCours ? 0.6 : 1
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.15)' }}
-                  onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
-                >
-                  <Check size={15} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
-                  Réparation OK
-                </button>
-              )}
-
-              {/* Boutons attente info */}
-              <div className="card" style={{ padding: '16px' }}>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>Mettre en attente d'information</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {detail.statutsAttenteInfo.map(s => (
-                    <button
-                      key={s.code}
-                      onClick={() => changerStatut(s.code)}
-                      disabled={actionEnCours}
-                      style={{
-                        background: s.couleur + '1F', color: s.couleur, border: `1px solid ${s.couleur}33`,
-                        padding: '8px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-                        textAlign: 'left', transition: 'all 0.15s'
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = s.couleur + '35' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = s.couleur + '1F' }}
-                    >
-                      {s.code} — {s.label}
-                    </button>
-                  ))}
-                  {detail.statutsAttenteInfo.length === 0 && (
-                    <p style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic' }}>Aucun statut d'attente configuré (ASP, ASW, ENG, NLV, PRV).</p>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
         ) : null}
 
-        {/* Feedback bas */}
+        {/* ── Footer feedback ── */}
         {(erreur || succes) && (
-          <div style={{ padding: '12px 24px', borderTop: '1px solid #1f2937' }}>
+          <div style={{ padding: '10px 20px', borderTop: '1px solid #1f2937', flexShrink: 0 }}>
             {erreur && (
               <div style={{ background: '#1f0000', border: '1px solid #ef4444', borderRadius: '6px', padding: '8px 12px', color: '#f87171', fontSize: '13px', display: 'flex', gap: '8px' }}>
                 <AlertCircle size={14} style={{ marginTop: '1px', flexShrink: 0 }} /> {erreur}
@@ -420,6 +527,7 @@ export default function Reparation() {
   const [scanSN, setScanSN] = useState('')
   const [erreurScan, setErreurScan] = useState('')
   const [inventaireModalId, setInventaireModalId] = useState<number | null>(null)
+  const [historiqueModal, setHistoriqueModal] = useState<{ id: number; sn: string } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { chargerRmaList() }, [siteId])
@@ -578,6 +686,7 @@ export default function Reparation() {
                     <tr
                       key={inv.id}
                       onClick={() => setInventaireModalId(inv.id)}
+                      onDoubleClick={e => { e.stopPropagation(); setInventaireModalId(null); setHistoriqueModal({ id: inv.id, sn: inv.sn || inv.pn || `#${inv.id}` }) }}
                       style={{ cursor: 'pointer', transition: 'background 0.1s' }}
                       onMouseEnter={e => { e.currentTarget.style.background = '#0f1117' }}
                       onMouseLeave={e => { e.currentTarget.style.background = '' }}
@@ -607,6 +716,15 @@ export default function Reparation() {
           siteId={siteId}
           onClose={() => setInventaireModalId(null)}
           onStatutChange={onStatutChange}
+        />
+      )}
+
+      {/* Modal historique (double-clic) */}
+      {historiqueModal && (
+        <ModalHistorique
+          inventaireId={historiqueModal.id}
+          titre={`Historique — ${historiqueModal.sn}`}
+          onClose={() => setHistoriqueModal(null)}
         />
       )}
     </div>

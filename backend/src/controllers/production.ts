@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { hasRole, serializeRoles } from '../utils/roles'
 import { enregistrerOperation } from '../utils/operations'
+import { logActivite, computeResultat } from '../utils/historique'
 
 const prisma = new PrismaClient()
 
@@ -429,11 +430,23 @@ export async function createDemandeSN(req: Request, res: Response, next: any) {
       include: { lignes: true }
     })
 
-    // Passer les inventaires en statut Transfert
+    // Passer les inventaires en statut Transfert + logger la transition
+    const invAvecStatut = await prisma.inventaire.findMany({
+      where: { id: { in: selectionnes.map(inv => inv.id) } },
+      include: { statut: true }
+    })
     await prisma.inventaire.updateMany({
       where: { id: { in: selectionnes.map(inv => inv.id) } },
       data: { statutId: statutTransfert.id }
     })
+    for (const inv of invAvecStatut) {
+      await logActivite({
+        siteId: Number(siteId), userId: (req as any).user?.id ?? undefined,
+        type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inv.id,
+        details: { label: `${inv.statut?.label ?? '?'} → ${statutTransfert.label}`, couleur: statutTransfert.couleur, statutAvant: inv.statut?.label ?? '?', statutApres: statutTransfert.label },
+        resultat: await computeResultat(inv.id, inv.statut?.ordre ?? 0, statutTransfert.ordre, statutTransfert.label)
+      })
+    }
 
     res.json({ ...demande, quantiteDemandee: qteDemandee })
   } catch (e) { next(e) }
@@ -486,31 +499,36 @@ export async function validerDemande(req: Request, res: Response, next: any) {
     if (demande.statut !== 'EN_ATTENTE') return res.status(400).json({ error: 'Demande déjà traitée' })
 
     if (demande.type === 'SN' && demande.lignes.length > 0) {
-      // Déclencher la transition workflow depuis le statut estTransfert
       const invIds = demande.lignes.map(l => l.inventaireId)
-      const premierInv = await prisma.inventaire.findFirst({ where: { id: { in: invIds } }, select: { statutId: true } })
-      if (premierInv?.statutId) {
-        const transition = await prisma.transition.findFirst({
-          where: { siteId: demande.siteId, statutFromId: premierInv.statutId },
-          include: { statutTo: true }
+      const attenteRepIds = await getStatutIdsByRole(demande.siteId, 'estAttenteReparation')
+      const statutAttenteRepId = attenteRepIds[0] ?? null
+      const statutAttenteRep = statutAttenteRepId
+        ? await prisma.statut.findUnique({ where: { id: statutAttenteRepId } })
+        : null
+
+      const invAvecStatut = await prisma.inventaire.findMany({
+        where: { id: { in: invIds } },
+        include: { statut: true }
+      })
+
+      if (statutAttenteRep) {
+        await prisma.inventaire.updateMany({
+          where: { id: { in: invIds } },
+          data: { statutId: statutAttenteRep.id, dateLav: new Date() }
         })
-        if (transition) {
-          const today = new Date()
-          await prisma.inventaire.updateMany({
-            where: { id: { in: invIds } },
-            data: { statutId: transition.statutToId, dateLav: today }
-          })
-        }
       }
 
-      // Tracer l'opérateur ayant validé le transfert
-      for (const inventaireId of invIds) {
-        await enregistrerOperation({
-          siteId: demande.siteId,
-          inventaireId,
-          userId: req.user?.id,
-          type: 'TRANSFERT',
-          details: { demandeId: demande.id }
+      for (const inv of invAvecStatut) {
+        await logActivite({
+          siteId: demande.siteId, userId: (req as any).user?.id ?? undefined,
+          type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inv.id,
+          details: {
+            label: `${inv.statut?.label ?? '?'} → ${statutAttenteRep?.label ?? '?'}`,
+            couleur: statutAttenteRep?.couleur ?? '#6b7280',
+            statutAvant: inv.statut?.label ?? '?',
+            statutApres: statutAttenteRep?.label ?? '?',
+          },
+          resultat: await computeResultat(inv.id, inv.statut?.ordre ?? 0, statutAttenteRep?.ordre ?? 0, statutAttenteRep?.label ?? '?')
         })
       }
     }
@@ -560,7 +578,7 @@ export async function annulerDemande(req: Request, res: Response, next: any) {
     // la demande reste valide et visible au planning.
     if (demande.type === 'SN' && demande.lignes.length > 0) {
       const transfertIds = await getStatutIdsByRole(demande.siteId, 'estTransfert')
-      const attenteReparationIds = await getStatutIdsByRole(demande.siteId, 'ATTENTE_RÉPARATION')
+      const attenteReparationIds = await getStatutIdsByRole(demande.siteId, 'estAttenteReparation')
       const annulableIds = [...new Set([...transfertIds, ...attenteReparationIds])]
       const stockIds = await getStatutIdsByRole(demande.siteId, 'estStock')
       const statutStock = stockIds.length > 0 ? await prisma.statut.findFirst({ where: { id: { in: stockIds } } }) : null
@@ -576,10 +594,22 @@ export async function annulerDemande(req: Request, res: Response, next: any) {
       }
 
       if (statutStock) {
-        await prisma.inventaire.updateMany({
+        const invAnnulables = await prisma.inventaire.findMany({
           where: { id: { in: demande.lignes.map(l => l.inventaireId) }, statutId: { in: annulableIds } },
+          include: { statut: true }
+        })
+        await prisma.inventaire.updateMany({
+          where: { id: { in: invAnnulables.map(i => i.id) } },
           data: { statutId: statutStock.id }
         })
+        for (const inv of invAnnulables) {
+          await logActivite({
+            siteId: demande.siteId, userId: (req as any).user?.id ?? undefined,
+            type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inv.id,
+            details: { label: `${inv.statut?.label ?? '?'} → ${statutStock.label} (annulation transfert)`, couleur: statutStock.couleur, statutAvant: inv.statut?.label ?? '?', statutApres: statutStock.label },
+            resultat: await computeResultat(inv.id, inv.statut?.ordre ?? 0, statutStock.ordre, statutStock.label)
+          })
+        }
       }
     }
 

@@ -1,8 +1,9 @@
 import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { normCode, getArticlesQTE } from '../utils/pda'
-import { logActivite } from '../utils/historique'
+import { logActivite, computeResultat } from '../utils/historique'
 import { hasRole } from '../utils/roles'
+import { ATTENTE_ROLES } from './attenteInfo'
 
 const prisma = new PrismaClient()
 
@@ -106,11 +107,12 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
     })
     if (!inv) return res.status(404).json({ error: 'Inventaire introuvable' })
 
-    // MODEL depuis l'article lié si pas dans l'inventaire
+    // DESIGNATION et FAMILLE depuis l'article lié
+    let designationMachine = ''
     let modelMachine = ''
     if (inv.article) {
-      const champModel = inv.article.valeurs.find(v => normCode(v.champ.code) === 'MODEL')
-      modelMachine = champModel?.valeur ?? ''
+      designationMachine = inv.article.valeurs.find(v => normCode(v.champ.code) === 'DESIGNATION')?.valeur ?? ''
+      modelMachine       = inv.article.valeurs.find(v => normCode(v.champ.code) === 'FAMILLE')?.valeur    ?? ''
     }
 
     // Historique activité
@@ -163,27 +165,30 @@ export async function getDetailInventaire(req: Request, res: Response, next: any
       })
 
     // Statuts disponibles pour changer le statut depuis le module réparation
-    const statutsProduction = await prisma.statut.findMany({
+    const tousStatutsProduction = await prisma.statut.findMany({
       where: { siteId, id: { in: await getStatutsEnProduction(siteId) } }
     })
+    const statutRepare       = tousStatutsProduction.find(s => hasRole(s.roles, 'estRepare')) ?? null
+    const statutsAttenteInfo = tousStatutsProduction.filter(s =>
+      ATTENTE_ROLES.some(role => hasRole(s.roles, role))
+    )
 
     res.json({
-      id:                 inv.id,
-      serialNumber:       inv.serialNumber       ?? '',
-      partNumber:         inv.partNumber         ?? '',
-      rma:                inv.rma                ?? '',
-      customer:           inv.customer           ?? '',
-      productFamily:      inv.productFamily      ?? '',
-      defectFromCustomer: inv.defectFromCustomer ?? '',
-      descrCode:          inv.descrCode          ?? '',
-      repaireNotes:       inv.repaireNotes       ?? '',
-      livelloRiparazione: inv.livelloRiparazione ?? '',
-      model:              modelMachine,
-      statut:             inv.statut,
-      pieces:             inv.pieces,
+      id:           inv.id,
+      pn:           inv.partNumber         ?? '',
+      sn:           inv.serialNumber       ?? '',
+      rma:          inv.rma                ?? '',
+      designation:  designationMachine,
+      client:       inv.customer           ?? '',
+      panneClient:  inv.defectFromCustomer ?? '',
+      panneConstate:inv.descrCode          ?? '',
+      niveauRep:    inv.livelloRiparazione ?? '',
+      model:        modelMachine,
+      statut:       inv.statut,
       historique,
       pdaDispos,
-      statutsDispos: statutsProduction,
+      statutRepare,
+      statutsAttenteInfo,
     })
   } catch (e) { next(e) }
 }
@@ -273,11 +278,11 @@ export async function changerStatutReparation(req: Request, res: Response, next:
   try {
     const siteId       = Number(req.params.siteId)
     const inventaireId = Number(req.params.id)
-    const { statutId, commentaire } = req.body
+    const { statutCode } = req.body
     const userId = req.user?.id ?? null
 
     const [statut, invActuel] = await Promise.all([
-      prisma.statut.findUnique({ where: { id: Number(statutId) } }),
+      prisma.statut.findUnique({ where: { siteId_code: { siteId, code: statutCode } } }),
       prisma.inventaire.findUnique({ where: { id: inventaireId }, include: { statut: true } })
     ])
     if (!statut) return res.status(404).json({ error: 'Statut introuvable' })
@@ -296,9 +301,11 @@ export async function changerStatutReparation(req: Request, res: Response, next:
 
     await prisma.inventaire.update({ where: { id: inventaireId }, data })
 
+    const resultat = await computeResultat(inventaireId, invActuel?.statut?.ordre ?? 0, statut.ordre, statut.label)
     await logActivite({
       siteId, userId: userId ?? undefined, type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inventaireId,
-      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur, commentaire }
+      details: { label: `${labelSource} → ${statut.label}`, couleur: statut.couleur, statutAvant: labelSource, statutApres: statut.label },
+      resultat
     })
 
     res.json({ success: true, statut })
