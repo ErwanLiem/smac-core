@@ -324,7 +324,7 @@ export default function AttendusDetail() {
       <div className="page-header">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <button onClick={() => navigate('/attendus')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '13px' }}>← Réceptions prévues</button>
+            <button onClick={() => navigate('/attendus')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '13px' }}>← Réceptions attendues</button>
             {isClos && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: '#1e2130', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}><Lock size={11} /> Clôturé</span>}
           </div>
           <h1 className="page-title">
@@ -880,7 +880,7 @@ export default function AttendusDetail() {
                 )
               })}
               {configChamps.filter(c => c.visible).length === 0 && (
-                <p style={{ color: '#9ca3af', fontSize: '13px' }}>Aucun champ configuré — allez dans Configuration → Réceptions prévues.</p>
+                <p style={{ color: '#9ca3af', fontSize: '13px' }}>Aucun champ configuré — allez dans Configuration → Réceptions attendues.</p>
               )}
             </div>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>

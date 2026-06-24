@@ -91,7 +91,7 @@ export default function Sidebar() {
     {
       title: 'LOGISTIQUE',
       items: [
-        { name: 'Réceptions prévues', path: '/attendus', icon: ClipboardList },
+        { name: 'Réceptions attendues', path: '/attendus', icon: ClipboardList },
         { name: 'Réception', path: '/reception', icon: Package },
         { name: 'Inventaire', path: '/inventaire', icon: Warehouse },
         { name: 'Transfert', path: '/logistique', icon: Truck },
@@ -112,7 +112,7 @@ export default function Sidebar() {
         { name: 'Données', path: '/admin/donnees', icon: Database },
         { name: 'Workflow', path: '/admin/workflow', icon: Settings },
         { name: 'Production', path: '/admin/production', icon: Truck },
-        { name: 'Réceptions prévues', path: '/admin/attendus', icon: ClipboardList },
+        { name: 'Réceptions attendues', path: '/admin/attendus', icon: ClipboardList },
         { name: 'Société', path: '/admin/config-site', icon: Building2 },
         { name: 'Accès', path: '/admin/acces', icon: Users },
       ],

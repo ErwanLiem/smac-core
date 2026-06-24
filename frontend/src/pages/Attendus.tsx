@@ -120,7 +120,7 @@ export default function Attendus() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="page-header" style={{ flexShrink: 0 }}>
         <div>
-          <h1 className="page-title">Réceptions prévues</h1>
+          <h1 className="page-title">Réceptions attendues</h1>
           <p className="page-subtitle">{attendus.length} réception{attendus.length !== 1 ? 's' : ''} prévue{attendus.length !== 1 ? 's' : ''}</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowImport(true)}>
