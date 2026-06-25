@@ -4,6 +4,7 @@ import { logActivite } from '../utils/historique'
 import { verifierReglesAlerte } from '../utils/reglesAlerte'
 import { enregistrerOperation } from '../utils/operations'
 import { getArticlesQTE } from '../utils/pda'
+import { hasRole } from '../utils/roles'
 
 const prisma = new PrismaClient()
 
@@ -146,6 +147,23 @@ export async function update(req: Request, res: Response, next: any) {
       }
     }
     if (statutId !== undefined) data.statutId = statutId ? Number(statutId) : null
+
+    // Si le statut change et que l'article est dans une Master Box, vérifier s'il doit en sortir
+    if (statutId !== undefined && statutId) {
+      const nouveauStatut = await prisma.statut.findUnique({ where: { id: Number(statutId) } })
+      const quitteLEmballage = nouveauStatut && !hasRole(nouveauStatut.roles, 'estEmballage')
+      if (quitteLEmballage) {
+        const ligneExistante = await prisma.ligneMasterBox.findUnique({ where: { inventaireId: Number(id) } })
+        if (ligneExistante) {
+          await prisma.ligneMasterBox.delete({ where: { inventaireId: Number(id) } })
+          // Supprimer la Master Box si elle est vide
+          const nbRestant = await prisma.ligneMasterBox.count({ where: { masterBoxId: ligneExistante.masterBoxId } })
+          if (nbRestant === 0) {
+            await prisma.masterBox.delete({ where: { id: ligneExistante.masterBoxId } })
+          }
+        }
+      }
+    }
 
     const inventaire = await prisma.inventaire.update({
       where: { id: Number(id) },

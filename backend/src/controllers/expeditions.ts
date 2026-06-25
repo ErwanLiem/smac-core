@@ -2,7 +2,7 @@ import { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import { hasRole } from '../utils/roles'
 import { enregistrerOperation } from '../utils/operations'
-import { logActivite } from '../utils/historique'
+import { logActivite, computeResultat } from '../utils/historique'
 import { normCode } from '../utils/pda'
 
 const prisma = new PrismaClient()
@@ -116,11 +116,13 @@ export async function scanEmballage(req: Request, res: Response, next: any) {
       data: { statutId: statutEmballage.id, datePack: today, dateCls: today }
     })
 
-    await enregistrerOperation({
-      siteId,
-      inventaireId: inv.id,
-      userId: req.user?.id,
-      type: 'EMBALLAGE'
+    const labelAvantEmb = inv.statut?.label ?? '?'
+    const resultatEmb = await computeResultat(inv.id, inv.statut?.ordre ?? 0, statutEmballage.ordre, statutEmballage.label)
+    await logActivite({
+      siteId, userId: (req as any).user?.id ?? undefined,
+      type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: inv.id,
+      details: { label: `${labelAvantEmb} → ${statutEmballage.label}`, couleur: statutEmballage.couleur, statutAvant: labelAvantEmb, statutApres: statutEmballage.label },
+      resultat: resultatEmb
     })
 
     res.json({
@@ -383,7 +385,12 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
     const today = new Date()
     let nbArticles = 0
     for (const box of boxes) {
+      const invIds = box.lignes.map(l => l.inventaireId)
+      const invsAvant = await prisma.inventaire.findMany({ where: { id: { in: invIds } }, include: { statut: true } })
+      const invMap = Object.fromEntries(invsAvant.map(i => [i.id, i]))
+
       for (const ligne of box.lignes) {
+        const invAvant = invMap[ligne.inventaireId]
         await prisma.inventaire.update({
           where: { id: ligne.inventaireId },
           data: {
@@ -393,11 +400,13 @@ export async function envoyerMasterBoxes(req: Request, res: Response, next: any)
             ...(plateformeNom ? { plateformeEnvoi: plateformeNom } : {}),
           }
         })
-        await enregistrerOperation({
-          siteId,
-          inventaireId: ligne.inventaireId,
-          userId: req.user?.id,
-          type: 'EXPEDITION'
+        const labelAvantExp = invAvant?.statut?.label ?? '?'
+        const resultatExp = await computeResultat(ligne.inventaireId, invAvant?.statut?.ordre ?? 0, statutFinal.ordre, statutFinal.label)
+        await logActivite({
+          siteId, userId: (req as any).user?.id ?? undefined,
+          type: 'TRANSITION_STATUT', entite: 'inventaire', entiteId: ligne.inventaireId,
+          details: { label: `${labelAvantExp} → ${statutFinal.label}`, couleur: statutFinal.couleur, statutAvant: labelAvantExp, statutApres: statutFinal.label },
+          resultat: resultatExp
         })
         nbArticles++
       }
